@@ -122,7 +122,12 @@ struct EditPlaylistSheet: View {
             // Upload a new cover if one was picked. A cover failure must not
             // discard a playlist that was just created/renamed successfully —
             // the playlist is saved; only the image didn't attach.
-            if let pickedImage, let jpeg = pickedImage.jpegData(compressionQuality: 0.85) {
+            //
+            // Downscale to a display size first: a cover is shown at ~200pt, so a
+            // full-res photo (a picked image is easily 2–5 MB) is wasted bytes and
+            // trips server upload limits. 1000px square, ~0.8 quality → well under
+            // a megabyte.
+            if let pickedImage, let jpeg = pickedImage.coverJPEG() {
                 do {
                     _ = try await api.uploadPlaylistCover(id, jpeg: jpeg)
                 } catch {
@@ -137,5 +142,23 @@ struct EditPlaylistSheet: View {
         } catch {
             self.error = (error as? APIClient.APIError)?.errorDescription ?? "Could not save."
         }
+    }
+}
+
+private extension UIImage {
+    /// A cover-sized JPEG: scaled to fit within `maxDimension` (keeping aspect),
+    /// then encoded. Keeps uploads small — a picked photo is display-only here,
+    /// and the full-res original both wastes bytes and trips server upload caps.
+    func coverJPEG(maxDimension: CGFloat = 1000, quality: CGFloat = 0.8) -> Data? {
+        let longest = max(size.width, size.height)
+        let scale = longest > maxDimension ? maxDimension / longest : 1
+        let target = CGSize(width: size.width * scale, height: size.height * scale)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1 // target is already in pixels; don't multiply by screen scale
+        let resized = UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: target))
+        }
+        return resized.jpegData(compressionQuality: quality)
     }
 }

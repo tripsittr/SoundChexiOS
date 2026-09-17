@@ -91,8 +91,6 @@ struct PlaylistCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             PlaylistCover(artworkURL: playlist.artworkURL, mosaic: [])
-                .aspectRatio(1, contentMode: .fit)
-                .clipShape(.rect(cornerRadius: SoundChexTheme.radiusPoster))
             Text(playlist.name).font(.subheadline).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
             if let count = playlist.count {
                 Text("\(count) song\(count == 1 ? "" : "s")").font(.caption)
@@ -111,6 +109,16 @@ struct PlaylistCover: View {
     let mosaic: [URL]
 
     var body: some View {
+        // Always a square: the content fills a 1:1 box and is clipped, so a
+        // landscape/portrait cover image or an odd mosaic never distorts the
+        // card's shape. Consumers no longer need their own aspectRatio.
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay { content }
+            .clipShape(.rect(cornerRadius: SoundChexTheme.radiusPoster))
+    }
+
+    @ViewBuilder private var content: some View {
         if let artworkURL {
             CachedImage(url: artworkURL) { $0.resizable().scaledToFill() } placeholder: { base }
         } else if !mosaic.isEmpty {

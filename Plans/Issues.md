@@ -31,7 +31,7 @@ The API case for this split is in the server repo's `NativeClients.md`.
 
 | ID | What | Notes |
 |----|------|-------|
-| IOS-18 | Full visual redesign completion | Home hero+rails, palette, poster scrim, dark bars done (this PR). Still to match: detail screens, the now-playing full-screen sheet, the music sub-nav pills, browse grid polish, and the header treatment. Reference `Plans/DesignSpec.md`. |
+| IOS-18 | Full visual redesign completion | Home hero+rails, palette, poster scrim, dark bars, **detail screens** (album/artist/show headers: uppercase eyebrow, "·"-joined meta line, accent Play pill + 44px bordered circles, CachedImage throughout) and the now-playing full-screen sheet done. Still to match: the music sub-nav pills and browse grid polish. Reference `Plans/DesignSpec.md`. |
 | IOS-06b | Resumable partial downloads | Batch "download all" is done (IOS-05c). Still to add: resuming a *partial* file after a kill (background `URLSession` resume data), so a large file interrupted mid-transfer picks up rather than restarting. |
 | IOS-07b | Video: subtitles | Video playback + PiP done (IOS-07a). Subtitles still to add — needs an API subtitle endpoint (currently session-only). |
 | IOS-08 | Book reader | EPUB/PDF rendering. The server's reader routes are session-only; needs API equivalents for text/contents/annotations, or render from the downloaded file. Large; likely deferred behind audio + video. |

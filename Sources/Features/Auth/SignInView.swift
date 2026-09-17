@@ -43,6 +43,14 @@ struct SignInView: View {
                     }
 
                     signInButton
+
+                    // Version + release name, so the build is identifiable from
+                    // the very first screen.
+                    Text("SoundChex \(AppRelease.display)")
+                        .font(.caption2)
+                        .foregroundStyle(SoundChexTheme.ink500)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 12)
                 }
                 .padding(24)
                 .frame(maxWidth: 440)

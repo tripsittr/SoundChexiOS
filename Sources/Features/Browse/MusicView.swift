@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// The Music tab: Songs / Albums / Artists, chosen with a segmented control —
-/// the native equivalent of the web music sub-nav. The picker lives in the
-/// navigation bar so there is no stray empty header above the content.
+/// The Music tab: Songs / Albums / Artists, chosen with a pill sub-nav — the
+/// native equivalent of the web music sub-nav (999px pills, accent when active).
+///
+/// The pills sit in a fixed bar under the nav title rather than a `safeAreaInset`
+/// (which left an invisible empty header on the list) or the toolbar's principal
+/// slot (a segmented control, not the spec's pills).
 struct MusicView: View {
     @Environment(LibraryStore.self) private var store
     @State private var section: Section = .songs
@@ -13,20 +16,36 @@ struct MusicView: View {
 
     var body: some View {
         NavigationStack {
-            content
-                .navigationTitle("Music")
-                .navigationBarTitleDisplayMode(.inline)
-                .background(SoundChexTheme.base900)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Picker("", selection: $section) {
-                            ForEach(Section.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 280)
-                    }
-                }
+            VStack(spacing: 0) {
+                subNav
+                content
+            }
+            .navigationTitle("Music")
+            .navigationBarTitleDisplayMode(.inline)
+            .background(SoundChexTheme.base900)
         }
+    }
+
+    /// The pill row. Its own bar so it never collapses to an empty header.
+    private var subNav: some View {
+        HStack(spacing: 8) {
+            ForEach(Section.allCases, id: \.self) { item in
+                let active = item == section
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) { section = item }
+                } label: {
+                    Text(item.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(active ? .white : SoundChexTheme.ink400)
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                        .background(active ? SoundChexTheme.accent : SoundChexTheme.base700, in: .capsule)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(SoundChexTheme.base900)
     }
 
     @ViewBuilder private var content: some View {
@@ -63,13 +82,14 @@ struct MusicView: View {
                         ArtistDetailView(artist: artist)
                     } label: {
                         HStack(spacing: 12) {
-                            AsyncImage(url: artist.artwork) { $0.resizable().scaledToFill() } placeholder: {
-                                SoundChexTheme.base700
+                            CachedImage(url: artist.artwork) { $0.resizable().scaledToFill() } placeholder: {
+                                SoundChexTheme.base700.overlay(
+                                    Image(systemName: "music.mic").foregroundStyle(SoundChexTheme.ink500))
                             }
                             .frame(width: 44, height: 44).clipShape(.circle)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(artist.name).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
-                                Text("\(artist.albums.count) albums").font(.caption)
+                                Text("\(artist.albums.count) album\(artist.albums.count == 1 ? "" : "s")").font(.caption)
                                     .foregroundStyle(SoundChexTheme.ink500)
                             }
                         }
@@ -83,8 +103,9 @@ struct MusicView: View {
 
     private func albumCell(_ album: LibraryStore.Album) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            AsyncImage(url: album.artwork) { $0.resizable().scaledToFill() } placeholder: {
-                SoundChexTheme.base700
+            CachedImage(url: album.artwork) { $0.resizable().scaledToFill() } placeholder: {
+                SoundChexTheme.base700.overlay(
+                    Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500))
             }
             .aspectRatio(1, contentMode: .fill)
             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusPoster))

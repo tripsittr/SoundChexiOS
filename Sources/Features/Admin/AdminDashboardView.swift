@@ -63,7 +63,7 @@ struct AdminDashboardView: View {
                 VStack(spacing: 10) {
                     ForEach(s.topItems) { item in
                         HStack(spacing: 12) {
-                            AsyncImage(url: item.artwork) { $0.resizable().scaledToFill() } placeholder: {
+                            CachedImage(url: item.artwork) { $0.resizable().scaledToFill() } placeholder: {
                                 SoundChexTheme.base700
                             }
                             .frame(width: 40, height: 40).clipShape(.rect(cornerRadius: 6))

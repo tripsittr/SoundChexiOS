@@ -13,6 +13,11 @@ struct SettingsView: View {
             List {
                 Section("Library") {
                     NavigationLink {
+                        PlaylistsView()
+                    } label: {
+                        Label("Playlists", systemImage: "music.note.list")
+                    }
+                    NavigationLink {
                         DownloadsView()
                     } label: {
                         Label("Downloads", systemImage: "arrow.down.circle")

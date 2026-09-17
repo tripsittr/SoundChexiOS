@@ -13,6 +13,8 @@ struct LibraryTabs: View {
 
     var body: some View {
         TabView {
+            HomeView()
+                .tabItem { Label("Home", systemImage: "house.fill") }
             MediaListView(type: .music, title: "Music")
                 .tabItem { Label("Music", systemImage: "music.note") }
             MediaGridView(type: .movie, title: "Movies")
@@ -25,6 +27,7 @@ struct LibraryTabs: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
         }
         .environment(store)
+        .tint(SoundChexTheme.accent)
         // The now-playing bar rides above the tab bar, present on every tab.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             NowPlayingBar()

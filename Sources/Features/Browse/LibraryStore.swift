@@ -60,6 +60,38 @@ final class LibraryStore {
         items(of: type).filter { $0.parentID == nil }
     }
 
+    // MARK: - Home
+
+    /// The hero item — the most recently added top-level thing with artwork.
+    var heroItem: MediaItem? {
+        items
+            .filter { $0.parentID == nil && $0.artwork != nil }
+            .first
+    }
+
+    /// The home rails: a "Recently added" mix, then one row per type. Derived
+    /// from the loaded catalogue, the way the web home composes its rows.
+    struct Row: Identifiable {
+        let id = UUID()
+        let title: String
+        let items: [MediaItem]
+    }
+
+    var homeRows: [Row] {
+        var rows: [Row] = []
+
+        let recent = items.filter { $0.parentID == nil }.prefix(20)
+        if !recent.isEmpty { rows.append(Row(title: "Recently added", items: Array(recent))) }
+
+        for (type, label) in [(MediaType.music, "Music"), (.movie, "Movies"),
+                              (.show, "Shows"), (.book, "Books")] {
+            let ofType = topLevel(of: type).prefix(20)
+            if !ofType.isEmpty { rows.append(Row(title: label, items: Array(ofType))) }
+        }
+
+        return rows
+    }
+
     func search(_ term: String) -> [MediaItem] {
         let needle = term.trimmingCharacters(in: .whitespaces).lowercased()
         guard needle.count >= 2 else { return [] }

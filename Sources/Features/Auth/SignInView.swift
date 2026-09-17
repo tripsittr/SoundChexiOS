@@ -50,16 +50,20 @@ struct SignInView: View {
             }
         }
         .tint(SoundChexTheme.accent)
-        .sheet(item: profilesBinding) { list in
-            ProfilePickerView(profiles: list.profiles) { profile, pin in
-                await completeSignIn(profile: profile, pin: pin)
-            }
-            .presentationDetents([.medium, .large])
+        // The profile chooser is a full page, not a sheet — picking who is
+        // listening is its own step. Covers the form until a profile is chosen
+        // or the user backs out to a different account.
+        .fullScreenCover(item: profilesBinding) { list in
+            ProfilePickerView(
+                profiles: list.profiles,
+                onPick: { profile, pin in await completeSignIn(profile: profile, pin: pin) },
+                onCancel: { profiles = nil }
+            )
         }
     }
 
-    /// The profiles list wrapped so `.sheet(item:)` can present it — it needs an
-    /// Identifiable, so the array is boxed.
+    /// The profiles list wrapped so `.fullScreenCover(item:)` can present it — it
+    /// needs an Identifiable, so the array is boxed.
     private var profilesBinding: Binding<ProfileList?> {
         Binding(
             get: { profiles.map(ProfileList.init) },

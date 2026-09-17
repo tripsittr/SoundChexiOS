@@ -27,6 +27,7 @@ struct Artwork: View {
             }
         }
         .frame(width: size, height: size * aspect)
+        .clipped()
         .clipShape(.rect(cornerRadius: 6))
     }
 

@@ -31,9 +31,9 @@ The API case for this split is in the server repo's `NativeClients.md`.
 
 | ID | What | Notes |
 |----|------|-------|
-| IOS-02 | Device signing | `project.yml` has an empty `DEVELOPMENT_TEAM`; set it (or configure automatic signing) so the app builds to a real iPhone. Provisioning profile, bundle id `net.soundchex.ios`. Until then the app runs only in the Simulator. |
-| IOS-03 | Server-side search wiring | `SearchView` filters the local catalogue. Point it at `GET /api/v1/search` (built server-side) for dialogue + book-text coverage, falling back to the local filter offline. |
 | IOS-04 | Detail screens | Album → track list, artist → albums, show → seasons/episodes, film/book detail. `/api/v1/library` already carries parent_id and the metadata; a per-item detail endpoint is optional (see IOS-13). |
+| IOS-17 | Admin panel (in-app subset) | A subset of the web admin, styled to match the iOS app (not a clone): upload, stats, dashboard, view/edit media, and user management. Needs API endpoints (admin actions are session-only today). Its own milestone after browse/offline. |
+| IOS-18 | Full visual redesign completion | Home hero+rails, palette, poster scrim, dark bars done (this PR). Still to match: detail screens, the now-playing full-screen sheet, the music sub-nav pills, browse grid polish, and the header treatment. Reference `Plans/DesignSpec.md`. |
 | IOS-05 | Offline: local catalogue + downloads | The whole reason iOS went native. SwiftData (or a file store) mirror of `/api/v1/library`, per-item downloads to disk, offline browse from the local store, and AVPlayer playing local files when offline. Gated on free space for "download all". Mirrors offline-rebuild scope but done natively. |
 | IOS-06 | Background + resumable downloads | `URLSession` background transfers so a film keeps downloading when the app is backgrounded and resumes a partial file. The native answer to the server repo's S-07. |
 | IOS-07 | Video playback | Films and episodes via `AVPlayerViewController` (or a custom player) — the stream endpoint already serves video with Range. Picture-in-picture, subtitles (needs an API subtitle endpoint — currently session-only). |
@@ -56,4 +56,6 @@ The API case for this split is in the server repo's `NativeClients.md`.
 
 | ID | What | When | Notes |
 |----|------|------|-------|
-| — | (none yet) | | |
+| IOS-02 | Device signing | 2026-09-16 | Team `7GSWB72PH6` + bundle id `app.soundchex.ios` + automatic signing captured in `project.yml` (so `xcodegen generate` doesn't wipe them). Builds and installs to iPhone 3000. |
+| IOS-P | Full-page profile picker | 2026-09-16 | Replaced the sheet with a full-screen "Who's listening?" page — a grid of Netflix-style coloured avatar tiles (profile colour + initial, or avatar image), PIN alert for locked profiles, "Use a different account" to back out. Server `POST /api/v1/profiles` now returns `color`/`initial`/`avatar_url`. |
+| IOS-D | Visual redesign to match the web theme (partial) | 2026-09-16 | Exact palette in `SoundChexTheme` (tokens.css hex), home screen rebuilt as hero + horizontal poster rails, poster scrim overlay, dark tab/nav bars. `Plans/DesignSpec.md` captures the full spec. Remaining surfaces tracked as IOS-18. |

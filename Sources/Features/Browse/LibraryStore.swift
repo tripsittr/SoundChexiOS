@@ -4,8 +4,9 @@ import Observation
 /// The device's copy of the catalogue, loaded once and filtered by every screen.
 ///
 /// One fetch of `/api/v1/library` fills this; the tabs read from it rather than
-/// each hitting the network. A later milestone persists it for offline and keeps
-/// it in step with `/library/delta`, the way the web mirror does.
+/// each hitting the network. It is persisted to disk for offline use and kept in
+/// step with `/library/delta`: after the first full fetch, refreshes send the
+/// last `synced_at` and apply only what changed, the way the web mirror does.
 @MainActor
 @Observable
 final class LibraryStore {
@@ -15,6 +16,16 @@ final class LibraryStore {
 
     private var api: APIClient?
     private var hasLoaded = false
+
+    /// The server's `synced_at` from the last successful fetch, sent back as the
+    /// delta baseline. Persisted so a relaunch can sync incrementally rather than
+    /// re-downloading the whole catalogue. UserDefaults, not the cache file, so a
+    /// cleared cache also clears the baseline and forces a clean full fetch.
+    private static let syncedAtKey = "library.syncedAt"
+    private var syncedAt: String? {
+        get { UserDefaults.standard.string(forKey: Self.syncedAtKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.syncedAtKey) }
+    }
 
     /// Where the catalogue is cached on disk, so it browses offline and a launch
     /// shows something immediately rather than waiting on the network.
@@ -45,10 +56,15 @@ final class LibraryStore {
         loadError = nil
 
         do {
-            let response = try await api.library()
-            items = response.items
+            // With a baseline and a non-empty cache, sync incrementally; a full
+            // fetch on every launch would move ~0.8 MB to replace what is almost
+            // always unchanged.
+            if let since = syncedAt, !items.isEmpty {
+                try await applyDelta(since: since, api: api)
+            } else {
+                try await fullFetch(api: api)
+            }
             hasLoaded = true
-            saveToDisk()
         } catch {
             // Offline with a cache is not an error — the cached library stands.
             if items.isEmpty {
@@ -58,6 +74,41 @@ final class LibraryStore {
         }
 
         isLoading = false
+    }
+
+    /// Replaces the whole catalogue from the server and records the new baseline.
+    private func fullFetch(api: APIClient) async throws {
+        let response = try await api.library()
+        items = response.items
+        syncedAt = response.syncedAt
+        saveToDisk()
+    }
+
+    /// Fetches only what changed since `since`, merges updates, drops removed
+    /// ids, and advances the baseline. Falls back to a full fetch if the server
+    /// rejects the baseline (e.g. a 422 on a malformed date after a data reset).
+    private func applyDelta(since: String, api: APIClient) async throws {
+        let delta: LibraryDeltaResponse
+        do {
+            delta = try await api.libraryDelta(since: since, knownIDs: items.map(\.id))
+        } catch APIClient.APIError.http(let status) where status == 422 {
+            try await fullFetch(api: api)
+            return
+        }
+
+        if !delta.items.isEmpty || !delta.removedIds.isEmpty {
+            var byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+            for updated in delta.items { byID[updated.id] = updated }
+            for removed in delta.removedIds { byID.removeValue(forKey: removed) }
+            // Keep id order — the server orders by id and "Recently added" and the
+            // hero read the tail/head of that order, which a dictionary loses.
+            items = byID.values.sorted { $0.id < $1.id }
+            saveToDisk()
+        }
+
+        // Advance the baseline even when nothing changed, so the next window is
+        // measured from this sync rather than re-reporting the same span.
+        if let newSynced = delta.syncedAt { syncedAt = newSynced }
     }
 
     /// Fills from the disk cache if the network copy has not loaded yet.
@@ -74,9 +125,11 @@ final class LibraryStore {
         }
     }
 
-    /// Drops the cached library — for sign-out / change server.
+    /// Drops the cached library and its sync baseline — for sign-out / change
+    /// server, so the next account starts from a clean full fetch.
     static func clearCache() {
         try? FileManager.default.removeItem(at: cacheURL)
+        UserDefaults.standard.removeObject(forKey: syncedAtKey)
     }
 
     // MARK: - Filtered views

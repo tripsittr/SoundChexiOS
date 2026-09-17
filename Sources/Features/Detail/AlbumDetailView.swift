@@ -4,7 +4,10 @@ import SwiftUI
 /// track plays the album from there.
 struct AlbumDetailView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(DownloadStore.self) private var downloads
     let album: LibraryStore.Album
+
+    @State private var batchMessage: String?
 
     var body: some View {
         ScrollView {
@@ -51,10 +54,34 @@ struct AlbumDetailView: View {
                         .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
                         .background(SoundChexTheme.base700, in: .capsule).foregroundStyle(SoundChexTheme.ink100)
                 }
+
+                // Download the whole album.
+                Button {
+                    switch downloads.downloadAll(album.tracks) {
+                    case .started(let n): flash("Downloading \(n) songs…")
+                    case .insufficientSpace: flash("Not enough free space.")
+                    case .nothingToDo: flash("Already downloaded.")
+                    }
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.title3)
+                        .frame(width: 44, height: 44)
+                        .background(SoundChexTheme.base700, in: .circle)
+                        .foregroundStyle(SoundChexTheme.ink200)
+                }
             }
             .padding(.horizontal, 16).padding(.top, 4)
+
+            if let batchMessage {
+                Text(batchMessage).font(.caption).foregroundStyle(SoundChexTheme.ink500)
+            }
         }
         .padding(.top, 12)
+    }
+
+    private func flash(_ text: String) {
+        batchMessage = text
+        Task { try? await Task.sleep(for: .seconds(3)); batchMessage = nil }
     }
 
     private var trackList: some View {

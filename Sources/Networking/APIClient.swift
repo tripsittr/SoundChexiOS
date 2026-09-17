@@ -128,6 +128,21 @@ struct APIClient {
         try await send("/api/v1/library", method: "GET")
     }
 
+    /// What changed since a previous sync. `since` is the server's own
+    /// `synced_at` from the last fetch (never a device clock), and `knownIDs` is
+    /// everything the device holds, so the server can name what to drop —
+    /// deletions and a tightened rating cap alike.
+    func libraryDelta(since: String, knownIDs: [Int]) async throws -> LibraryDeltaResponse {
+        struct Body: Encodable {
+            let since: String
+            let knownIds: [Int]
+        }
+        return try await send(
+            "/api/v1/library/delta", method: "POST",
+            body: Body(since: since, knownIds: knownIDs)
+        )
+    }
+
     // MARK: - Search
 
     /// Library search — titles, people, dialogue and book text, server-side.

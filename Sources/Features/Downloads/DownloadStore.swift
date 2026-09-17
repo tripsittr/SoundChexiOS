@@ -91,6 +91,41 @@ final class DownloadStore: NSObject {
         task.resume()
     }
 
+    /// Downloads a batch — an album, or the whole library.
+    ///
+    /// Returns why it stopped so the caller can tell the user: `.started` with a
+    /// count, or `.insufficientSpace`. Only items not already stored are queued.
+    /// The per-file size is unknown until it downloads, so the gate is coarse: it
+    /// refuses when free space is already below a floor, and warns the UI to keep
+    /// an eye on it rather than promising the whole set will fit.
+    func downloadAll(_ items: [MediaItem]) -> BatchResult {
+        let pending = items.filter { $0.playable && state(for: $0.id) != .stored }
+        guard !pending.isEmpty else { return .nothingToDo }
+
+        // Refuse if the device is already nearly full — 1 GB floor. A real
+        // per-file gate needs sizes the API does not send yet (server S-119).
+        if freeBytes() < 1_000_000_000 {
+            return .insufficientSpace
+        }
+
+        for item in pending {
+            download(item)
+        }
+        return .started(count: pending.count)
+    }
+
+    enum BatchResult: Equatable {
+        case started(count: Int)
+        case insufficientSpace
+        case nothingToDo
+    }
+
+    /// Free space on the store's volume, in bytes.
+    private func freeBytes() -> Int64 {
+        let values = try? Self.directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        return values?.volumeAvailableCapacityForImportantUsage ?? .max
+    }
+
     /// Removes a downloaded item from disk.
     func remove(_ itemID: Int) {
         try? FileManager.default.removeItem(at: Self.mediaURL(for: itemID))

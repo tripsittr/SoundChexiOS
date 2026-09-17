@@ -138,3 +138,12 @@ struct LibraryResponse: Decodable, Sendable {
     // synced_at arrives as syncedAt after the key transform — synthesized keys
     // match, so no explicit map is needed.
 }
+
+/// What `/library/delta` returns: the items that changed since `since`, and the
+/// ids the device should drop (deleted, or no longer permitted).
+struct LibraryDeltaResponse: Decodable, Sendable {
+    let items: [MediaItem]
+    let removedIds: [Int]
+    let syncedAt: String?
+    let count: Int?
+}

@@ -38,3 +38,63 @@ resolves. Pick the next unused one at each minor bump.
 2. Bump `CURRENT_PROJECT_VERSION`.
 3. Write the changelog entry.
 4. Tag `v0.2.0` on the merge commit.
+
+## The name bank
+
+There is no shortage of names — music terminology gives 100+ good ones before
+we'd feel constrained. Pick the next **unused** name at each minor bump: take it
+from the recommended sequence unless a name fits the release's character better,
+then move its row up into the table above and cross it off here.
+
+`Encore` is reserved for **1.0.0** — don't spend it early.
+
+### Recommended sequence (next up)
+
+After 0.3.0 "Crescendo": Interlude → Bridge → Refrain → Cadence → Reprise →
+Coda → Segue → Vamp → Motif → Resonance → Reverie → Cascade → _(then dip into
+the pool below)_ → **Encore (1.0.0)**.
+
+### The pool, by category
+
+**Structure / form** — Prelude, Intro, Interlude, Bridge, Refrain, Chorus,
+Verse, Hook, Coda, Outro, Reprise, Movement, Passage, Cadenza, Cadence, Segue,
+Vamp, Breakdown, Drop, Build, Intermezzo, Postlude, Motif, Theme, Variation,
+Development, Recapitulation, Exposition, Interval.
+
+**Dynamics / expression** — Diminuendo, Forte, Fortissimo, Pianissimo,
+Sforzando, Accent, Swell, Sustain, Legato, Staccato, Marcato, Tenuto, Rubato,
+Espressivo, Dolce, Vivace, Grave, Tremolo, Vibrato, Glissando, Portamento,
+Fermata, Attack, Release, Decay, Resonance.
+
+**Tempo** — Largo, Adagio, Andante, Moderato, Allegro, Allegretto, Presto,
+Prestissimo, Accelerando, Ritardando, Lento, Grazioso, Con Brio, Agitato.
+
+**Harmony / theory** — Harmony, Melody, Counterpoint, Chord, Triad, Octave,
+Fifth, Third, Unison, Consonance, Dissonance, Resolution, Modulation, Transpose,
+Arpeggio, Scale, Mode, Tonic, Dominant, Progression, Voicing, Inversion,
+Suspension.
+
+**Rhythm / time** — Tempo, Meter, Measure, Downbeat, Upbeat, Backbeat,
+Syncopation, Groove, Pulse, Swing, Shuffle, Polyrhythm, Ostinato, Riff, Pattern,
+Loop, Beat.
+
+**Works / genres** — Sonata, Symphony, Concerto, Rhapsody, Nocturne, Serenade,
+Ballad, Étude, Fugue, Canon, Requiem, Anthem, Hymn, Lullaby, Fantasia, Toccata,
+Suite, Aria, Cantata, Elegy, Waltz, Fanfare, Berceuse, Barcarolle, Caprice,
+Impromptu, Divertimento, Scherzo, Minuet, Gigue, Sarabande, Chaconne,
+Passacaglia.
+
+**Instruments / voice / gear** — Timbre, Register, Falsetto, Soprano, Alto,
+Tenor, Baritone, Bass, Treble, Reverb, Echo, Delay, Phaser, Distortion,
+Overdrive, Fader, Mixer, Console, Amplifier, Waveform, Frequency, Oscillator,
+Filter, Envelope.
+
+**Notation / marks** — Clef, Staff, Ledger, Sharp, Flat, Natural, Rest, Tie,
+Slur, Beam, Key, Signature, Notehead, Stem, Barline, Repeat, Segno.
+
+**Atmospheric / evocative** — Reverie, Cascade, Wavelength, Amplitude, Tone,
+Accord, Chime, Sonic, Aural, Ambience.
+
+> Keep this in step with `Sources/DesignSystem/AppRelease.swift`, whose
+> `names` map must gain a `minor → name` row for each version actually shipped —
+> the pool here is the menu, that map is what the app displays.

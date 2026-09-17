@@ -12,30 +12,37 @@ struct LibraryTabs: View {
     @State private var store = LibraryStore()
 
     var body: some View {
+        // Each tab insets its own content for the now-playing bar, so the bar
+        // sits *above* the system tab bar rather than being drawn over it — an
+        // inset on the TabView itself overlapped the tab bar.
         TabView {
-            HomeView()
+            HomeView().nowPlayingInset()
                 .tabItem { Label("Home", systemImage: "house.fill") }
-            MediaListView(type: .music, title: "Music")
+            MediaListView(type: .music, title: "Music").nowPlayingInset()
                 .tabItem { Label("Music", systemImage: "music.note") }
-            MediaGridView(type: .movie, title: "Movies")
+            MediaGridView(type: .movie, title: "Movies").nowPlayingInset()
                 .tabItem { Label("Movies", systemImage: "film") }
-            MediaGridView(type: .show, title: "Shows")
+            MediaGridView(type: .show, title: "Shows").nowPlayingInset()
                 .tabItem { Label("Shows", systemImage: "tv") }
-            MediaGridView(type: .book, title: "Books")
+            MediaGridView(type: .book, title: "Books").nowPlayingInset()
                 .tabItem { Label("Books", systemImage: "book") }
-            SearchView()
+            SearchView().nowPlayingInset()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
         }
         .environment(store)
         .tint(SoundChexTheme.accent)
-        // The now-playing bar rides above the tab bar, present on every tab.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            NowPlayingBar()
-        }
         .task {
             store.attach(api: session.api)
             playback.attach(api: session.api)
             await store.loadIfNeeded()
         }
+    }
+}
+
+private extension View {
+    /// Docks the now-playing bar above this tab's content (and thus above the
+    /// system tab bar), present only while something is playing.
+    func nowPlayingInset() -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) { NowPlayingBar() }
     }
 }

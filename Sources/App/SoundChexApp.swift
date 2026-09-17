@@ -57,7 +57,11 @@ private struct RootView: View {
     var body: some View {
         Group {
             if session.isSignedIn {
+                // Keyed on the identity generation so a profile switch rebuilds
+                // the whole signed-in tree with a fresh store against the new
+                // token — the new profile has its own library and history.
                 LibraryTabs()
+                    .id(session.identityGeneration)
             } else {
                 SignInView()
             }

@@ -7,6 +7,9 @@ struct ShowDetailView: View {
     @Environment(PlaybackController.self) private var playback
     let item: MediaItem
 
+    /// The item to play in the video player, when one is tapped.
+    @State private var playing: MediaItem?
+
     private var episodes: [MediaItem] { store.children(of: item.id) }
 
     var body: some View {
@@ -28,6 +31,9 @@ struct ShowDetailView: View {
         .background(SoundChexTheme.base900)
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(item: $playing) { toPlay in
+            VideoPlayerView(item: toPlay)
+        }
     }
 
     private var header: some View {
@@ -56,7 +62,7 @@ struct ShowDetailView: View {
                 }
                 ForEach(group.episodes) { episode in
                     Button {
-                        playback.play([episode])
+                        playing = episode
                     } label: {
                         HStack(spacing: 12) {
                             if let n = episode.meta?.episodeNumber {
@@ -82,7 +88,7 @@ struct ShowDetailView: View {
 
     private func playButton(for item: MediaItem, label: String) -> some View {
         Button {
-            playback.play([item])
+            playing = item
         } label: {
             Label(label, systemImage: "play.fill")
                 .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)

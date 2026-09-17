@@ -10,6 +10,7 @@ struct NowPlayingPage: View {
 
     @State private var scrubbing = false
     @State private var scrubValue: Double = 0
+    @State private var addingToPlaylist = false
 
     var body: some View {
         ZStack {
@@ -143,7 +144,7 @@ struct NowPlayingPage: View {
             Spacer()
 
             Menu {
-                TrackActions(item: item)
+                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18))
@@ -152,6 +153,10 @@ struct NowPlayingPage: View {
             }
         }
         .padding(.top, 20)
+        .sheet(isPresented: $addingToPlaylist) {
+            AddToPlaylistSheet(item: item)
+                .presentationDetents([.medium, .large])
+        }
     }
 
     @ViewBuilder private var upNextList: some View {

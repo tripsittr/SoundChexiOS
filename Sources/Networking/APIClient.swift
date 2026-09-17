@@ -139,6 +139,43 @@ struct APIClient {
         return response.items
     }
 
+    // MARK: - Playlists
+
+    /// The account's playlists, for the picker.
+    func playlists() async throws -> [Playlist] {
+        struct Response: Decodable { let playlists: [Playlist] }
+        let response: Response = try await send("/api/v1/playlists", method: "GET")
+        return response.playlists
+    }
+
+    /// One playlist and its tracks.
+    func playlist(_ id: Int) async throws -> PlaylistDetail {
+        try await send("/api/v1/playlists/\(id)", method: "GET")
+    }
+
+    /// Creates a playlist, returning it.
+    func createPlaylist(name: String) async throws -> Playlist {
+        struct Body: Encodable { let name: String }
+        return try await send("/api/v1/playlists", method: "POST", body: Body(name: name))
+    }
+
+    /// Adds an item to a playlist.
+    func addToPlaylist(_ playlistID: Int, itemID: Int) async throws {
+        struct Body: Encodable { let itemId: Int }
+        _ = try await sendRaw("/api/v1/playlists/\(playlistID)/items", method: "POST",
+                              body: Body(itemId: itemID))
+    }
+
+    /// Removes an item from a playlist.
+    func removeFromPlaylist(_ playlistID: Int, itemID: Int) async throws {
+        _ = try await sendRaw("/api/v1/playlists/\(playlistID)/items/\(itemID)", method: "DELETE")
+    }
+
+    /// Deletes a playlist (the tracks are untouched).
+    func deletePlaylist(_ id: Int) async throws {
+        _ = try await sendRaw("/api/v1/playlists/\(id)", method: "DELETE")
+    }
+
     // MARK: - Lyrics
 
     /// The lyrics for a track, or nil when the server has none. The server

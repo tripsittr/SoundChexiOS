@@ -37,6 +37,8 @@ struct SongRow: View {
     var queue: [MediaItem] = []
     var index: Int = 0
 
+    @State private var addingToPlaylist = false
+
     var body: some View {
         HStack(spacing: 12) {
             Button {
@@ -63,7 +65,7 @@ struct SongRow: View {
 
             // The kebab: the same actions as the swipes, for discoverability.
             Menu {
-                TrackActions(item: item)
+                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
             } label: {
                 Image(systemName: "ellipsis")
                     .foregroundStyle(SoundChexTheme.ink500)
@@ -71,8 +73,7 @@ struct SongRow: View {
                     .contentShape(.rect)
             }
         }
-        // Swipe right → add to queue; swipe left → play next. (Add to playlist
-        // joins the left swipe once the playlist API lands — IOS-19.)
+        // Swipe right → add to queue; swipe left → add to playlist.
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button {
                 playback.addToQueue(item)
@@ -83,21 +84,34 @@ struct SongRow: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button {
+                addingToPlaylist = true
+            } label: {
+                Label("Playlist", systemImage: "music.note.list")
+            }
+            .tint(SoundChexTheme.base600)
+            Button {
                 playback.playNext(item)
             } label: {
                 Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
             }
-            .tint(SoundChexTheme.base600)
+            .tint(SoundChexTheme.ink600)
+        }
+        .sheet(isPresented: $addingToPlaylist) {
+            AddToPlaylistSheet(item: item)
+                .presentationDetents([.medium, .large])
         }
     }
 }
 
-/// The per-track action set, shared by the kebab menu and (later) the context
-/// menu. Playlist actions are added with the playlist API (IOS-19).
+/// The per-track action set, shared by the kebab menu and the now-playing page.
+///
+/// Add-to-playlist is a callback rather than a self-contained action because a
+/// menu item cannot present a sheet — the owning row does, when this asks.
 struct TrackActions: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
     let item: MediaItem
+    var onAddToPlaylist: (() -> Void)?
 
     var body: some View {
         Button {
@@ -109,6 +123,14 @@ struct TrackActions: View {
             playback.addToQueue(item)
         } label: {
             Label("Add to queue", systemImage: "text.append")
+        }
+
+        if let onAddToPlaylist {
+            Button {
+                onAddToPlaylist()
+            } label: {
+                Label("Add to playlist", systemImage: "music.note.list")
+            }
         }
 
         if downloads.isStored(item.id) {
@@ -124,6 +146,5 @@ struct TrackActions: View {
                 Label("Download", systemImage: "arrow.down.circle")
             }
         }
-        // "Add to playlist" appears here once the playlist API is wired (IOS-19).
     }
 }

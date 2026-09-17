@@ -420,12 +420,19 @@ struct APIClient {
         append("Content-Type: \(mimeType)\r\n\r\n")
         body.append(fileData)
         append("\r\n--\(boundary)--\r\n")
-        request.httpBody = body
+
+        // Send the body with `upload(from:)`, not `httpBody` + `data(for:)`.
+        // With `httpBody` on a POST, URLSession can stream the body chunked (no
+        // Content-Length), and PHP-FPM then does not populate `$_FILES` — the
+        // upload arrives but `request->file('cover')` is empty, so validation
+        // says "cover is required" (a 422). `upload(from:)` sends a measured
+        // body with a Content-Length, which the multipart parser needs.
+        request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
 
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await URLSession.shared.upload(for: request, from: body)
         } catch {
             throw APIError.unreachable(underlying: error)
         }

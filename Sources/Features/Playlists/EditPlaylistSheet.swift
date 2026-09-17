@@ -119,9 +119,17 @@ struct EditPlaylistSheet: View {
                 id = created.id
             }
 
-            // Upload a new cover if one was picked.
+            // Upload a new cover if one was picked. A cover failure must not
+            // discard a playlist that was just created/renamed successfully —
+            // the playlist is saved; only the image didn't attach.
             if let pickedImage, let jpeg = pickedImage.jpegData(compressionQuality: 0.85) {
-                _ = try await api.uploadPlaylistCover(id, jpeg: jpeg)
+                do {
+                    _ = try await api.uploadPlaylistCover(id, jpeg: jpeg)
+                } catch {
+                    self.error = "Playlist saved, but the cover image couldn't be uploaded."
+                    onSaved()
+                    return
+                }
             }
 
             onSaved()

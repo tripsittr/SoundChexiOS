@@ -3,6 +3,17 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.4.1 “Interlude” — 2026-09-17
+
+### Fixed
+- **Playlist cover upload 422** — setting a cover while creating or editing a
+  playlist failed with “The cover field is required.” The multipart upload was
+  sent via `httpBody`, which URLSession can stream chunked (no Content-Length);
+  PHP-FPM then never populates `$_FILES`, so the server saw no file. Now sent
+  with `upload(from:)` and an explicit Content-Length. A cover failure also no
+  longer discards the playlist — it’s saved; only the image is skipped, with a
+  note.
+
 ## 0.4.0 “Interlude” — 2026-09-17
 
 ### Added

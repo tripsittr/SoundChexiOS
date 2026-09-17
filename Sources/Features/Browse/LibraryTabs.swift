@@ -16,6 +16,8 @@ struct LibraryTabs: View {
         // Each tab insets its own content for the now-playing bar, so the bar
         // sits *above* the system tab bar rather than being drawn over it — an
         // inset on the TabView itself overlapped the tab bar.
+        // The Search tab is gone: search lives in the persistent header (AppHeader)
+        // on every page instead, alongside the account button.
         TabView {
             HomeView().nowPlayingInset()
                 .tabItem { Label("Home", systemImage: "house.fill") }
@@ -27,8 +29,6 @@ struct LibraryTabs: View {
                 .tabItem { Label("Shows", systemImage: "tv") }
             MediaGridView(type: .book, title: "Books").nowPlayingInset()
                 .tabItem { Label("Books", systemImage: "book") }
-            SearchView().nowPlayingInset()
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
         }
         .environment(store)
         .tint(SoundChexTheme.accent)
@@ -42,10 +42,11 @@ struct LibraryTabs: View {
     }
 }
 
-private extension View {
+extension View {
     /// Docks the now-playing bar above this tab's content (and thus above the
     /// system tab bar), present only while something is playing.
     func nowPlayingInset() -> some View {
         safeAreaInset(edge: .bottom, spacing: 0) { NowPlayingBar() }
     }
+
 }

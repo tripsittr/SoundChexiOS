@@ -10,29 +10,39 @@ struct MediaGridView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.isLoading && store.items.isEmpty {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = store.loadError, store.items.isEmpty {
-                    ContentUnavailableView("Couldn't load", systemImage: "wifi.slash", description: Text(error))
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 18) {
-                            ForEach(store.topLevel(of: type)) { item in
-                                NavigationLink {
-                                    ShowDetailView(item: item)
-                                } label: {
-                                    Poster(item: item)
+            VStack(spacing: 0) {
+                AppHeader()
+                Group {
+                    if store.isLoading && store.items.isEmpty {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let error = store.loadError, store.items.isEmpty {
+                        ContentUnavailableView("Couldn't load", systemImage: "wifi.slash", description: Text(error))
+                    } else {
+                        ScrollView {
+                            // The page name as a section heading — the header bar
+                            // above carries search + account, not a title.
+                            Text(title)
+                                .font(.title2.bold()).foregroundStyle(SoundChexTheme.ink100)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16).padding(.top, 4)
+
+                            LazyVGrid(columns: columns, spacing: 18) {
+                                ForEach(store.topLevel(of: type)) { item in
+                                    NavigationLink {
+                                        ShowDetailView(item: item)
+                                    } label: {
+                                        Poster(item: item)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(16)
                         }
-                        .padding(16)
                     }
                 }
             }
-            .navigationTitle(title)
             .background(SoundChexTheme.base900)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }

@@ -10,41 +10,45 @@ struct MusicView: View {
     @Environment(LibraryStore.self) private var store
     @State private var section: Section = .songs
 
-    enum Section: String, CaseIterable { case songs = "Songs", albums = "Albums", artists = "Artists" }
+    enum Section: String, CaseIterable {
+        case songs = "Songs", albums = "Albums", artists = "Artists", playlists = "Playlists"
+    }
 
     private let grid = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                AppHeader()
                 subNav
                 content
             }
-            .navigationTitle("Music")
-            .navigationBarTitleDisplayMode(.inline)
             .background(SoundChexTheme.base900)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
-    /// The pill row. Its own bar so it never collapses to an empty header.
+    /// The pill row. Horizontally scrollable so four pills never crowd a narrow
+    /// phone. Its own bar so it never collapses to an empty header.
     private var subNav: some View {
-        HStack(spacing: 8) {
-            ForEach(Section.allCases, id: \.self) { item in
-                let active = item == section
-                Button {
-                    withAnimation(.easeOut(duration: 0.2)) { section = item }
-                } label: {
-                    Text(item.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(active ? .white : SoundChexTheme.ink400)
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                        .background(active ? SoundChexTheme.accent : SoundChexTheme.base700, in: .capsule)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Section.allCases, id: \.self) { item in
+                    let active = item == section
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) { section = item }
+                    } label: {
+                        Text(item.rawValue)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(active ? .white : SoundChexTheme.ink400)
+                            .padding(.horizontal, 16).padding(.vertical, 8)
+                            .background(active ? SoundChexTheme.accent : SoundChexTheme.base700, in: .capsule)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-            Spacer()
+            .padding(.horizontal, 16).padding(.vertical, 10)
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
         .background(SoundChexTheme.base900)
     }
 
@@ -75,6 +79,9 @@ struct MusicView: View {
                     .padding(16)
                 }
                 .background(SoundChexTheme.base900)
+
+            case .playlists:
+                PlaylistsGrid()
 
             case .artists:
                 List(store.artists) { artist in

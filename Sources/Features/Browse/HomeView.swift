@@ -5,41 +5,30 @@ import SwiftUI
 struct HomeView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(PlaybackController.self) private var playback
-    @State private var showingSettings = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let hero = store.heroItem {
-                    HeroBanner(item: hero) { play(hero) }
-                }
+        VStack(spacing: 0) {
+            // The persistent search + account bar, on Home as on every page.
+            AppHeader()
 
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(store.homeRows) { row in
-                        Rail(title: row.title, items: row.items) { play($0) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let hero = store.heroItem {
+                        HeroBanner(item: hero) { play(hero) }
                     }
+
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(store.homeRows) { row in
+                            Rail(title: row.title, items: row.items) { play($0) }
+                        }
+                    }
+                    // Overlap the first rail onto the hero's fade.
+                    .padding(.top, store.heroItem == nil ? 16 : -24)
+                    .padding(.bottom, 24)
                 }
-                // Overlap the first rail onto the hero's fade.
-                .padding(.top, store.heroItem == nil ? 16 : -24)
-                .padding(.bottom, 24)
             }
         }
         .background(SoundChexTheme.base900)
-        .ignoresSafeArea(edges: .top)
-        // The account/settings entry — a circular button floating top-right over
-        // the hero, the way the web header carries the account menu.
-        .overlay(alignment: .topTrailing) {
-            Button { showingSettings = true } label: {
-                Image(systemName: "person.crop.circle")
-                    .font(.title2)
-                    .foregroundStyle(SoundChexTheme.ink100)
-                    .padding(10)
-                    .background(.black.opacity(0.35), in: .circle)
-                    .shadow(radius: 6)
-            }
-            .padding(.trailing, 16)
-            .padding(.top, 8)
-        }
         .overlay {
             if store.isLoading && store.items.isEmpty {
                 ProgressView().tint(SoundChexTheme.accent)
@@ -47,9 +36,6 @@ struct HomeView: View {
                 ContentUnavailableView("Couldn't load", systemImage: "wifi.slash",
                                        description: Text(error))
             }
-        }
-        .fullScreenCover(isPresented: $showingSettings) {
-            SettingsView()
         }
     }
 

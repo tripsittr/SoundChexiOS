@@ -9,6 +9,7 @@ enum AppRelease {
     private static let names: [String: String] = [
         "0.2": "Overture",
         "0.3": "Crescendo",
+        "0.4": "Interlude",
         "1.0": "Encore",
     ]
 

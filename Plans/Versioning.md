@@ -19,8 +19,8 @@ resolves. Pick the next unused one at each minor bump.
 |---------|------|-------------|
 | 0.2.0 | **Overture** | The first native Swift iOS app: sign-in, browse, playback, downloads/offline, playlists, admin, detail screens, lyrics. |
 | 0.3.0 | **Crescendo** | Batch "download all" gated on free space, and incremental library delta sync (`/library/delta`) instead of a full re-fetch each launch. |
-| 0.4.0 | Interlude | _(next)_ |
-| 0.5.0 | Bridge | |
+| 0.4.0 | **Interlude** | Persistent search + account header on every page (Search tab removed); a Playlists pill in Music with Spotify-style create/edit/reorder/cover playlists. |
+| 0.5.0 | Bridge | _(next)_ |
 | 0.6.0 | Refrain | |
 | 1.0.0 | Encore | The first stable release. |
 
@@ -50,7 +50,7 @@ then move its row up into the table above and cross it off here.
 
 ### Recommended sequence (next up)
 
-After 0.3.0 "Crescendo": Interlude → Bridge → Refrain → Cadence → Reprise →
+After 0.4.0 "Interlude": Bridge → Refrain → Cadence → Reprise →
 Coda → Segue → Vamp → Motif → Resonance → Reverie → Cascade → _(then dip into
 the pool below)_ → **Encore (1.0.0)**.
 

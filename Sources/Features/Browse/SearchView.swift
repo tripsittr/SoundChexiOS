@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// Search across the library.
+/// Search across the library, as a reusable list.
 ///
 /// Queries the server (`GET /api/v1/search`), which covers titles, people,
 /// dialogue and book text — more than a title match. Debounced so it does not
 /// fire on every keystroke, and it falls back to filtering the already-loaded
 /// catalogue when the server cannot be reached, so search still works with a
 /// flaky connection.
-struct SearchView: View {
+///
+/// This is the body only (no NavigationStack), so it drops into the search
+/// overlay the persistent header presents. It carries its own `.searchable`.
+struct SearchResultsList: View {
     @Environment(LibraryStore.self) private var store
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
@@ -18,40 +21,38 @@ struct SearchView: View {
     @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
-        NavigationStack {
-            List(results) { item in
-                Button {
-                    if item.type == .music { playback.play([item]) }
-                } label: {
-                    HStack(spacing: 12) {
-                        Artwork(item: item, size: 44, aspect: item.type == .music ? 1 : 1.4)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
-                            if let subtitle = item.subtitle {
-                                Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
-                            }
+        List(results) { item in
+            Button {
+                if item.type == .music { playback.play([item]) }
+            } label: {
+                HStack(spacing: 12) {
+                    Artwork(item: item, size: 44, aspect: item.type == .music ? 1 : 1.4)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                        if let subtitle = item.subtitle {
+                            Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
                         }
-                        Spacer()
                     }
-                    .contentShape(.rect)
+                    Spacer()
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(SoundChexTheme.base900)
+                .contentShape(.rect)
             }
-            .listStyle(.plain)
-            .overlay {
-                if term.count < 2 {
-                    ContentUnavailableView("Search your library", systemImage: "magnifyingglass")
-                } else if isSearching && results.isEmpty {
-                    ProgressView()
-                } else if results.isEmpty {
-                    ContentUnavailableView.search(text: term)
-                }
-            }
-            .navigationTitle("Search")
-            .background(SoundChexTheme.base900)
+            .buttonStyle(.plain)
+            .listRowBackground(SoundChexTheme.base900)
         }
-        .searchable(text: $term, prompt: "Songs, films, books…")
+        .listStyle(.plain)
+        .overlay {
+            if term.count < 2 {
+                ContentUnavailableView("Search your library", systemImage: "magnifyingglass")
+            } else if isSearching && results.isEmpty {
+                ProgressView().tint(SoundChexTheme.accent)
+            } else if results.isEmpty {
+                ContentUnavailableView.search(text: term)
+            }
+        }
+        .background(SoundChexTheme.base900)
+        .searchable(text: $term, placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Songs, films, books…")
         .onChange(of: term) { _, newValue in
             runSearch(newValue)
         }

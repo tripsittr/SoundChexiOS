@@ -3,6 +3,24 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.4.0 “Interlude” — 2026-09-17
+
+### Added
+- **Persistent header on every page** — a search field and the account button
+  now sit in a bar at the top of Home, Music, Movies, Shows and Books. Tapping
+  search opens a full-screen search overlay; the account button opens Settings.
+  The dedicated Search tab is removed (its function moved into the header).
+- **Playlists in Music** — a new **Playlists** pill alongside Songs / Albums /
+  Artists, with Spotify/Apple-style playlist management:
+  - Create, rename, and describe playlists; set a **cover image** (or fall back
+    to a 2×2 mosaic of the tracks' covers).
+  - A big-cover detail page with a Play / Shuffle header and total duration.
+  - **Drag-to-reorder** and swipe-to-remove tracks, persisted to the server.
+  - Delete a playlist (the songs stay in your library).
+
+### Changed
+- Home no longer floats the account avatar over the hero — the header carries it.
+
 ## 0.3.0 “Crescendo” — 2026-09-17
 
 ### Added

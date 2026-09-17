@@ -7,7 +7,7 @@ import Foundation
 /// mangled `parent_id`), every field tolerant of being absent, and a bad artwork
 /// string treated as no artwork rather than a decode failure that would take the
 /// whole catalogue down — which is exactly the "server couldn't load" symptom.
-struct MediaItem: Identifiable, Decodable, Hashable, Sendable {
+struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     let id: Int
     let type: MediaType
     let title: String
@@ -53,7 +53,22 @@ struct MediaItem: Identifiable, Decodable, Hashable, Sendable {
         self.meta = meta
     }
 
-    struct Meta: Decodable, Hashable, Sendable {
+    /// For the on-disk library cache. Written and read by us, so a plain encode
+    /// is fine (the decoder is lenient for the server's shape; this round-trips
+    /// our own).
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(type, forKey: .type)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(subtitle, forKey: .subtitle)
+        try c.encodeIfPresent(parentID, forKey: .parentID)
+        try c.encode(playable, forKey: .playable)
+        try c.encodeIfPresent(artwork?.absoluteString, forKey: .artwork)
+        try c.encodeIfPresent(meta, forKey: .meta)
+    }
+
+    struct Meta: Codable, Hashable, Sendable {
         let artist: String?
         let album: String?
         let author: String?

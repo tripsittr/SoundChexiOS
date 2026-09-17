@@ -47,6 +47,11 @@ struct SettingsView: View {
 
                 Section("Server") {
                     LabeledContent("Address", value: session.serverURL?.host() ?? "—")
+                    Button {
+                        Task { await session.changeServer(); dismiss() }
+                    } label: {
+                        Label("Change server", systemImage: "server.rack")
+                    }
                 }
 
                 Section("Profile") {

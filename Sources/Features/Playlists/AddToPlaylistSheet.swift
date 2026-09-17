@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import SwiftUI
 
 /// Pick a playlist to add a track to — or make a new one. Shown from the kebab

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import SwiftUI
 
 /// What's downloaded on this device — playable with no connection.

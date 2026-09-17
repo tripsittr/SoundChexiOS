@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import SwiftUI
 
 /// A store of the account's playlists, shared by the Music pill and the Settings

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import SwiftUI
 
 /// Edit a media item's core fields and its type metadata — the admin item edit.

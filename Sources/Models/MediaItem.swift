@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import Foundation
 
 /// One thing in the library: a song, a film, a show (or its episode), a book.

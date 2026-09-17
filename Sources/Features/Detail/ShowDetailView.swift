@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import SwiftUI
 
 /// A show or film: artwork header, and episodes grouped by season (for a show).

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import Foundation
 
 /// A JSON value that is a string, an int, or null — enough to carry the mixed

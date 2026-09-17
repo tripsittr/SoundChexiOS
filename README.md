@@ -40,3 +40,11 @@ or Xcode's Signing & Capabilities (IOS-02).
 The endpoints this app relies on live in the server repo (`SoundChex App`):
 `/api/v1/profiles`, `/api/v1/tokens`, `/api/v1/library`,
 `/api/v1/items/{id}/stream`, `/api/v1/items/{id}/progress`, `/api/v1/search`.
+
+## Licence
+
+**GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)** — see
+[LICENSE](LICENSE). The same licence as the SoundChex server; all SoundChex
+platforms are AGPLv3. Because this is a client that people use over a network to
+reach their server, any modified, network-hosted build must offer its users the
+corresponding source (AGPL §13).

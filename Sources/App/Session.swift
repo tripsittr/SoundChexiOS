@@ -26,6 +26,15 @@ final class Session {
     /// views keyed on it rebuild and reload against the new token/profile.
     private(set) var identityGeneration = 0
 
+    /// Whether the current profile may reach the admin surface. Refreshed from
+    /// `/me` after each identity change; false until confirmed.
+    private(set) var isAdmin = false
+
+    /// Refreshes the admin flag from the server for the current token.
+    func refreshIdentity() async {
+        isAdmin = (try? await api?.me())?.profile?.isAdmin ?? false
+    }
+
     var isSignedIn: Bool { serverURL != nil && token != nil }
 
     private let defaults = UserDefaults.standard

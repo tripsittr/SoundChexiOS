@@ -139,6 +139,18 @@ struct APIClient {
         return response.items
     }
 
+    // MARK: - Identity / admin
+
+    /// Who this token belongs to, and whether the profile may administer.
+    func me() async throws -> Identity {
+        try await send("/api/v1/me", method: "GET")
+    }
+
+    /// Admin dashboard figures. 403 if the profile is not an admin.
+    func adminStats() async throws -> AdminStats {
+        try await send("/api/v1/admin/stats", method: "GET")
+    }
+
     // MARK: - Playlists
 
     /// The account's playlists, for the picker.

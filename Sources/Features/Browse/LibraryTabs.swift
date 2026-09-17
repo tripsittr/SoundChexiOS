@@ -36,6 +36,7 @@ struct LibraryTabs: View {
             store.attach(api: session.api)
             playback.attach(api: session.api)
             downloads.attach(api: session.api)
+            await session.refreshIdentity()
             await store.loadIfNeeded()
         }
     }

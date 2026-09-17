@@ -57,6 +57,36 @@ final class PlaybackController {
         updateNowPlayingInfo()
     }
 
+    /// Inserts an item to play right after the current one.
+    ///
+    /// If nothing is playing, it just starts. Otherwise it slots in at the front
+    /// of what remains, so "play next" jumps the rest of the queue.
+    func playNext(_ item: MediaItem) {
+        guard let api else { return }
+        if current == nil {
+            play([item])
+        } else {
+            queue.insert(item, at: index + 1)
+            _ = api // keep the guard meaningful; loading happens on advance
+        }
+    }
+
+    /// Appends an item to the end of the queue.
+    func addToQueue(_ item: MediaItem) {
+        if current == nil, let api {
+            _ = api
+            play([item])
+        } else {
+            queue.append(item)
+        }
+    }
+
+    /// What is coming up after the current track, for the queue view.
+    var upNext: [MediaItem] {
+        guard index + 1 <= queue.count else { return [] }
+        return Array(queue[(index + 1)...])
+    }
+
     func next() {
         guard index + 1 < queue.count, let api else { return }
         index += 1
@@ -86,7 +116,17 @@ final class PlaybackController {
 
         guard let url = api.streamURL(itemID: item.id) else { return }
 
-        let asset = AVURLAsset(url: url)
+        // The stream route authenticates with a Sanctum bearer *header* — a
+        // query-param token is ignored, which is why playback started but no
+        // audio ever arrived (the request 401'd). AVURLAsset lets us attach the
+        // header to every request it makes for the media, including range
+        // requests during a seek.
+        var options: [String: Any] = [:]
+        if let token = api.token {
+            options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": "Bearer \(token)"]
+        }
+
+        let asset = AVURLAsset(url: url, options: options)
         let playerItem = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: playerItem)
 

@@ -64,6 +64,9 @@ struct SongRow: View {
             }
             .buttonStyle(.plain)
 
+            // Persistent download control, like the web row.
+            DownloadButton(item: item, size: 18)
+
             // The kebab: the same actions as the swipes, for discoverability.
             Menu {
                 TrackActions(item: item,

@@ -32,16 +32,14 @@ The API case for this split is in the server repo's `NativeClients.md`.
 | ID | What | Notes |
 |----|------|-------|
 | IOS-18 | Full visual redesign completion | Home hero+rails, palette, poster scrim, dark bars done (this PR). Still to match: detail screens, the now-playing full-screen sheet, the music sub-nav pills, browse grid polish, and the header treatment. Reference `Plans/DesignSpec.md`. |
-| IOS-05b | Offline: full catalogue browse | Per-item downloads + offline playback are done (IOS-05a). Still to do: mirror `/api/v1/library` to a local store so the *whole* catalogue browses offline (not just downloads), and gate a "download all" on free space. |
+| IOS-05c | Offline: "download all" + delta | Full-catalogue offline browse is done (IOS-05b — library cached to disk, shown offline). Remaining: a "download all" gated on free space, and `/library/delta` to refresh the cache incrementally instead of a full re-fetch (IOS-12). |
 | IOS-06b | Resumable downloads + "download all" | Background transfers work (IOS-06a); still to add resuming a *partial* file after a kill, and album/library batch download with a free-space gate. |
 | IOS-07b | Video: subtitles | Video playback + PiP done (IOS-07a). Subtitles still to add — needs an API subtitle endpoint (currently session-only). |
 | IOS-08 | Book reader | EPUB/PDF rendering. The server's reader routes are session-only; needs API equivalents for text/contents/annotations, or render from the downloaded file. Large; likely deferred behind audio + video. |
-| IOS-10 | Change server | Settings has sign-out and profile switch; still needs a "change server" flow (currently only via sign-out + new address). |
 | IOS-20 | Shuffle + repeat | Transport controls in the now-playing page and bar. Player supports a queue; add shuffle/repeat modes. |
 | IOS-11 | Multiple server addresses / fast-route race | The web connect screen raced a LAN address against the relay. A native app should prefer a fast local address when reachable and fall back to the tunnel — the same 20ms-vs-700ms problem. |
 | IOS-12 | Library delta sync | Use `GET /api/v1/library/delta` to keep the local mirror current instead of a full re-fetch each launch. Depends on IOS-05's store. |
 | IOS-13 | Item-detail JSON endpoint (server) | Optional. `/api/v1/library` carries most of what a detail screen needs; a dedicated endpoint would add related items, people, skip markers. Build only if IOS-04 needs more than the mirror holds. |
-| IOS-14 | Artwork caching | `AsyncImage` re-fetches; add a disk cache so covers are instant on scroll and available offline. |
 
 ## Deferred
 
@@ -75,4 +73,7 @@ The API case for this split is in the server repo's `NativeClients.md`.
 | IOS-04 | Detail screens | 2026-09-17 | Music tab gets a Songs/Albums/Artists segmented control. Album → big artwork, Play/Shuffle, track list. Artist → their albums → album. Movies/Shows/Books poster → detail (artwork + play; shows list episodes grouped by season). All derived client-side from the loaded library (album/artist grouping, `children(of:)` in LibraryStore) — no new API. |
 | IOS-VER | Version + release name everywhere | 2026-09-17 | One `AppRelease` type; version + music name shown on sign-in and Settings (`0.2.0 "Overture"`). App bumped to 0.2.0 "Overture". |
 | IOS-BG | Music page, download button, background audio | 2026-09-17 | Music page segmented control moved into the nav bar (was a stray invisible header). Song rows get a persistent download button. **Background audio fixed** — `UIBackgroundModes` must be an array, not a string (iOS silently ignored it); switched to an explicit generated Info.plist, `.longFormAudio` policy, session activated before playback, resume after interruption. |
+| IOS-14 | Artwork caching | 2026-09-17 | Covers load through a disk-backed URLCache (32MB mem / 512MB disk) via `CachedImage`, so a cover seen once loads instantly and works offline — `AsyncImage` kept nothing and re-fetched on every scroll. |
+| IOS-05b | Offline: full catalogue browse | 2026-09-17 | `/api/v1/library` is cached to disk (`library.json`); a launch shows it instantly and the *whole* catalogue browses offline, not just downloads. Refreshes from the network in the background; the cache is cleared on sign-out/change-server. |
+| IOS-10 | Change server | 2026-09-17 | Settings → Server → Change server signs out, forgets the stored server, and returns to a blank sign-in screen for a different server. |
 | IOS-07a | Video playback + PiP | 2026-09-17 | Films/episodes play in `AVPlayerViewController` (fullscreen, AirPlay, **Picture-in-Picture**, auto-PiP on backgrounding); token-authed video stream or the downloaded file, resumes from and reports server progress. Opened from a movie/show detail. Subtitles are IOS-07b. |

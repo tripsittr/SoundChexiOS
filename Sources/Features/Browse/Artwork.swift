@@ -10,17 +10,12 @@ struct Artwork: View {
     var body: some View {
         Group {
             if let url = item.artwork {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    case .failure:
-                        placeholder
-                    case .empty:
-                        placeholder.overlay(ProgressView().tint(SoundChexTheme.ink500))
-                    @unknown default:
-                        placeholder
-                    }
+                // Disk-cached, so a cover already seen loads instantly and works
+                // offline — AsyncImage kept nothing and re-fetched every scroll.
+                CachedImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    placeholder
                 }
             } else {
                 placeholder

@@ -16,33 +16,67 @@ final class LibraryStore {
     private var api: APIClient?
     private var hasLoaded = false
 
+    /// Where the catalogue is cached on disk, so it browses offline and a launch
+    /// shows something immediately rather than waiting on the network.
+    private static let cacheURL: URL = {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("library.json")
+    }()
+
     func attach(api: APIClient?) {
         self.api = api
     }
 
-    /// Loads the catalogue the first time a tab appears. Repeated calls are cheap
-    /// no-ops, so every tab's `.task` can call it without re-fetching.
+    /// On first appearance, show the disk cache at once (so the app is usable
+    /// offline and a launch is instant), then refresh from the network.
     func loadIfNeeded() async {
         guard !hasLoaded, !isLoading else { return }
+
+        loadFromDisk()
         await load()
     }
 
     func load() async {
         guard let api else { return }
 
-        isLoading = true
+        // Only show the spinner when there is nothing cached to show meanwhile.
+        isLoading = items.isEmpty
         loadError = nil
 
         do {
             let response = try await api.library()
             items = response.items
             hasLoaded = true
+            saveToDisk()
         } catch {
-            loadError = (error as? APIClient.APIError)?.errorDescription
-                ?? "Could not load your library."
+            // Offline with a cache is not an error — the cached library stands.
+            if items.isEmpty {
+                loadError = (error as? APIClient.APIError)?.errorDescription
+                    ?? "Could not load your library."
+            }
         }
 
         isLoading = false
+    }
+
+    /// Fills from the disk cache if the network copy has not loaded yet.
+    private func loadFromDisk() {
+        guard items.isEmpty,
+              let data = try? Data(contentsOf: Self.cacheURL),
+              let cached = try? JSONDecoder().decode([MediaItem].self, from: data) else { return }
+        items = cached
+    }
+
+    private func saveToDisk() {
+        if let data = try? JSONEncoder().encode(items) {
+            try? data.write(to: Self.cacheURL)
+        }
+    }
+
+    /// Drops the cached library — for sign-out / change server.
+    static func clearCache() {
+        try? FileManager.default.removeItem(at: cacheURL)
     }
 
     // MARK: - Filtered views

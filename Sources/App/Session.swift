@@ -132,5 +132,17 @@ final class Session {
 
         token = nil
         api = nil
+
+        // The cached library is this profile's; drop it so the next person does
+        // not see it. Downloads stay — they are explicit files the user keeps.
+        LibraryStore.clearCache()
+    }
+
+    /// Signs out *and* forgets the server, so the sign-in screen starts blank —
+    /// for connecting to a different server rather than re-signing-in to this one.
+    func changeServer() async {
+        await signOut()
+        defaults.removeObject(forKey: serverKey)
+        serverURL = nil
     }
 }

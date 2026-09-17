@@ -20,9 +20,9 @@ settings:
     DEVELOPMENT_TEAM: "7GSWB72PH6"
     CODE_SIGN_STYLE: Automatic
     # Versioning: SemVer with a music-themed name per minor release (see
-    # Plans/Versioning.md). 0.2.0 is "Overture" — the first native release.
-    MARKETING_VERSION: "0.2.0"
-    CURRENT_PROJECT_VERSION: "2"
+    # Plans/Versioning.md). 0.3.0 is "Crescendo" — batch download + delta sync.
+    MARKETING_VERSION: "0.3.0"
+    CURRENT_PROJECT_VERSION: "3"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete
@@ -42,6 +42,12 @@ targets:
       path: Generated/Info.plist
       properties:
         CFBundleDisplayName: SoundChex
+        # Track the build settings, not a frozen literal — an explicit info block
+        # otherwise pins the version to whatever XcodeGen first wrote (was 1.0),
+        # so Settings showed the wrong release. These resolve MARKETING_VERSION /
+        # CURRENT_PROJECT_VERSION at build time.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Background audio (keeps playing when the screen locks) and AirPlay.

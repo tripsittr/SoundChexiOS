@@ -18,8 +18,8 @@ resolves. Pick the next unused one at each minor bump.
 | Version | Name | What it was |
 |---------|------|-------------|
 | 0.2.0 | **Overture** | The first native Swift iOS app: sign-in, browse, playback, downloads/offline, playlists, admin, detail screens, lyrics. |
-| 0.3.0 | Crescendo | _(next)_ |
-| 0.4.0 | Interlude | |
+| 0.3.0 | **Crescendo** | Batch "download all" gated on free space, and incremental library delta sync (`/library/delta`) instead of a full re-fetch each launch. |
+| 0.4.0 | Interlude | _(next)_ |
 | 0.5.0 | Bridge | |
 | 0.6.0 | Refrain | |
 | 1.0.0 | Encore | The first stable release. |

@@ -32,6 +32,16 @@ struct SettingsView: View {
                         } label: {
                             Label("Dashboard", systemImage: "chart.bar.xaxis")
                         }
+                        NavigationLink {
+                            AdminProfilesView()
+                        } label: {
+                            Label("Profiles", systemImage: "person.2.badge.gearshape")
+                        }
+                        Button {
+                            Task { try? await session.api?.triggerScan() }
+                        } label: {
+                            Label("Scan for new media", systemImage: "arrow.clockwise")
+                        }
                     }
                 }
 

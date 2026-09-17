@@ -1,0 +1,44 @@
+# The Xcode project is generated from this file with `xcodegen`, so the
+# .xcodeproj is a build artifact rather than something hand-edited — the same
+# approach the Tauri side uses, and it keeps merge conflicts out of the pbxproj.
+#
+# Regenerate after changing this file or adding source folders:
+#   cd SoundChexiOS && xcodegen generate
+name: SoundChex
+options:
+  bundleIdPrefix: net.soundchex
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""              # set to the signing team for device builds
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Strict concurrency is on by default at Swift 6; keep it, the app is small
+    # enough to get right from the start.
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  SoundChex:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.soundchex.ios
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        # The app talks to a self-hosted server over Tailscale — often plain
+        # http on a private address. ATS is relaxed for that; tighten later if
+        # every deployment is https.
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: "YES"
+        # Background audio, so playback continues when the screen locks.
+        INFOPLIST_KEY_UIBackgroundModes: "audio"
+        ENABLE_PREVIEWS: "YES"
+        GENERATE_INFOPLIST_FILE: "YES"

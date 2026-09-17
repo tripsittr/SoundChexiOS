@@ -1,0 +1,22 @@
+# Generated Xcode project — recreated from project.yml with `xcodegen generate`.
+SoundChex.xcodeproj/
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Signing — never commit provisioning profiles or certs.
+*.mobileprovision
+*.p12
+*.cer

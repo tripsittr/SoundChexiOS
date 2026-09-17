@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 SoundChex
+
 import Foundation
 
 /// A playlist (a Collection on the server), account-scoped and shared across the

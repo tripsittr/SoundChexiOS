@@ -38,6 +38,7 @@ struct SongRow: View {
     var index: Int = 0
 
     @State private var addingToPlaylist = false
+    @State private var editing = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -65,7 +66,9 @@ struct SongRow: View {
 
             // The kebab: the same actions as the swipes, for discoverability.
             Menu {
-                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
+                TrackActions(item: item,
+                             onAddToPlaylist: { addingToPlaylist = true },
+                             onEdit: { editing = true })
             } label: {
                 Image(systemName: "ellipsis")
                     .foregroundStyle(SoundChexTheme.ink500)
@@ -100,6 +103,9 @@ struct SongRow: View {
             AddToPlaylistSheet(item: item)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $editing) {
+            AdminItemEditView(itemID: item.id)
+        }
     }
 }
 
@@ -110,8 +116,10 @@ struct SongRow: View {
 struct TrackActions: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
+    @Environment(Session.self) private var session
     let item: MediaItem
     var onAddToPlaylist: (() -> Void)?
+    var onEdit: (() -> Void)?
 
     var body: some View {
         Button {
@@ -144,6 +152,15 @@ struct TrackActions: View {
                 downloads.download(item)
             } label: {
                 Label("Download", systemImage: "arrow.down.circle")
+            }
+        }
+
+        // Admin-only: edit the item's metadata.
+        if session.isAdmin, let onEdit {
+            Button {
+                onEdit()
+            } label: {
+                Label("Edit", systemImage: "pencil")
             }
         }
     }

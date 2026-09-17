@@ -151,6 +151,63 @@ struct APIClient {
         try await send("/api/v1/admin/stats", method: "GET")
     }
 
+    /// One item's editable admin detail.
+    func adminItem(_ id: Int) async throws -> AdminItem {
+        try await send("/api/v1/admin/items/\(id)", method: "GET")
+    }
+
+    /// Saves an item's edited fields. `meta` carries the type's fields.
+    func updateAdminItem(_ id: Int, title: String, userRating: Double?,
+                         notes: String?, meta: [String: AnyCodableValue]) async throws -> AdminItem {
+        struct Body: Encodable {
+            let title: String
+            let userRating: Double?
+            let notes: String?
+            let meta: [String: AnyCodableValue]
+        }
+        return try await send("/api/v1/admin/items/\(id)", method: "PATCH",
+                              body: Body(title: title, userRating: userRating, notes: notes, meta: meta))
+    }
+
+    /// The account's profiles for management, plus the rating ladder.
+    func adminProfiles() async throws -> AdminProfilesResponse {
+        try await send("/api/v1/admin/profiles", method: "GET")
+    }
+
+    /// Creates a profile.
+    func createProfile(name: String, color: String?, isKids: Bool,
+                       maxRating: String?, pin: String?) async throws -> AdminProfile {
+        struct Body: Encodable {
+            let name: String; let color: String?; let isKids: Bool
+            let maxRating: String?; let pin: String?
+        }
+        return try await send("/api/v1/admin/profiles", method: "POST",
+                              body: Body(name: name, color: color, isKids: isKids,
+                                         maxRating: maxRating, pin: pin))
+    }
+
+    /// Updates a profile.
+    func updateProfile(_ id: Int, name: String?, color: String?, isKids: Bool?,
+                       maxRating: String?, pin: String?) async throws -> AdminProfile {
+        struct Body: Encodable {
+            let name: String?; let color: String?; let isKids: Bool?
+            let maxRating: String?; let pin: String?
+        }
+        return try await send("/api/v1/admin/profiles/\(id)", method: "PATCH",
+                              body: Body(name: name, color: color, isKids: isKids,
+                                         maxRating: maxRating, pin: pin))
+    }
+
+    /// Deletes a profile.
+    func deleteProfile(_ id: Int) async throws {
+        _ = try await sendRaw("/api/v1/admin/profiles/\(id)", method: "DELETE")
+    }
+
+    /// Queues a library scan to pick up newly-added files.
+    func triggerScan() async throws {
+        _ = try await sendRaw("/api/v1/admin/scan", method: "POST")
+    }
+
     // MARK: - Playlists
 
     /// The account's playlists, for the picker.

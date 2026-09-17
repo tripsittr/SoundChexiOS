@@ -20,9 +20,10 @@ settings:
     DEVELOPMENT_TEAM: "7GSWB72PH6"
     CODE_SIGN_STYLE: Automatic
     # Versioning: SemVer with a music-themed name per minor release (see
-    # Plans/Versioning.md). 0.3.0 is "Crescendo" — batch download + delta sync.
-    MARKETING_VERSION: "0.3.0"
-    CURRENT_PROJECT_VERSION: "3"
+    # Plans/Versioning.md). 0.4.0 is "Interlude" — persistent search/account
+    # header on every page + Spotify-style playlists.
+    MARKETING_VERSION: "0.4.0"
+    CURRENT_PROJECT_VERSION: "4"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete

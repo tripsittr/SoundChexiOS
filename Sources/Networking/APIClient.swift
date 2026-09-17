@@ -238,9 +238,34 @@ struct APIClient {
     }
 
     /// Creates a playlist, returning it.
-    func createPlaylist(name: String) async throws -> Playlist {
-        struct Body: Encodable { let name: String }
-        return try await send("/api/v1/playlists", method: "POST", body: Body(name: name))
+    func createPlaylist(name: String, description: String? = nil) async throws -> Playlist {
+        struct Body: Encodable { let name: String; let description: String? }
+        return try await send("/api/v1/playlists", method: "POST",
+                              body: Body(name: name, description: description))
+    }
+
+    /// Renames a playlist and/or edits its description, returning the updated one.
+    func updatePlaylist(_ id: Int, name: String?, description: String?) async throws -> Playlist {
+        struct Body: Encodable { let name: String?; let description: String? }
+        return try await send("/api/v1/playlists/\(id)", method: "PATCH",
+                              body: Body(name: name, description: description))
+    }
+
+    /// Persists a drag-reorder: the full ordered list of the playlist's item ids.
+    func reorderPlaylist(_ id: Int, order: [Int]) async throws {
+        struct Body: Encodable { let order: [Int] }
+        _ = try await sendRaw("/api/v1/playlists/\(id)/order", method: "PUT", body: Body(order: order))
+    }
+
+    /// Uploads a cover image (JPEG data) for a playlist, returning its new URL.
+    func uploadPlaylistCover(_ id: Int, jpeg: Data) async throws -> URL? {
+        struct Response: Decodable { let artworkURL: URL?
+            enum CodingKeys: String, CodingKey { case artworkURL = "artworkUrl" } }
+        let data = try await sendMultipart(
+            "/api/v1/playlists/\(id)/cover",
+            fileField: "cover", filename: "cover.jpg", mimeType: "image/jpeg", fileData: jpeg
+        )
+        return (try? decoder.decode(Response.self, from: data))?.artworkURL
     }
 
     /// Adds an item to a playlist.
@@ -362,6 +387,54 @@ struct APIClient {
             throw APIError.http(status: http.statusCode)
         }
 
+        return data
+    }
+
+    /// A `multipart/form-data` POST carrying one file — for the playlist cover
+    /// upload, which JSON can't express. One field, one file; that's all the
+    /// server's `image` validation needs.
+    private func sendMultipart(
+        _ path: String,
+        fileField: String,
+        filename: String,
+        mimeType: String,
+        fileData: Data
+    ) async throws -> Data {
+        guard let url = URL(string: path, relativeTo: baseURL) else {
+            throw APIError.badURL
+        }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        func append(_ string: String) { body.append(Data(string.utf8)) }
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(filename)\"\r\n")
+        append("Content-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        append("\r\n--\(boundary)--\r\n")
+        request.httpBody = body
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw APIError.unreachable(underlying: error)
+        }
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.http(status: -1) }
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.http(status: http.statusCode)
+        }
         return data
     }
 }

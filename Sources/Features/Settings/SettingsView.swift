@@ -13,7 +13,9 @@ struct SettingsView: View {
             List {
                 Section("Library") {
                     NavigationLink {
-                        PlaylistsView()
+                        PlaylistsGrid()
+                            .navigationTitle("Playlists")
+                            .navigationBarTitleDisplayMode(.inline)
                     } label: {
                         Label("Playlists", systemImage: "music.note.list")
                     }

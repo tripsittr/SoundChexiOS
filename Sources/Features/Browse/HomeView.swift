@@ -121,7 +121,7 @@ struct HeroBanner: View {
 
     private var backdrop: some View {
         GeometryReader { geo in
-            AsyncImage(url: item.artwork) { image in
+            CachedImage(url: item.artwork) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 SoundChexTheme.base800

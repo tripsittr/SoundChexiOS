@@ -74,7 +74,7 @@ private struct DownloadArtwork: View {
     var body: some View {
         Group {
             if let url = item.artwork {
-                AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { placeholder }
+                CachedImage(url: url) { $0.resizable().scaledToFill() } placeholder: { placeholder }
             } else {
                 placeholder
             }

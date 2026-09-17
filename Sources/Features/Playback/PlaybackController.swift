@@ -188,6 +188,10 @@ final class PlaybackController {
         let playerItem = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: playerItem)
 
+        // Activate the session now, right before audio starts — a failed
+        // activation at launch would otherwise mute everything silently.
+        activateSession()
+
         // Resume where this track was left off, then play.
         Task {
             let resume = (try? await api.progress(itemID: item.id))?.position ?? 0
@@ -246,8 +250,53 @@ final class PlaybackController {
     // MARK: - System integration
 
     private func configureSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        let session = AVAudioSession.sharedInstance()
+        // `.longFormAudio` policy is what tells iOS this is music/podcast-style
+        // playback that should keep going in the background and take over the
+        // lock screen — the default policy does not, which is why audio stopped
+        // when the screen locked.
+        try? session.setCategory(.playback, mode: .default, policy: .longFormAudio)
+
+        // Re-activate on an interruption ending (a phone call, another app's
+        // audio) so playback can resume rather than staying silent. The needed
+        // values are pulled out here — a Notification cannot cross to the main
+        // actor under Swift 6 strict concurrency, but the two UInts can.
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: session, queue: .main
+        ) { [weak self] note in
+            let typeRaw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let optionsRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+            MainActor.assumeIsolated { self?.handleInterruption(typeRaw: typeRaw, optionsRaw: optionsRaw) }
+        }
+    }
+
+    /// Makes sure the audio session is active. Called right before playback so a
+    /// failed activation at launch does not permanently mute the app.
+    private func activateSession() {
         try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    private func handleInterruption(typeRaw: UInt?, optionsRaw: UInt?) {
+        guard let typeRaw, let type = AVAudioSession.InterruptionType(rawValue: typeRaw) else { return }
+
+        switch type {
+        case .began:
+            isPlaying = false
+            updateNowPlayingInfo()
+        case .ended:
+            // Resume only if the system says we should (the user did not switch
+            // to something else deliberately).
+            if let optionsRaw,
+               AVAudioSession.InterruptionOptions(rawValue: optionsRaw).contains(.shouldResume) {
+                activateSession()
+                player.play()
+                isPlaying = true
+                updateNowPlayingInfo()
+            }
+        @unknown default:
+            break
+        }
     }
 
     private func configureRemoteCommands() {

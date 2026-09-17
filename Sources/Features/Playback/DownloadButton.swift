@@ -2,39 +2,51 @@ import SwiftUI
 
 /// The persistent download control for a track.
 ///
-/// Shows the item's download state — not yet downloaded, downloading, or stored
-/// — and stays visible (unlike the row's hover-only button on the web). The
-/// download store lands in IOS-05; until then this reflects "not downloaded" and
-/// starting a download is a no-op with a note, so the control exists and is
-/// styled but does nothing destructive.
+/// Reflects the item's real download state from the DownloadStore — not
+/// downloaded, downloading (with progress), or stored — and stays visible.
+/// Tapping downloads; tapping a stored item offers to remove it.
 struct DownloadButton: View {
+    @Environment(DownloadStore.self) private var downloads
     let item: MediaItem
     var size: CGFloat = 22
 
-    // Placeholder state until the download store (IOS-05) provides the real one.
-    @State private var state: DownloadState = .idle
-
-    enum DownloadState { case idle, downloading, stored, failed }
+    @State private var confirmingRemove = false
 
     var body: some View {
         Button {
-            // Wired to the download store in IOS-05.
+            switch downloads.state(for: item.id) {
+            case .stored: confirmingRemove = true
+            case .downloading: break
+            default: downloads.download(item)
+            }
         } label: {
             icon
                 .font(.system(size: size))
                 .frame(width: 44, height: 44)
                 .contentShape(.rect)
         }
-        .disabled(state == .downloading)
+        .confirmationDialog("Remove download?", isPresented: $confirmingRemove, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) { downloads.remove(item.id) }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     @ViewBuilder private var icon: some View {
-        switch state {
+        switch downloads.state(for: item.id) {
         case .idle:
             Image(systemName: "arrow.down.circle")
                 .foregroundStyle(SoundChexTheme.ink300)
-        case .downloading:
-            ProgressView().tint(SoundChexTheme.accent)
+        case .downloading(let progress):
+            ZStack {
+                Circle()
+                    .trim(from: 0, to: max(progress, 0.02))
+                    .stroke(SoundChexTheme.accent, style: .init(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: size, height: size)
+                Image(systemName: "stop.fill")
+                    .font(.system(size: size * 0.4))
+                    .foregroundStyle(SoundChexTheme.ink500)
+            }
         case .stored:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(SoundChexTheme.storedGreen)

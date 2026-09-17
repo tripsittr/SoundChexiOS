@@ -9,6 +9,7 @@ import SwiftUI
 struct SoundChexApp: App {
     @State private var session = Session()
     @State private var playback = PlaybackController()
+    @State private var downloads = DownloadStore.shared
 
     init() {
         configureBarAppearance()
@@ -19,6 +20,7 @@ struct SoundChexApp: App {
             RootView()
                 .environment(session)
                 .environment(playback)
+                .environment(downloads)
                 .preferredColorScheme(.dark)
                 .tint(SoundChexTheme.accent)
         }

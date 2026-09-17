@@ -96,6 +96,7 @@ struct SongRow: View {
 /// menu. Playlist actions are added with the playlist API (IOS-19).
 struct TrackActions: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(DownloadStore.self) private var downloads
     let item: MediaItem
 
     var body: some View {
@@ -109,6 +110,20 @@ struct TrackActions: View {
         } label: {
             Label("Add to queue", systemImage: "text.append")
         }
-        // "Add to playlist" appears here once the playlist API is wired.
+
+        if downloads.isStored(item.id) {
+            Button(role: .destructive) {
+                downloads.remove(item.id)
+            } label: {
+                Label("Remove download", systemImage: "trash")
+            }
+        } else {
+            Button {
+                downloads.download(item)
+            } label: {
+                Label("Download", systemImage: "arrow.down.circle")
+            }
+        }
+        // "Add to playlist" appears here once the playlist API is wired (IOS-19).
     }
 }

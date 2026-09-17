@@ -22,6 +22,10 @@ final class Session {
     /// The API client, valid only while signed in.
     private(set) var api: APIClient?
 
+    /// Bumped whenever the active identity changes (sign-in, profile switch), so
+    /// views keyed on it rebuild and reload against the new token/profile.
+    private(set) var identityGeneration = 0
+
     var isSignedIn: Bool { serverURL != nil && token != nil }
 
     private let defaults = UserDefaults.standard
@@ -68,6 +72,32 @@ final class Session {
 
         defaults.set(server.absoluteString, forKey: serverKey)
         Keychain.setToken(issued, for: server)
+    }
+
+    /// The profiles on this account, for the in-app switcher. No password: the
+    /// token already proves the account.
+    func myProfiles() async throws -> [Profile] {
+        guard let api else { return [] }
+        return try await api.myProfiles()
+    }
+
+    /// Switches to another profile on the same account — the person using the
+    /// login changes, the login does not. Gets a fresh token and swaps it in
+    /// without signing out.
+    func switchProfile(to profile: Profile, pin: String?) async throws {
+        guard let api, let serverURL else { return }
+
+        let issued = try await api.switchProfile(
+            profileID: profile.id, pin: pin, deviceName: Self.deviceName
+        )
+
+        token = issued
+        self.api = APIClient(baseURL: serverURL, token: issued)
+        Keychain.setToken(issued, for: serverURL)
+
+        // The new profile has its own library/history; bump so the signed-in
+        // views rebuild and reload against it.
+        identityGeneration += 1
     }
 
     /// A human-readable name for this device, shown in the server's token list so

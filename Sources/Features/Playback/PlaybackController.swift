@@ -21,9 +21,16 @@ final class PlaybackController {
     private(set) var position: Double = 0
     private(set) var duration: Double = 0
 
+    /// Shuffle and repeat, surfaced for the now-playing controls.
+    private(set) var isShuffled = false
+    enum RepeatMode { case off, all, one }
+    private(set) var repeatMode: RepeatMode = .off
+
     private var api: APIClient?
     private var queue: [MediaItem] = []
     private var index = 0
+    /// The queue as it was handed in, so shuffle can be toggled off again.
+    private var originalQueue: [MediaItem] = []
 
     private let player = AVPlayer()
     private var timeObserver: Any?
@@ -46,9 +53,45 @@ final class PlaybackController {
     func play(_ items: [MediaItem], startAt start: Int = 0) {
         guard !items.isEmpty, let api else { return }
 
+        originalQueue = items
         queue = items
         index = min(max(start, 0), items.count - 1)
+
+        // A new context resets shuffle to whatever the toggle is now: if shuffle
+        // is on, shuffle the rest behind the tapped track.
+        if isShuffled { applyShuffle(keepingCurrent: true) }
+
         loadCurrent(api: api)
+    }
+
+    /// Toggles shuffle. Shuffling keeps the current track playing and reorders
+    /// what's behind it; un-shuffling restores the original order from here on.
+    func toggleShuffle() {
+        isShuffled.toggle()
+        if isShuffled {
+            applyShuffle(keepingCurrent: true)
+        } else if let current, let restored = originalQueue.firstIndex(of: current) {
+            queue = originalQueue
+            index = restored
+        }
+    }
+
+    /// Cycles repeat: off → all → one → off.
+    func cycleRepeat() {
+        repeatMode = switch repeatMode {
+        case .off: .all
+        case .all: .one
+        case .one: .off
+        }
+    }
+
+    private func applyShuffle(keepingCurrent: Bool) {
+        guard !queue.isEmpty else { return }
+        let current = keepingCurrent ? queue[safe: index] : nil
+        var rest = queue.enumerated().filter { $0.offset != index }.map(\.element)
+        rest.shuffle()
+        queue = (current.map { [$0] } ?? []) + rest
+        index = 0
     }
 
     func togglePlayPause() {
@@ -88,8 +131,15 @@ final class PlaybackController {
     }
 
     func next() {
-        guard index + 1 < queue.count, let api else { return }
-        index += 1
+        guard let api else { return }
+        if index + 1 < queue.count {
+            index += 1
+        } else if repeatMode == .all {
+            // Wrap to the top of the queue.
+            index = 0
+        } else {
+            return
+        }
         loadCurrent(api: api)
     }
 
@@ -173,7 +223,16 @@ final class PlaybackController {
 
     private func advanceAtEnd() {
         guard duration > 0, position >= duration - 0.5 else { return }
-        next()
+
+        // Repeat-one loops the same track; otherwise advance (which wraps when
+        // repeat-all is on).
+        if repeatMode == .one, let api {
+            seek(to: 0)
+            player.play()
+            _ = api
+        } else {
+            next()
+        }
     }
 
     // MARK: - System integration
@@ -205,5 +264,12 @@ final class PlaybackController {
         ]
         info[MPMediaItemPropertyMediaType] = MPMediaType.music.rawValue
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
+
+private extension Array {
+    /// Bounds-checked subscript, nil when out of range.
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

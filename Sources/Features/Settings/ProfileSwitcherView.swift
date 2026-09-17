@@ -1,49 +1,37 @@
 import SwiftUI
 
-/// Switching profile.
+/// Switch which profile is using the account — no sign-out, no password.
 ///
-/// A token is bound to one profile and minting a new one needs the password,
-/// which the app deliberately does not keep. So switching re-authenticates: it
-/// signs the current profile out and returns to the sign-in screen, where the
-/// profile picker appears again. Explained here so it doesn't read as a bug.
+/// An account (the Laravel login) has several profiles (the people using it),
+/// each with its own library, history and rating cap. Switching is just choosing
+/// who is using the app now: the current token already proves the account, so
+/// the server issues a fresh profile-bound token and the app swaps it in. A PIN
+/// is asked only where that profile is locked.
 struct ProfileSwitcherView: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
-    /// Called after sign-out so the presenting settings sheet can close too.
+    /// Closes the presenting settings sheet after a successful switch.
     var onSwitched: () -> Void
+
+    @State private var profiles: [Profile] = []
+    @State private var loadError: String?
 
     var body: some View {
         NavigationStack {
             ZStack {
                 SoundChexTheme.base900.ignoresSafeArea()
-                VStack(spacing: 20) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 44))
-                        .foregroundStyle(SoundChexTheme.accent)
-                    Text("Switch profile")
-                        .font(.title2.bold())
-                        .foregroundStyle(SoundChexTheme.ink100)
-                    Text("To keep your account secure, switching profiles signs you out and asks you to sign in again — then you can pick a different profile.")
-                        .font(.subheadline)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(SoundChexTheme.ink400)
-                        .padding(.horizontal, 32)
 
-                    Button {
-                        Task {
-                            await session.signOut()
-                            onSwitched()
-                        }
-                    } label: {
-                        Text("Sign out and switch")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(SoundChexTheme.accent, in: .rect(cornerRadius: 12))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 32)
-                    .padding(.top, 8)
+                if let loadError {
+                    ContentUnavailableView("Couldn't load profiles",
+                                           systemImage: "person.slash",
+                                           description: Text(loadError))
+                } else if profiles.isEmpty {
+                    ProgressView().tint(SoundChexTheme.accent)
+                } else {
+                    ProfilePickerView(
+                        profiles: profiles,
+                        onPick: { profile, pin in await switchTo(profile, pin: pin) }
+                    )
                 }
             }
             .toolbar {
@@ -51,6 +39,21 @@ struct ProfileSwitcherView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+        }
+        .task {
+            do { profiles = try await session.myProfiles() }
+            catch { loadError = (error as? APIClient.APIError)?.errorDescription
+                ?? "Could not load profiles." }
+        }
+    }
+
+    private func switchTo(_ profile: Profile, pin: String?) async {
+        do {
+            try await session.switchProfile(to: profile, pin: pin)
+            onSwitched()
+        } catch {
+            loadError = (error as? APIClient.APIError)?.errorDescription
+                ?? "Could not switch profile."
         }
     }
 }

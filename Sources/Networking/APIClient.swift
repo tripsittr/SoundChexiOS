@@ -97,6 +97,30 @@ struct APIClient {
         _ = try await sendRaw("/api/v1/tokens/current", method: "DELETE")
     }
 
+    /// The account's profiles, for a *signed-in* device — no password needed,
+    /// because the token proves the account. Used by the in-app profile switcher.
+    func myProfiles() async throws -> [Profile] {
+        struct Response: Decodable { let profiles: [Profile] }
+        let response: Response = try await send("/api/v1/profiles/mine", method: "GET")
+        return response.profiles
+    }
+
+    /// Switches to another profile on the same account without re-authenticating.
+    /// Returns a fresh token bound to the chosen profile; the old one is revoked.
+    func switchProfile(profileID: Int, pin: String?, deviceName: String) async throws -> String {
+        struct Body: Encodable {
+            let profileId: Int
+            let pin: String?
+            let deviceName: String
+        }
+        struct Response: Decodable { let token: String }
+        let response: Response = try await send(
+            "/api/v1/profiles/switch", method: "POST",
+            body: Body(profileId: profileID, pin: pin, deviceName: deviceName)
+        )
+        return response.token
+    }
+
     // MARK: - Library
 
     /// The whole catalogue.
@@ -113,6 +137,21 @@ struct APIClient {
         let escaped = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
         let response: Response = try await send("/api/v1/search?q=\(escaped)", method: "GET")
         return response.items
+    }
+
+    // MARK: - Lyrics
+
+    /// The lyrics for a track, or nil when the server has none. The server
+    /// fetches and caches them from a lyric provider; the app just reads them.
+    func lyrics(itemID: Int) async throws -> String? {
+        struct Response: Decodable { let lyrics: String? }
+        // A 404 (no lyrics) is not an error worth surfacing — return nil.
+        do {
+            let response: Response = try await send("/api/v1/items/\(itemID)/lyrics", method: "GET")
+            return response.lyrics
+        } catch APIError.http(404) {
+            return nil
+        }
     }
 
     // MARK: - Progress

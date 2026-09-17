@@ -25,6 +25,8 @@ struct NowPlayingPage: View {
                         titleBlock(item)
                         scrubber
                         transport
+                        actionsRow(item)
+                        LyricsSection(item: item)
                         upNextList
                     }
                     .padding(.horizontal, 28)
@@ -98,9 +100,16 @@ struct NowPlayingPage: View {
     }
 
     private var transport: some View {
-        HStack(spacing: 40) {
+        HStack(spacing: 32) {
+            // Shuffle
+            Button { playback.toggleShuffle() } label: {
+                Image(systemName: "shuffle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(playback.isShuffled ? SoundChexTheme.accent : SoundChexTheme.ink400)
+            }
+
             Button { playback.previous() } label: {
-                Image(systemName: "backward.fill").font(.title)
+                Image(systemName: "backward.fill").font(.title2)
             }
             Button { playback.togglePlayPause() } label: {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
@@ -111,11 +120,38 @@ struct NowPlayingPage: View {
                     .shadow(color: SoundChexTheme.accent.opacity(0.4), radius: 12, y: 4)
             }
             Button { playback.next() } label: {
-                Image(systemName: "forward.fill").font(.title)
+                Image(systemName: "forward.fill").font(.title2)
+            }
+
+            // Repeat: off / all / one
+            Button { playback.cycleRepeat() } label: {
+                Image(systemName: playback.repeatMode == .one ? "repeat.1" : "repeat")
+                    .font(.system(size: 18))
+                    .foregroundStyle(playback.repeatMode == .off ? SoundChexTheme.ink400 : SoundChexTheme.accent)
             }
         }
         .foregroundStyle(SoundChexTheme.ink200)
-        .padding(.top, 28)
+        .padding(.top, 24)
+    }
+
+    /// A row of secondary actions under the transport: download and the kebab.
+    private func actionsRow(_ item: MediaItem) -> some View {
+        HStack(spacing: 28) {
+            // Persistent download control (wired to the download store in IOS-05).
+            DownloadButton(item: item)
+
+            Spacer()
+
+            Menu {
+                TrackActions(item: item)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18))
+                    .foregroundStyle(SoundChexTheme.ink300)
+                    .frame(width: 44, height: 44)
+            }
+        }
+        .padding(.top, 20)
     }
 
     @ViewBuilder private var upNextList: some View {

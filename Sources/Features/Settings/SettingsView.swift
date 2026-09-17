@@ -92,6 +92,27 @@ struct SettingsView: View {
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        // The music-themed name for this minor release — see Plans/Versioning.md.
+        if let name = AppRelease.name(for: v) {
+            return "\(v) “\(name)” (\(b))"
+        }
         return "\(v) (\(b))"
+    }
+}
+
+/// Maps a SemVer to its release name. Kept here so the version line and any
+/// about screen read from one place.
+enum AppRelease {
+    private static let names: [String: String] = [
+        "0.2": "Overture",
+        "0.3": "Crescendo",
+        "1.0": "Encore",
+    ]
+
+    /// The name for a full version string like "0.2.1" — keyed on its minor.
+    static func name(for version: String) -> String? {
+        let parts = version.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        return names["\(parts[0]).\(parts[1])"]
     }
 }

@@ -19,7 +19,12 @@ struct MediaGridView: View {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 18) {
                             ForEach(store.topLevel(of: type)) { item in
-                                Poster(item: item)
+                                NavigationLink {
+                                    ShowDetailView(item: item)
+                                } label: {
+                                    Poster(item: item)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding(16)

@@ -19,7 +19,7 @@ struct LibraryTabs: View {
         TabView {
             HomeView().nowPlayingInset()
                 .tabItem { Label("Home", systemImage: "house.fill") }
-            MediaListView(type: .music, title: "Music").nowPlayingInset()
+            MusicView().nowPlayingInset()
                 .tabItem { Label("Music", systemImage: "music.note") }
             MediaGridView(type: .movie, title: "Movies").nowPlayingInset()
                 .tabItem { Label("Movies", systemImage: "film") }

@@ -19,8 +19,10 @@ settings:
     # not survive a regenerate. Same team the Tauri iOS build uses.
     DEVELOPMENT_TEAM: "7GSWB72PH6"
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    # Versioning: SemVer with a music-themed name per minor release (see
+    # Plans/Versioning.md). 0.2.0 is "Overture" — the first native release.
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete

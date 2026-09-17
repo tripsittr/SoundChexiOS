@@ -38,6 +38,21 @@ struct MediaItem: Identifiable, Decodable, Hashable, Sendable {
         meta = try? c.decodeIfPresent(Meta.self, forKey: .meta)
     }
 
+    /// A direct initialiser, for building an item from stored/offline data
+    /// rather than a server response (a custom decoder suppresses the synthesised
+    /// memberwise one).
+    init(id: Int, type: MediaType, title: String, subtitle: String?,
+         parentID: Int?, playable: Bool, artwork: URL?, meta: Meta?) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.subtitle = subtitle
+        self.parentID = parentID
+        self.playable = playable
+        self.artwork = artwork
+        self.meta = meta
+    }
+
     struct Meta: Decodable, Hashable, Sendable {
         let artist: String?
         let album: String?
@@ -60,6 +75,19 @@ struct MediaItem: Identifiable, Decodable, Hashable, Sendable {
             case seasonNumber, episodeNumber, releaseYear, durationMs
         }
 
+        /// Direct initialiser for building from stored data (offline entries).
+        init(artist: String? = nil, album: String? = nil, author: String? = nil,
+             director: String? = nil, episodeTitle: String? = nil,
+             trackNumber: Int? = nil, discNumber: Int? = nil,
+             seasonNumber: Int? = nil, episodeNumber: Int? = nil,
+             releaseYear: Int? = nil, durationMs: Int? = nil) {
+            self.artist = artist; self.album = album; self.author = author
+            self.director = director; self.episodeTitle = episodeTitle
+            self.trackNumber = trackNumber; self.discNumber = discNumber
+            self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
+            self.releaseYear = releaseYear; self.durationMs = durationMs
+        }
+
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             artist = try? c.decodeIfPresent(String.self, forKey: .artist)
@@ -77,7 +105,7 @@ struct MediaItem: Identifiable, Decodable, Hashable, Sendable {
     }
 }
 
-enum MediaType: String, Decodable, CaseIterable, Sendable {
+enum MediaType: String, Codable, CaseIterable, Sendable {
     case music, movie, show, book
     /// The catch-all for a value the server adds later that this build predates.
     case unknown

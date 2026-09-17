@@ -164,19 +164,27 @@ final class PlaybackController {
         let item = queue[index]
         current = item
 
-        guard let url = api.streamURL(itemID: item.id) else { return }
+        let asset: AVURLAsset
 
-        // The stream route authenticates with a Sanctum bearer *header* — a
-        // query-param token is ignored, which is why playback started but no
-        // audio ever arrived (the request 401'd). AVURLAsset lets us attach the
-        // header to every request it makes for the media, including range
-        // requests during a seek.
-        var options: [String: Any] = [:]
-        if let token = api.token {
-            options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": "Bearer \(token)"]
+        if let local = DownloadStore.shared.localURL(for: item.id) {
+            // Downloaded: play from disk. Works with no network, and needs no
+            // auth header since it is a local file.
+            asset = AVURLAsset(url: local)
+        } else {
+            guard let url = api.streamURL(itemID: item.id) else { return }
+
+            // The stream route authenticates with a Sanctum bearer *header* — a
+            // query-param token is ignored, which is why playback started but no
+            // audio ever arrived (the request 401'd). AVURLAsset lets us attach
+            // the header to every request it makes for the media, including range
+            // requests during a seek.
+            var options: [String: Any] = [:]
+            if let token = api.token {
+                options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": "Bearer \(token)"]
+            }
+            asset = AVURLAsset(url: url, options: options)
         }
 
-        let asset = AVURLAsset(url: url, options: options)
         let playerItem = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: playerItem)
 

@@ -9,6 +9,7 @@ import SwiftUI
 struct LibraryTabs: View {
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
+    @Environment(DownloadStore.self) private var downloads
     @State private var store = LibraryStore()
 
     var body: some View {
@@ -34,6 +35,7 @@ struct LibraryTabs: View {
         .task {
             store.attach(api: session.api)
             playback.attach(api: session.api)
+            downloads.attach(api: session.api)
             await store.loadIfNeeded()
         }
     }

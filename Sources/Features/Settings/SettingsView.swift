@@ -11,6 +11,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("Library") {
+                    NavigationLink {
+                        DownloadsView()
+                    } label: {
+                        Label("Downloads", systemImage: "arrow.down.circle")
+                    }
+                }
+
                 Section("Server") {
                     LabeledContent("Address", value: session.serverURL?.host() ?? "—")
                 }

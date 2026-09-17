@@ -11,10 +11,11 @@ struct APIClient {
     let baseURL: URL
     let token: String?
 
+    // snake_case JSON → camelCase Swift. Models that need a name the strategy
+    // wouldn't produce (e.g. parentID from parent_id) map that one key explicitly
+    // to the *transformed* name; see MediaItem.CodingKeys.
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        // The API returns snake_case (release_year, parent_id); map it to Swift's
-        // camelCase automatically so the models stay idiomatic.
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }()
@@ -37,9 +38,9 @@ struct APIClient {
         var errorDescription: String? {
             switch self {
             case .badURL: "That server address is not valid."
-            case .unreachable: "Could not reach the server."
+            case .unreachable(let e): "Could not reach the server. (\(e.localizedDescription))"
             case .http(let status): "The server returned an error (\(status))."
-            case .decoding: "The server's response was not understood."
+            case .decoding(let e): "The server's response was not understood. (\(decodingHint(e)))"
             case .unauthorized: "Your email or password was not accepted."
             }
         }
@@ -96,6 +97,30 @@ struct APIClient {
         _ = try await sendRaw("/api/v1/tokens/current", method: "DELETE")
     }
 
+    /// The account's profiles, for a *signed-in* device — no password needed,
+    /// because the token proves the account. Used by the in-app profile switcher.
+    func myProfiles() async throws -> [Profile] {
+        struct Response: Decodable { let profiles: [Profile] }
+        let response: Response = try await send("/api/v1/profiles/mine", method: "GET")
+        return response.profiles
+    }
+
+    /// Switches to another profile on the same account without re-authenticating.
+    /// Returns a fresh token bound to the chosen profile; the old one is revoked.
+    func switchProfile(profileID: Int, pin: String?, deviceName: String) async throws -> String {
+        struct Body: Encodable {
+            let profileId: Int
+            let pin: String?
+            let deviceName: String
+        }
+        struct Response: Decodable { let token: String }
+        let response: Response = try await send(
+            "/api/v1/profiles/switch", method: "POST",
+            body: Body(profileId: profileID, pin: pin, deviceName: deviceName)
+        )
+        return response.token
+    }
+
     // MARK: - Library
 
     /// The whole catalogue.
@@ -112,6 +137,127 @@ struct APIClient {
         let escaped = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
         let response: Response = try await send("/api/v1/search?q=\(escaped)", method: "GET")
         return response.items
+    }
+
+    // MARK: - Identity / admin
+
+    /// Who this token belongs to, and whether the profile may administer.
+    func me() async throws -> Identity {
+        try await send("/api/v1/me", method: "GET")
+    }
+
+    /// Admin dashboard figures. 403 if the profile is not an admin.
+    func adminStats() async throws -> AdminStats {
+        try await send("/api/v1/admin/stats", method: "GET")
+    }
+
+    /// One item's editable admin detail.
+    func adminItem(_ id: Int) async throws -> AdminItem {
+        try await send("/api/v1/admin/items/\(id)", method: "GET")
+    }
+
+    /// Saves an item's edited fields. `meta` carries the type's fields.
+    func updateAdminItem(_ id: Int, title: String, userRating: Double?,
+                         notes: String?, meta: [String: AnyCodableValue]) async throws -> AdminItem {
+        struct Body: Encodable {
+            let title: String
+            let userRating: Double?
+            let notes: String?
+            let meta: [String: AnyCodableValue]
+        }
+        return try await send("/api/v1/admin/items/\(id)", method: "PATCH",
+                              body: Body(title: title, userRating: userRating, notes: notes, meta: meta))
+    }
+
+    /// The account's profiles for management, plus the rating ladder.
+    func adminProfiles() async throws -> AdminProfilesResponse {
+        try await send("/api/v1/admin/profiles", method: "GET")
+    }
+
+    /// Creates a profile.
+    func createProfile(name: String, color: String?, isKids: Bool,
+                       maxRating: String?, pin: String?) async throws -> AdminProfile {
+        struct Body: Encodable {
+            let name: String; let color: String?; let isKids: Bool
+            let maxRating: String?; let pin: String?
+        }
+        return try await send("/api/v1/admin/profiles", method: "POST",
+                              body: Body(name: name, color: color, isKids: isKids,
+                                         maxRating: maxRating, pin: pin))
+    }
+
+    /// Updates a profile.
+    func updateProfile(_ id: Int, name: String?, color: String?, isKids: Bool?,
+                       maxRating: String?, pin: String?) async throws -> AdminProfile {
+        struct Body: Encodable {
+            let name: String?; let color: String?; let isKids: Bool?
+            let maxRating: String?; let pin: String?
+        }
+        return try await send("/api/v1/admin/profiles/\(id)", method: "PATCH",
+                              body: Body(name: name, color: color, isKids: isKids,
+                                         maxRating: maxRating, pin: pin))
+    }
+
+    /// Deletes a profile.
+    func deleteProfile(_ id: Int) async throws {
+        _ = try await sendRaw("/api/v1/admin/profiles/\(id)", method: "DELETE")
+    }
+
+    /// Queues a library scan to pick up newly-added files.
+    func triggerScan() async throws {
+        _ = try await sendRaw("/api/v1/admin/scan", method: "POST")
+    }
+
+    // MARK: - Playlists
+
+    /// The account's playlists, for the picker.
+    func playlists() async throws -> [Playlist] {
+        struct Response: Decodable { let playlists: [Playlist] }
+        let response: Response = try await send("/api/v1/playlists", method: "GET")
+        return response.playlists
+    }
+
+    /// One playlist and its tracks.
+    func playlist(_ id: Int) async throws -> PlaylistDetail {
+        try await send("/api/v1/playlists/\(id)", method: "GET")
+    }
+
+    /// Creates a playlist, returning it.
+    func createPlaylist(name: String) async throws -> Playlist {
+        struct Body: Encodable { let name: String }
+        return try await send("/api/v1/playlists", method: "POST", body: Body(name: name))
+    }
+
+    /// Adds an item to a playlist.
+    func addToPlaylist(_ playlistID: Int, itemID: Int) async throws {
+        struct Body: Encodable { let itemId: Int }
+        _ = try await sendRaw("/api/v1/playlists/\(playlistID)/items", method: "POST",
+                              body: Body(itemId: itemID))
+    }
+
+    /// Removes an item from a playlist.
+    func removeFromPlaylist(_ playlistID: Int, itemID: Int) async throws {
+        _ = try await sendRaw("/api/v1/playlists/\(playlistID)/items/\(itemID)", method: "DELETE")
+    }
+
+    /// Deletes a playlist (the tracks are untouched).
+    func deletePlaylist(_ id: Int) async throws {
+        _ = try await sendRaw("/api/v1/playlists/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Lyrics
+
+    /// The lyrics for a track, or nil when the server has none. The server
+    /// fetches and caches them from a lyric provider; the app just reads them.
+    func lyrics(itemID: Int) async throws -> String? {
+        struct Response: Decodable { let lyrics: String? }
+        // A 404 (no lyrics) is not an error worth surfacing — return nil.
+        do {
+            let response: Response = try await send("/api/v1/items/\(itemID)/lyrics", method: "GET")
+            return response.lyrics
+        } catch APIError.http(404) {
+            return nil
+        }
     }
 
     // MARK: - Progress
@@ -132,17 +278,11 @@ struct APIClient {
 
     // MARK: - URLs (for streaming and artwork, used directly by AVPlayer / AsyncImage)
 
-    /// The streaming URL for one item, with the token as a query parameter so
-    /// AVPlayer — which cannot set an Authorization header easily — can still
-    /// authenticate. (If the API expects the header instead, the player uses a
-    /// resource loader; see PlaybackURL.)
+    /// The streaming URL for one item. Authentication is the bearer token in the
+    /// Authorization header, which the player attaches to the AVURLAsset (a query
+    /// token is ignored by Sanctum), so no token rides on the URL.
     func streamURL(itemID: Int) -> URL? {
-        var components = URLComponents(url: baseURL.appendingPathComponent("/api/v1/items/\(itemID)/stream"),
-                                       resolvingAgainstBaseURL: false)
-        if let token {
-            components?.queryItems = [URLQueryItem(name: "token", value: token)]
-        }
-        return components?.url
+        baseURL.appendingPathComponent("/api/v1/items/\(itemID)/stream")
     }
 
     /// The artwork URL for one item.
@@ -208,6 +348,26 @@ struct APIClient {
         }
 
         return data
+    }
+}
+
+/// A short, human-readable reason a decode failed — which key or type, so a
+/// "response not understood" error names the actual mismatch instead of hiding it.
+private func decodingHint(_ error: Error) -> String {
+    guard let decoding = error as? DecodingError else {
+        return String(describing: error).prefix(80).description
+    }
+
+    switch decoding {
+    case .keyNotFound(let key, _):
+        return "missing '\(key.stringValue)'"
+    case .typeMismatch(_, let ctx), .valueNotFound(_, let ctx):
+        let path = ctx.codingPath.map(\.stringValue).joined(separator: ".")
+        return "type mismatch at '\(path)'"
+    case .dataCorrupted(let ctx):
+        return "corrupted: \(ctx.debugDescription.prefix(60))"
+    @unknown default:
+        return "unknown decode error"
     }
 }
 

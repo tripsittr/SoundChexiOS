@@ -60,6 +60,102 @@ final class LibraryStore {
         items(of: type).filter { $0.parentID == nil }
     }
 
+    /// The children of an item (a show's episodes), by parent id, in order.
+    func children(of parentID: Int) -> [MediaItem] {
+        items
+            .filter { $0.parentID == parentID }
+            .sorted {
+                let a = ($0.meta?.seasonNumber ?? 0, $0.meta?.episodeNumber ?? 0)
+                let b = ($1.meta?.seasonNumber ?? 0, $1.meta?.episodeNumber ?? 0)
+                return a < b
+            }
+    }
+
+    // MARK: - Music grouping (albums, artists)
+
+    /// One album: its tracks, in disc/track order.
+    struct Album: Identifiable, Hashable {
+        let id: String            // artist|album, so two albums of a name don't merge
+        let title: String
+        let artist: String
+        let tracks: [MediaItem]
+        var artwork: URL? { tracks.first?.artwork }
+    }
+
+    /// Albums, grouped from the music tracks by artist + album.
+    var albums: [Album] {
+        let music = items(of: .music)
+        let groups = Dictionary(grouping: music) { item in
+            "\(item.meta?.artist ?? "")|\(item.meta?.album ?? item.title)"
+        }
+        return groups.compactMap { key, tracks -> Album? in
+            guard let first = tracks.first else { return nil }
+            let sorted = tracks.sorted {
+                ($0.meta?.discNumber ?? 0, $0.meta?.trackNumber ?? 0)
+                    < ($1.meta?.discNumber ?? 0, $1.meta?.trackNumber ?? 0)
+            }
+            return Album(
+                id: key,
+                title: first.meta?.album ?? "Unknown album",
+                artist: first.meta?.artist ?? "Unknown artist",
+                tracks: sorted
+            )
+        }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    /// One artist: their albums.
+    struct Artist: Identifiable, Hashable {
+        let id: String            // the artist name
+        let name: String
+        let albums: [Album]
+        var artwork: URL? { albums.first?.artwork }
+        var trackCount: Int { albums.reduce(0) { $0 + $1.tracks.count } }
+    }
+
+    /// Artists, grouped from the albums.
+    var artists: [Artist] {
+        let groups = Dictionary(grouping: albums) { $0.artist }
+        return groups.map { name, albums in
+            Artist(id: name, name: name, albums: albums.sorted {
+                $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+            })
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    // MARK: - Home
+
+    /// The hero item — the most recently added top-level thing with artwork.
+    var heroItem: MediaItem? {
+        items
+            .filter { $0.parentID == nil && $0.artwork != nil }
+            .first
+    }
+
+    /// The home rails: a "Recently added" mix, then one row per type. Derived
+    /// from the loaded catalogue, the way the web home composes its rows.
+    struct Row: Identifiable {
+        let id = UUID()
+        let title: String
+        let items: [MediaItem]
+    }
+
+    var homeRows: [Row] {
+        var rows: [Row] = []
+
+        let recent = items.filter { $0.parentID == nil }.prefix(20)
+        if !recent.isEmpty { rows.append(Row(title: "Recently added", items: Array(recent))) }
+
+        for (type, label) in [(MediaType.music, "Music"), (.movie, "Movies"),
+                              (.show, "Shows"), (.book, "Books")] {
+            let ofType = topLevel(of: type).prefix(20)
+            if !ofType.isEmpty { rows.append(Row(title: label, items: Array(ofType))) }
+        }
+
+        return rows
+    }
+
     func search(_ term: String) -> [MediaItem] {
         let needle = term.trimmingCharacters(in: .whitespaces).lowercased()
         guard needle.count >= 2 else { return [] }

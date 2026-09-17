@@ -1,10 +1,10 @@
 import SwiftUI
 
 /// The persistent now-playing bar, docked above the tab bar while something
-/// plays. Tapping it could later open a full-screen player; for now it shows
-/// what's playing and the core transport.
+/// plays. Tapping it opens the full-screen player.
 struct NowPlayingBar: View {
     @Environment(PlaybackController.self) private var playback
+    @State private var showingPlayer = false
 
     var body: some View {
         if let item = playback.current {
@@ -12,22 +12,30 @@ struct NowPlayingBar: View {
                 progressTrack
 
                 HStack(spacing: 12) {
-                    Artwork(item: item, size: 40)
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item.title)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(SoundChexTheme.ink100)
-                            .lineLimit(1)
-                        if let subtitle = item.subtitle {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundStyle(SoundChexTheme.ink500)
-                                .lineLimit(1)
+                    // The info area opens the full-screen player; the transport
+                    // buttons keep their own taps.
+                    Button {
+                        showingPlayer = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Artwork(item: item, size: 40)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(SoundChexTheme.ink100)
+                                    .lineLimit(1)
+                                if let subtitle = item.subtitle {
+                                    Text(subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(SoundChexTheme.ink500)
+                                        .lineLimit(1)
+                                }
+                            }
+                            Spacer()
                         }
+                        .contentShape(.rect)
                     }
-
-                    Spacer()
+                    .buttonStyle(.plain)
 
                     Button { playback.previous() } label: {
                         Image(systemName: "backward.fill")
@@ -47,6 +55,9 @@ struct NowPlayingBar: View {
             .background(.ultraThinMaterial)
             .overlay(alignment: .top) {
                 Rectangle().fill(SoundChexTheme.base700).frame(height: 0.5)
+            }
+            .fullScreenCover(isPresented: $showingPlayer) {
+                NowPlayingPage()
             }
         }
     }

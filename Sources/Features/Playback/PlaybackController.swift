@@ -21,9 +21,16 @@ final class PlaybackController {
     private(set) var position: Double = 0
     private(set) var duration: Double = 0
 
+    /// Shuffle and repeat, surfaced for the now-playing controls.
+    private(set) var isShuffled = false
+    enum RepeatMode { case off, all, one }
+    private(set) var repeatMode: RepeatMode = .off
+
     private var api: APIClient?
     private var queue: [MediaItem] = []
     private var index = 0
+    /// The queue as it was handed in, so shuffle can be toggled off again.
+    private var originalQueue: [MediaItem] = []
 
     private let player = AVPlayer()
     private var timeObserver: Any?
@@ -46,9 +53,45 @@ final class PlaybackController {
     func play(_ items: [MediaItem], startAt start: Int = 0) {
         guard !items.isEmpty, let api else { return }
 
+        originalQueue = items
         queue = items
         index = min(max(start, 0), items.count - 1)
+
+        // A new context resets shuffle to whatever the toggle is now: if shuffle
+        // is on, shuffle the rest behind the tapped track.
+        if isShuffled { applyShuffle(keepingCurrent: true) }
+
         loadCurrent(api: api)
+    }
+
+    /// Toggles shuffle. Shuffling keeps the current track playing and reorders
+    /// what's behind it; un-shuffling restores the original order from here on.
+    func toggleShuffle() {
+        isShuffled.toggle()
+        if isShuffled {
+            applyShuffle(keepingCurrent: true)
+        } else if let current, let restored = originalQueue.firstIndex(of: current) {
+            queue = originalQueue
+            index = restored
+        }
+    }
+
+    /// Cycles repeat: off → all → one → off.
+    func cycleRepeat() {
+        repeatMode = switch repeatMode {
+        case .off: .all
+        case .all: .one
+        case .one: .off
+        }
+    }
+
+    private func applyShuffle(keepingCurrent: Bool) {
+        guard !queue.isEmpty else { return }
+        let current = keepingCurrent ? queue[safe: index] : nil
+        var rest = queue.enumerated().filter { $0.offset != index }.map(\.element)
+        rest.shuffle()
+        queue = (current.map { [$0] } ?? []) + rest
+        index = 0
     }
 
     func togglePlayPause() {
@@ -57,9 +100,46 @@ final class PlaybackController {
         updateNowPlayingInfo()
     }
 
+    /// Inserts an item to play right after the current one.
+    ///
+    /// If nothing is playing, it just starts. Otherwise it slots in at the front
+    /// of what remains, so "play next" jumps the rest of the queue.
+    func playNext(_ item: MediaItem) {
+        guard let api else { return }
+        if current == nil {
+            play([item])
+        } else {
+            queue.insert(item, at: index + 1)
+            _ = api // keep the guard meaningful; loading happens on advance
+        }
+    }
+
+    /// Appends an item to the end of the queue.
+    func addToQueue(_ item: MediaItem) {
+        if current == nil, let api {
+            _ = api
+            play([item])
+        } else {
+            queue.append(item)
+        }
+    }
+
+    /// What is coming up after the current track, for the queue view.
+    var upNext: [MediaItem] {
+        guard index + 1 <= queue.count else { return [] }
+        return Array(queue[(index + 1)...])
+    }
+
     func next() {
-        guard index + 1 < queue.count, let api else { return }
-        index += 1
+        guard let api else { return }
+        if index + 1 < queue.count {
+            index += 1
+        } else if repeatMode == .all {
+            // Wrap to the top of the queue.
+            index = 0
+        } else {
+            return
+        }
         loadCurrent(api: api)
     }
 
@@ -84,9 +164,27 @@ final class PlaybackController {
         let item = queue[index]
         current = item
 
-        guard let url = api.streamURL(itemID: item.id) else { return }
+        let asset: AVURLAsset
 
-        let asset = AVURLAsset(url: url)
+        if let local = DownloadStore.shared.localURL(for: item.id) {
+            // Downloaded: play from disk. Works with no network, and needs no
+            // auth header since it is a local file.
+            asset = AVURLAsset(url: local)
+        } else {
+            guard let url = api.streamURL(itemID: item.id) else { return }
+
+            // The stream route authenticates with a Sanctum bearer *header* — a
+            // query-param token is ignored, which is why playback started but no
+            // audio ever arrived (the request 401'd). AVURLAsset lets us attach
+            // the header to every request it makes for the media, including range
+            // requests during a seek.
+            var options: [String: Any] = [:]
+            if let token = api.token {
+                options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": "Bearer \(token)"]
+            }
+            asset = AVURLAsset(url: url, options: options)
+        }
+
         let playerItem = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: playerItem)
 
@@ -133,7 +231,16 @@ final class PlaybackController {
 
     private func advanceAtEnd() {
         guard duration > 0, position >= duration - 0.5 else { return }
-        next()
+
+        // Repeat-one loops the same track; otherwise advance (which wraps when
+        // repeat-all is on).
+        if repeatMode == .one, let api {
+            seek(to: 0)
+            player.play()
+            _ = api
+        } else {
+            next()
+        }
     }
 
     // MARK: - System integration
@@ -165,5 +272,12 @@ final class PlaybackController {
         ]
         info[MPMediaItemPropertyMediaType] = MPMediaType.music.rawValue
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
+
+private extension Array {
+    /// Bounds-checked subscript, nil when out of range.
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

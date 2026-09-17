@@ -24,6 +24,17 @@ struct SettingsView: View {
                     }
                 }
 
+                // Admin, only for a profile that may administer.
+                if session.isAdmin {
+                    Section("Admin") {
+                        NavigationLink {
+                            AdminDashboardView()
+                        } label: {
+                            Label("Dashboard", systemImage: "chart.bar.xaxis")
+                        }
+                    }
+                }
+
                 Section("Server") {
                     LabeledContent("Address", value: session.serverURL?.host() ?? "—")
                 }

@@ -1,14 +1,18 @@
 # Versioning
 
 SoundChex uses **SemVer** (`MAJOR.MINOR.PATCH`) with a personality: every
-**minor** release gets a **music-themed name**. Patches keep their minor's name.
+**minor** release gets a **music-themed name**, and that name holds for the
+whole minor — **it changes only at the next minor bump**, never on a patch.
 
-- **PATCH** (`0.2.0 → 0.2.1`) — fixes, no new features. Same name.
-- **MINOR** (`0.2.0 → 0.3.0`) — new features. New name.
+- **PATCH** (`0.4.0 → 0.4.1 → 0.4.2 …`) — fixes, no new features. **Same name.**
+  All of `0.4.x` is "Interlude"; the name does not change again until `0.5.0`.
+- **MINOR** (`0.4.x → 0.5.0`) — new features. **New name** (the next unused one).
 - **MAJOR** (`0.x → 1.0.0`) — the first stable, feature-complete release.
 
-While pre-1.0 the API and shape can still move; a minor bump is our "meaningful
-step forward", a patch our "made it better".
+So one name per minor, however many patches that minor collects: the name is
+keyed on `MAJOR.MINOR` alone (see `AppRelease.name(for:)`), so `0.4.0` and
+`0.4.9` both read "Interlude". While pre-1.0 the API and shape can still move; a
+minor bump is our "meaningful step forward", a patch our "made it better".
 
 ## The names
 

@@ -96,5 +96,5 @@ struct SettingsView: View {
         }
     }
 
-    private var appVersion: String { AppRelease.displayWithBuild }
+    private var appVersion: String { AppRelease.display }
 }

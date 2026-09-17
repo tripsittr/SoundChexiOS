@@ -41,7 +41,8 @@ enum AppRelease {
         return version
     }
 
-    /// The same, plus the build number: `0.2.0 “Overture” (2)`. For Settings/About.
+    /// The same, plus the build number: `0.2.0 “Overture” (2)`. Diagnostics only
+    /// — the user-facing Settings shows `display` without the build number.
     static var displayWithBuild: String {
         "\(display) (\(build))"
     }

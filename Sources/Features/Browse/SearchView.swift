@@ -1,34 +1,50 @@
 import SwiftUI
 
-/// Search across the loaded library.
+/// Search across the library.
 ///
-/// For now it filters the local catalogue, which covers titles, artists, albums
-/// and authors instantly with no round trip. A server search endpoint (which also
-/// searches dialogue and book text) is a later addition; when it lands this
-/// screen queries it and falls back to the local filter offline.
+/// Queries the server (`GET /api/v1/search`), which covers titles, people,
+/// dialogue and book text — more than a title match. Debounced so it does not
+/// fire on every keystroke, and it falls back to filtering the already-loaded
+/// catalogue when the server cannot be reached, so search still works with a
+/// flaky connection.
 struct SearchView: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(Session.self) private var session
+    @Environment(PlaybackController.self) private var playback
+
     @State private var term = ""
+    @State private var results: [MediaItem] = []
+    @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
-            List(store.search(term)) { item in
-                HStack(spacing: 12) {
-                    Artwork(item: item, size: 44, aspect: item.type == .music ? 1 : 1.4)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
-                        if let subtitle = item.subtitle {
-                            Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
+            List(results) { item in
+                Button {
+                    if item.type == .music { playback.play([item]) }
+                } label: {
+                    HStack(spacing: 12) {
+                        Artwork(item: item, size: 44, aspect: item.type == .music ? 1 : 1.4)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                            if let subtitle = item.subtitle {
+                                Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
+                            }
                         }
+                        Spacer()
                     }
+                    .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
                 .listRowBackground(SoundChexTheme.base900)
             }
             .listStyle(.plain)
             .overlay {
                 if term.count < 2 {
                     ContentUnavailableView("Search your library", systemImage: "magnifyingglass")
-                } else if store.search(term).isEmpty {
+                } else if isSearching && results.isEmpty {
+                    ProgressView()
+                } else if results.isEmpty {
                     ContentUnavailableView.search(text: term)
                 }
             }
@@ -36,5 +52,37 @@ struct SearchView: View {
             .background(SoundChexTheme.base900)
         }
         .searchable(text: $term, prompt: "Songs, films, books…")
+        .onChange(of: term) { _, newValue in
+            runSearch(newValue)
+        }
+    }
+
+    /// Debounced search: the server first, the local catalogue as a fallback.
+    private func runSearch(_ query: String) {
+        searchTask?.cancel()
+
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else {
+            results = []
+            return
+        }
+
+        searchTask = Task {
+            // Wait out a burst of typing before hitting the network.
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
+
+            isSearching = true
+            defer { isSearching = false }
+
+            if let api = session.api,
+               let found = try? await api.search(trimmed),
+               !Task.isCancelled {
+                results = found
+            } else if !Task.isCancelled {
+                // Offline or the request failed — filter what is already loaded.
+                results = store.search(trimmed)
+            }
+        }
     }
 }

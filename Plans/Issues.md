@@ -32,7 +32,6 @@ The API case for this split is in the server repo's `NativeClients.md`.
 | ID | What | Notes |
 |----|------|-------|
 | IOS-02 | Device signing | `project.yml` has an empty `DEVELOPMENT_TEAM`; set it (or configure automatic signing) so the app builds to a real iPhone. Provisioning profile, bundle id `net.soundchex.ios`. Until then the app runs only in the Simulator. |
-| IOS-03 | Server-side search wiring | `SearchView` filters the local catalogue. Point it at `GET /api/v1/search` (built server-side) for dialogue + book-text coverage, falling back to the local filter offline. |
 | IOS-04 | Detail screens | Album → track list, artist → albums, show → seasons/episodes, film/book detail. `/api/v1/library` already carries parent_id and the metadata; a per-item detail endpoint is optional (see IOS-13). |
 | IOS-05 | Offline: local catalogue + downloads | The whole reason iOS went native. SwiftData (or a file store) mirror of `/api/v1/library`, per-item downloads to disk, offline browse from the local store, and AVPlayer playing local files when offline. Gated on free space for "download all". Mirrors offline-rebuild scope but done natively. |
 | IOS-06 | Background + resumable downloads | `URLSession` background transfers so a film keeps downloading when the app is backgrounded and resumes a partial file. The native answer to the server repo's S-07. |
@@ -56,4 +55,4 @@ The API case for this split is in the server repo's `NativeClients.md`.
 
 | ID | What | When | Notes |
 |----|------|------|-------|
-| — | (none yet) | | |
+| IOS-03 | Server-side search wiring | 2026-09-16 | `SearchView` now queries `GET /api/v1/search` (titles, people, dialogue, book text), debounced 300ms, falling back to the local catalogue filter when the server can't be reached. Tapping a music result plays it. |

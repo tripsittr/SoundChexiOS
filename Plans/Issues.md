@@ -37,6 +37,9 @@ The API case for this split is in the server repo's `NativeClients.md`.
 | IOS-08 | Book reader | EPUB/PDF rendering. The server's reader routes are session-only; needs API equivalents for text/contents/annotations, or render from the downloaded file. Large; likely deferred behind audio + video. |
 | IOS-11 | Multiple server addresses / fast-route race | The web connect screen raced a LAN address against the relay. A native app should prefer a fast local address when reachable and fall back to the tunnel — the same 20ms-vs-700ms problem. |
 | IOS-13 | Item-detail JSON endpoint (server) | Optional. `/api/v1/library` carries most of what a detail screen needs; a dedicated endpoint would add related items, people, skip markers. Build only if IOS-04 needs more than the mirror holds. |
+| IOS-21 | CarPlay | Your library on the car screen — a `CPTemplateApplicationSceneDelegate` with browse/now-playing templates over the existing playback controller and the `/api/v1/*` catalogue. Audio only (CarPlay's media UI). A must-have. |
+| IOS-22 | AirPlay + Chromecast (sender) | Cast the current playback OUT to an Apple TV / HomePod / AirPlay speaker (AirPlay is largely free via AVPlayer's route picker — add `AVRoutePickerView`) and to a Chromecast / Google TV (Google Cast SDK sender). A must-have. tvOS (a receiver-style native app) stays separate under the tvOS work. |
+| IOS-TVOS | Apple TV (tvOS) app | The same Swift core (networking/models/playback) with a 10-foot focus-based SwiftUI UI. Shares this repo per the toolchain grouping (S-152). |
 
 ## Deferred
 

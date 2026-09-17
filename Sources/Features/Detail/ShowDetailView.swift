@@ -37,18 +37,37 @@ struct ShowDetailView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Artwork(item: item, size: 220, aspect: 1.5)
                 .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
-            VStack(spacing: 4) {
-                Text(item.title).font(.title3.bold()).foregroundStyle(SoundChexTheme.ink100)
-                    .multilineTextAlignment(.center)
-                if let subtitle = item.subtitle {
-                    Text(subtitle).font(.subheadline).foregroundStyle(SoundChexTheme.ink400)
-                }
+            Text(eyebrow)
+                .font(.caption2.bold()).tracking(1.5)
+                .foregroundStyle(SoundChexTheme.ink500)
+            Text(item.title).font(.title3.bold()).foregroundStyle(SoundChexTheme.ink100)
+                .multilineTextAlignment(.center)
+            if let meta = metaLine {
+                Text(meta).font(.subheadline).foregroundStyle(SoundChexTheme.ink500)
             }
         }
         .padding(.top, 12)
+    }
+
+    private var eyebrow: String {
+        episodes.isEmpty ? "Film" : "Show"
+    }
+
+    /// "2024 · 3 seasons" for a show, "2024" for a film, or the subtitle — the
+    /// "·"-joined meta line, skipping missing parts.
+    private var metaLine: String? {
+        var parts: [String] = []
+        if let year = item.meta?.releaseYear { parts.append(String(year)) }
+        if !episodes.isEmpty {
+            let seasons = Set(episodes.compactMap { $0.meta?.seasonNumber }).count
+            if seasons > 0 { parts.append("\(seasons) season\(seasons == 1 ? "" : "s")") }
+        } else if let subtitle = item.subtitle {
+            parts.append(subtitle)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var episodeList: some View {

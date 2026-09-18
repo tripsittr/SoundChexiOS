@@ -43,8 +43,13 @@ The endpoints this app relies on live in the server repo (`SoundChex App`):
 
 ## Licence
 
-**GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)** — see
-[LICENSE](LICENSE). The same licence as the SoundChex server; all SoundChex
-platforms are AGPLv3. Because this is a client that people use over a network to
-reach their server, any modified, network-hosted build must offer its users the
-corresponding source (AGPL §13).
+SoundChex is **dual-licensed** — **AGPL-3.0-or-later** by default (see
+[LICENSE](LICENSE)), or a **commercial licence** for those who can't/won't comply
+with the AGPL. Full explanation, the contributor agreement, and the commercial
+option are in the main repo:
+[LICENSING.md](https://github.com/tripsittr/SoundChex/blob/main/LICENSING.md)
+(contact `licensing@soundchex.app`).
+
+All SoundChex platforms share this. Because this is a client people use over a
+network to reach their server, any modified, network-hosted build must offer its
+users the corresponding source (AGPL §13).

@@ -1,83 +1,17 @@
-# iOS App Issues
+# Issues — moved to the admin tracker
 
-Tracking for the native Swift iOS client. Same convention as the server repo's
-`Documentation & Planning/Issues.md`: every feature, fix and bug gets an entry
-before the work starts, and entries move **In progress → Open → Deferred → Done**
-without being deleted — a decision not to do something is worth as much as a fix.
+Issue and to-do tracking for **every SoundChex repo** now lives in the database,
+managed from the SoundChex landing site's admin panel — not in this file.
 
-Prefix `IOS-` to keep these distinct from the server's `S-` ids.
+- **Admin panel:** `/admin` on the SoundChex website → **Tracker**. Create, edit,
+  filter (by platform, status, type, repo) and publish items.
+- **From the console:** `php artisan track:issue` in the **SoundChexWebsite**
+  repo — interactive, or with flags (`--platform --type --status --repo --ref
+  --publish`).
 
-## Background
+This repo's historical `Issues.md` was imported into the tracker (keyed on its
+original reference ids), and the full backlog is reproducible from
+`SoundChexWebsite/database/seeders/data/items.json`. Nothing was lost.
 
-The iOS client was a Tauri WebView shell wrapping the remote Laravel web app.
-Offline on iOS fought the platform at every turn — WebKit drops the service
-worker on cold launch, the `tauri://` and server origins have separate storage,
-and offline navigation could not use real page loads. After a long grind
-(catalogue-to-disk, offline-shell chrome reconstruction, in-place navigation) the
-decision was made to **rebuild iOS natively in Swift/SwiftUI against the JSON
-API**. Android will follow natively; **desktop (macOS/Windows/Linux) stays
-Tauri**. This supersedes the server repo's S-107 / S-06 / S-07 / S-144 / S-145
-offline work *for iOS* — those remain the desktop/web story.
-
-The API case for this split is in the server repo's `NativeClients.md`.
-
-## In progress
-
-| ID | What | Notes |
-|----|------|-------|
-| IOS-01 | Project scaffold + online browse + playback | The spine: XcodeGen project, token sign-in (profile picker + PIN), library browse for all four types, search, AVPlayer playback with a now-playing bar, background audio, lock-screen controls, resume. Builds clean on the simulator. **Done in the first commit; kept In progress until run on a device.** |
-
-## Open
-
-| ID | What | Notes |
-|----|------|-------|
-| IOS-18 | Full visual redesign completion | Home hero+rails, palette, poster scrim, dark bars, detail screens, the now-playing sheet, and the **music sub-nav pills** (999px, accent when active, in a fixed bar — no more segmented control or invisible header) done. Artwork is CachedImage everywhere now (hero backdrop, downloads, admin, music grid/artist rows). Effectively complete against `Plans/DesignSpec.md`; reopen for any specific surface that drifts. |
-| IOS-06b | Resumable partial downloads | Batch "download all" is done (IOS-05c). Still to add: resuming a *partial* file after a kill (background `URLSession` resume data), so a large file interrupted mid-transfer picks up rather than restarting. |
-| IOS-07b | Video: subtitles | Video playback + PiP done (IOS-07a). Subtitles still to add — needs an API subtitle endpoint (currently session-only). |
-| IOS-08 | Book reader | EPUB/PDF rendering. The server's reader routes are session-only; needs API equivalents for text/contents/annotations, or render from the downloaded file. Large; likely deferred behind audio + video. |
-| IOS-11 | Multiple server addresses / fast-route race | The web connect screen raced a LAN address against the relay. A native app should prefer a fast local address when reachable and fall back to the tunnel — the same 20ms-vs-700ms problem. |
-| IOS-13 | Item-detail JSON endpoint (server) | Optional. `/api/v1/library` carries most of what a detail screen needs; a dedicated endpoint would add related items, people, skip markers. Build only if IOS-04 needs more than the mirror holds. |
-| IOS-21 | CarPlay | Your library on the car screen — a `CPTemplateApplicationSceneDelegate` with browse/now-playing templates over the existing playback controller and the `/api/v1/*` catalogue. Audio only (CarPlay's media UI). A must-have. |
-| IOS-22 | AirPlay + Chromecast (sender) | Cast the current playback OUT to an Apple TV / HomePod / AirPlay speaker (AirPlay is largely free via AVPlayer's route picker — add `AVRoutePickerView`) and to a Chromecast / Google TV (Google Cast SDK sender). A must-have. tvOS (a receiver-style native app) stays separate under the tvOS work. |
-| IOS-TVOS | Apple TV (tvOS) app | The same Swift core (networking/models/playback) with a 10-foot focus-based SwiftUI UI. Shares this repo per the toolchain grouping (S-152). |
-
-## Deferred
-
-| ID | What | Notes |
-|----|------|-------|
-| IOS-15 | Android native client | Same native approach in Kotlin/Compose against the same API, once the iOS shape is proven. The API built for iOS (profiles, token-authed stream, progress, search) is shared. |
-| IOS-16 | Bundle Tailscale | Same conclusion as the server repo's S-33: a real tunnel needs a Network Extension entitlement; not worth it unless the app is distributed to other people. |
-
-## Done
-
-| ID | What | When | Notes |
-|----|------|------|-------|
-| IOS-HDR | Persistent search + account header | 2026-09-17 | `AppHeader` (search field + account button) on Home, Music, Movies, Shows, Books — search everywhere via a full-screen overlay, account everywhere to Settings. The dedicated Search tab is removed; `SearchView` became the reusable `SearchResultsList`. Home stopped floating the avatar over the hero. (0.4.0 "Interlude".) |
-| IOS-PL | Spotify-style playlists | 2026-09-17 | A Playlists pill in Music (and the Settings entry) → a cover-card grid with a New tile; a big-cover detail page with Play/Shuffle + total duration, drag-reorder and swipe-remove (persisted via the new server API), an edit sheet (name/description/cover via PhotosPicker), and delete. New client API: `updatePlaylist` (PATCH), `reorderPlaylist` (PUT order), `uploadPlaylistCover` (multipart); `Playlist`/`PlaylistDetail` gain `artworkUrl`/`duration_ms`. Server side is S-149 (PR #75). Cover fallback draws a 2×2 track-art mosaic. (0.4.0 "Interlude".) |
-| IOS-02 | Device signing | 2026-09-16 | Team `7GSWB72PH6` + bundle id `app.soundchex.ios` + automatic signing captured in `project.yml` (so `xcodegen generate` doesn't wipe them). Builds and installs to iPhone 3000. |
-| IOS-P | Full-page profile picker | 2026-09-16 | Replaced the sheet with a full-screen "Who's listening?" page — a grid of Netflix-style coloured avatar tiles (profile colour + initial, or avatar image), PIN alert for locked profiles, "Use a different account" to back out. Server `POST /api/v1/profiles` now returns `color`/`initial`/`avatar_url`. |
-| IOS-D | Visual redesign to match the web theme (partial) | 2026-09-16 | Exact palette in `SoundChexTheme` (tokens.css hex), home screen rebuilt as hero + horizontal poster rails, poster scrim overlay, dark tab/nav bars. `Plans/DesignSpec.md` captures the full spec. Remaining surfaces tracked as IOS-18. |
-| IOS-B1 | Fix "no audio" playback | 2026-09-17 | The stream URL carried the token as a query param, which Sanctum ignores → every stream 401'd (playback started, no audio). Now the bearer token is attached to the AVURLAsset as an Authorization header (survives range requests / seeks). |
-| IOS-B2 | Library "server couldn't load" | 2026-09-17 | Fixed defensive decoding: `MediaItem` tolerates any missing/malformed field (a bad artwork URL no longer fails the whole catalogue); corrected the `parent_id` key mapping under `.convertFromSnakeCase`; error messages now name the real cause. |
-| IOS-09 | Now-playing full-screen page | 2026-09-17 | Tap the bar → full-screen player: large artwork, working scrubber, transport, and an "Up next" queue. |
-| IOS-Q | Queue, swipe & kebab actions | 2026-09-17 | Swipe right → add to queue, swipe left → play next; a ⋯ kebab on each row with Play next / Add to queue. `playNext`/`addToQueue`/`upNext` on the player. (Add-to-playlist joins these with IOS-19.) |
-| IOS-S | Settings + profile switch access | 2026-09-17 | Account button on Home → Settings: server address, Switch profile, Sign out. |
-| IOS-SW | Profile switch without sign-out | 2026-09-17 | Account (Laravel login) vs profile (who's using it) are distinct: switching profile is no sign-out, no password. Server `GET /profiles/mine` + `POST /profiles/switch` issue a fresh profile token from the current one (PIN only where locked); the signed-in view is keyed on an identity generation so it reloads for the new profile. |
-| IOS-BAR | Now-playing bar covered the tab bar | 2026-09-17 | The bar now insets each tab's content so it docks above the system tab bar instead of over it. |
-| IOS-NPC | Now-playing controls | 2026-09-17 | Shuffle and repeat (off/all/one) working in the player; a persistent download icon and a ⋯ kebab on the now-playing page. |
-| IOS-LYR | Lyrics | 2026-09-17 | Now-playing shows a Lyrics section only when the song has lyrics. Server `GET /items/{id}/lyrics` + `LyricsService` fetch/cache from LRCLIB (free, no key). Genius/Musixmatch can be added behind the same service. |
-| IOS-ICON | App icon, accent, dark launch | 2026-09-17 | SoundChex headphones+waveform icon (1024, no alpha) in Assets.xcassets; accent red; base-900 launch ground; display name "SoundChex"; dark mode. |
-| IOS-05a | Downloads + offline playback | 2026-09-17 | `DownloadStore`: background URLSession downloads a track's stream to disk (self-describing JSON sidecars, excluded from backup); the player prefers the local file for any stored track, so downloads play offline. Download button (progress ring → green check), kebab Download/Remove, and a Downloads screen (Settings → Library) that plays the whole list. |
-| IOS-06a | Background downloads | 2026-09-17 | Background `URLSession` keeps a transfer going while suspended and reattaches on launch. (Partial-file resume is IOS-06b.) |
-| IOS-05c | Offline: "download all" + delta sync | 2026-09-17 | **Download all**: a batch download on an album (and reusable for the whole library) via `DownloadStore.downloadAll`, gated on free space (1 GB floor using `volumeAvailableCapacityForImportantUsage`), skipping already-stored tracks; reports back started/insufficient-space/nothing-to-do. **Delta sync** (was IOS-12): after the first full fetch, launches send the server's last `synced_at` to `POST /api/v1/library/delta` with the held ids, merge only changed items and drop `removed_ids` (deletions + tightened rating caps), and advance the baseline — no full re-fetch each launch. Falls back to a full fetch on a 422 baseline. Baseline cleared with the cache on sign-out/change-server. |
-| IOS-20 | Shuffle + repeat | 2026-09-17 | Shuffle and repeat (off/all/one) in the player and now-playing controls; "Shuffle" on an album plays it shuffled. (Folded into IOS-NPC's now-playing controls.) |
-| IOS-19 | Playlists | 2026-09-17 | Add-to-playlist from the kebab and the left swipe → a sheet that picks an existing playlist or creates one. A Playlists screen (Settings → Library) lists them and plays a playlist's tracks as a queue. New server API: `auth:sanctum` `GET/POST /playlists`, `GET/DELETE /playlists/{id}`, `POST/DELETE /playlists/{id}/items` (account-scoped Collections, gated per track). |
-| IOS-17a | Admin dashboard | 2026-09-17 | Read-only admin dashboard (Settings → Admin, shown only for an admin profile): library counts, activity (plays/accounts/profiles), most-played. Server `GET /api/v1/admin/stats` behind `EnsureApiAdmin`; `/me` returns `is_admin`. |
-| IOS-17b | Admin: item edit, profiles, scan | 2026-09-17 | Completes the admin panel. **Item edit** from a song's ⋯ menu (admin only): title, per-type metadata (artist/album/year, director, episode/season, author/publisher), rating, notes. **Profile management** (Settings → Admin → Profiles): list/add/edit (name, kids, rating cap, PIN)/delete. **Scan for new media** button queues a library scan. Server `GET/PATCH /admin/items/{id}`, `GET/POST/PATCH/DELETE /admin/profiles`, `POST /admin/scan`. |
-| IOS-04 | Detail screens | 2026-09-17 | Music tab gets a Songs/Albums/Artists segmented control. Album → big artwork, Play/Shuffle, track list. Artist → their albums → album. Movies/Shows/Books poster → detail (artwork + play; shows list episodes grouped by season). All derived client-side from the loaded library (album/artist grouping, `children(of:)` in LibraryStore) — no new API. |
-| IOS-VER | Version + release name everywhere | 2026-09-17 | One `AppRelease` type; version + music name shown on sign-in and Settings (`0.2.0 "Overture"`). App bumped to 0.2.0 "Overture". |
-| IOS-BG | Music page, download button, background audio | 2026-09-17 | Music page segmented control moved into the nav bar (was a stray invisible header). Song rows get a persistent download button. **Background audio fixed** — `UIBackgroundModes` must be an array, not a string (iOS silently ignored it); switched to an explicit generated Info.plist, `.longFormAudio` policy, session activated before playback, resume after interruption. |
-| IOS-14 | Artwork caching | 2026-09-17 | Covers load through a disk-backed URLCache (32MB mem / 512MB disk) via `CachedImage`, so a cover seen once loads instantly and works offline — `AsyncImage` kept nothing and re-fetched on every scroll. |
-| IOS-05b | Offline: full catalogue browse | 2026-09-17 | `/api/v1/library` is cached to disk (`library.json`); a launch shows it instantly and the *whole* catalogue browses offline, not just downloads. Refreshes from the network in the background; the cache is cleared on sign-out/change-server. |
-| IOS-10 | Change server | 2026-09-17 | Settings → Server → Change server signs out, forgets the stored server, and returns to a blank sign-in screen for a different server. |
-| IOS-07a | Video playback + PiP | 2026-09-17 | Films/episodes play in `AVPlayerViewController` (fullscreen, AirPlay, **Picture-in-Picture**, auto-PiP on backgrounding); token-authed video stream or the downloaded file, resumes from and reports server progress. Opened from a movie/show detail. Subtitles are IOS-07b. |
+> **Workflow:** log new work as a tracker item *before* starting it — the same
+> discipline the Markdown tracker enforced, in the database now.

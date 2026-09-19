@@ -13,6 +13,7 @@ struct LibraryTabs: View {
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
+    @Environment(ThemeStore.self) private var theme
     @State private var store = LibraryStore()
 
     var body: some View {
@@ -36,7 +37,7 @@ struct LibraryTabs: View {
                 .tabItem { Label { Text("Books") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Book()) } }
         }
         .environment(store)
-        .tint(SoundChexTheme.accent)
+        .tint(theme.accent)
         .task {
             store.attach(api: session.api)
             playback.attach(api: session.api)

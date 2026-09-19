@@ -13,6 +13,7 @@ struct SoundChexApp: App {
     @State private var session = Session()
     @State private var playback = PlaybackController()
     @State private var downloads = DownloadStore.shared
+    @State private var theme = ThemeStore()
 
     init() {
         configureBarAppearance()
@@ -24,8 +25,12 @@ struct SoundChexApp: App {
                 .environment(session)
                 .environment(playback)
                 .environment(downloads)
-                .preferredColorScheme(.dark)
-                .tint(SoundChexTheme.accent)
+                .environment(theme)
+                // The user's chosen appearance and accent, applied app-wide and
+                // live: changing either in Settings updates every screen at once
+                // because the tint and scheme flow from the store.
+                .preferredColorScheme(theme.appearance.colorScheme)
+                .tint(theme.accent)
         }
     }
 }

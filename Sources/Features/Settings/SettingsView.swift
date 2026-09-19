@@ -59,6 +59,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Personalise") {
+                    NavigationLink {
+                        ThemeSettingsView()
+                    } label: {
+                        Label("Appearance", systemImage: "paintpalette")
+                    }
+                }
+
                 Section("Profile") {
                     Button {
                         switching = true

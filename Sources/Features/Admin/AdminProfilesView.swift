@@ -7,6 +7,7 @@ import SwiftUI
 /// management. List, create, edit (name/colour/kids/rating/PIN), delete.
 struct AdminProfilesView: View {
     @Environment(Session.self) private var session
+    @Environment(ThemeStore.self) private var theme
     @State private var profiles: [AdminProfile] = []
     @State private var ratings: [String] = []
     @State private var loading = true
@@ -58,9 +59,11 @@ struct AdminProfilesView: View {
         }
         .sheet(item: $editing) { profile in
             AdminProfileEditView(profile: profile, ratings: ratings) { await load() }
+                .soundchexTheme(theme)
         }
         .sheet(isPresented: $creating) {
             AdminProfileEditView(profile: nil, ratings: ratings) { await load() }
+                .soundchexTheme(theme)
         }
         .task { await load() }
     }

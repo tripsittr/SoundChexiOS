@@ -10,6 +10,7 @@ import SwiftUI
 /// wrong credentials show a message here rather than failing silently.
 struct SignInView: View {
     @Environment(Session.self) private var session
+    @Environment(ThemeStore.self) private var theme
 
     @State private var server = ""
     @State private var email = ""
@@ -60,7 +61,7 @@ struct SignInView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .tint(SoundChexTheme.accent)
+        .tint(theme.accent)
         // The profile chooser is a full page, not a sheet — picking who is
         // listening is its own step. Covers the form until a profile is chosen
         // or the user backs out to a different account.
@@ -70,6 +71,7 @@ struct SignInView: View {
                 onPick: { profile, pin in await completeSignIn(profile: profile, pin: pin) },
                 onCancel: { profiles = nil }
             )
+            .soundchexTheme(theme)
         }
     }
 

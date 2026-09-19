@@ -13,6 +13,7 @@ import SwiftUI
 /// area rather than floating over content.
 struct AppHeader: View {
     @Environment(Session.self) private var session
+    @Environment(ThemeStore.self) private var theme
 
     @State private var searching = false
     @State private var showingSettings = false
@@ -40,7 +41,7 @@ struct AppHeader: View {
             // stops the header reading as Apple Music's.
             Button { showingSettings = true } label: {
                 Circle()
-                    .fill(SoundChexTheme.accent)
+                    .fill(theme.accent)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "person.fill")
@@ -53,11 +54,14 @@ struct AppHeader: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(SoundChexTheme.base900)
+        // Covers get a fresh environment, so carry the theme in explicitly —
+        // otherwise Settings and Search fall back to the system light appearance
+        // and blue tint.
         .fullScreenCover(isPresented: $searching) {
-            SearchOverlay()
+            SearchOverlay().soundchexTheme(theme)
         }
         .fullScreenCover(isPresented: $showingSettings) {
-            SettingsView()
+            SettingsView().soundchexTheme(theme)
         }
     }
 }

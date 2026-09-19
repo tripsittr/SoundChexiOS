@@ -33,6 +33,7 @@ final class PlaylistStore {
 /// with a "New playlist" tile first, Spotify/Apple style.
 struct PlaylistsGrid: View {
     @Environment(Session.self) private var session
+    @Environment(ThemeStore.self) private var theme
     @State private var store = PlaylistStore()
     @State private var creating = false
 
@@ -68,6 +69,7 @@ struct PlaylistsGrid: View {
         .sheet(isPresented: $creating) {
             EditPlaylistSheet(playlist: nil) { Task { await store.reload() } }
                 .presentationDetents([.medium])
+                .soundchexTheme(theme)
         }
     }
 

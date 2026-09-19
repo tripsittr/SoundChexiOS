@@ -36,6 +36,7 @@ struct MediaListView: View {
 /// whole list from this row, so the rest of the screen queues behind it.
 struct SongRow: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(ThemeStore.self) private var theme
     let item: MediaItem
     var queue: [MediaItem] = []
     var index: Int = 0
@@ -108,9 +109,11 @@ struct SongRow: View {
         .sheet(isPresented: $addingToPlaylist) {
             AddToPlaylistSheet(item: item)
                 .presentationDetents([.medium, .large])
+                .soundchexTheme(theme)
         }
         .sheet(isPresented: $editing) {
             AdminItemEditView(itemID: item.id)
+                .soundchexTheme(theme)
         }
     }
 }

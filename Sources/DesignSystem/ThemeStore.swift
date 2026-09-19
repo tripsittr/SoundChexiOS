@@ -57,17 +57,17 @@ final class ThemeStore {
 
     /// The accent, as 0xRRGGBB. Every accent read in the app resolves here.
     var accentHex: UInt32 {
-        didSet { defaults.set(Int(accentHex), forKey: Keys.accent); markCustom() }
+        didSet { defaults.set(Int(accentHex), forKey: Keys.accent); markCustom(); syncPalette() }
     }
 
     /// The app background for dark mode.
     var backgroundDarkHex: UInt32 {
-        didSet { defaults.set(Int(backgroundDarkHex), forKey: Keys.backgroundDark); markCustom() }
+        didSet { defaults.set(Int(backgroundDarkHex), forKey: Keys.backgroundDark); markCustom(); syncPalette() }
     }
 
     /// The app background for light mode.
     var backgroundLightHex: UInt32 {
-        didSet { defaults.set(Int(backgroundLightHex), forKey: Keys.backgroundLight); markCustom() }
+        didSet { defaults.set(Int(backgroundLightHex), forKey: Keys.backgroundLight); markCustom(); syncPalette() }
     }
 
     private(set) var hasCustomised: Bool
@@ -81,6 +81,18 @@ final class ThemeStore {
         self.backgroundDarkHex = Self.readHex(defaults, Keys.backgroundDark) ?? Self.defaultBackgroundDark
         self.backgroundLightHex = Self.readHex(defaults, Keys.backgroundLight) ?? Self.defaultBackgroundLight
         self.hasCustomised = defaults.bool(forKey: Keys.custom)
+        syncPalette()
+    }
+
+    /// Push the current colours into the shared palette so the static
+    /// `SoundChexTheme.*` accessors (used across the app without the environment)
+    /// resolve to the user's choices and the right scheme.
+    private func syncPalette() {
+        ThemePalette.shared.apply(
+            accent: accentHex,
+            backgroundDark: backgroundDarkHex,
+            backgroundLight: backgroundLightHex
+        )
     }
 
     private static func readHex(_ d: UserDefaults, _ key: String) -> UInt32? {

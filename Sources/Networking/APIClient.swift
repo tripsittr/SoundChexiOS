@@ -362,6 +362,11 @@ struct APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // Fail fast rather than spin: a wrong scheme/host (e.g. https against a
+        // plaintext LAN server) otherwise hangs on a TLS handshake that never
+        // completes, which reads as "loads forever". 20s is generous for a LAN
+        // or relay round-trip and short enough to surface an error.
+        request.timeoutInterval = 20
 
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -411,6 +416,9 @@ struct APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // An upload may be large, so a longer ceiling than a plain request, but
+        // still bounded so a wrong host does not hang forever.
+        request.timeoutInterval = 120
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

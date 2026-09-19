@@ -186,13 +186,21 @@ struct SignInView: View {
 
     /// Adds a scheme if the user typed a bare host, and drops any path — the same
     /// forgiving parse the web connect screen did.
+    ///
+    /// A bare host defaults to **http** when it looks local (a LAN IP, a `.local`
+    /// name, `localhost`, or any host given with an explicit non-443 port) and to
+    /// **https** otherwise (a public/tunnelled hostname like `*.ts.net`). A local
+    /// SoundChex server is plaintext on :8000; assuming https there made the app
+    /// hang on a TLS handshake the server never answers, which read as "loads
+    /// forever and does nothing".
     private func normalizedServerURL(_ raw: String) -> URL? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
-        let withScheme = trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
+        let hasScheme = trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
+        let withScheme = hasScheme
             ? trimmed
-            : "https://\(trimmed)"
+            : (Self.looksLocal(trimmed) ? "http://\(trimmed)" : "https://\(trimmed)")
 
         guard let components = URLComponents(string: withScheme),
               let host = components.host, !host.isEmpty else { return nil }
@@ -202,5 +210,40 @@ struct SignInView: View {
         base.host = host
         base.port = components.port
         return base.url
+    }
+
+    /// Whether a bare (scheme-less) host string is a local server, and so should
+    /// default to plaintext http rather than https.
+    private static func looksLocal(_ hostPort: String) -> Bool {
+        // Parse "host:port" — reuse URLComponents by giving it a scheme.
+        guard let c = URLComponents(string: "http://\(hostPort)"), let host = c.host else {
+            return false
+        }
+
+        // An explicit port other than 443 means a dev/LAN server (443 is the one
+        // port that is conventionally TLS).
+        if let port = c.port, port != 443 {
+            return true
+        }
+
+        let lower = host.lowercased()
+        if lower == "localhost" || lower.hasSuffix(".local") {
+            return true
+        }
+
+        // A private-range IPv4 literal: 10.x, 127.x, 192.168.x, 172.16–31.x.
+        let parts = lower.split(separator: ".").compactMap { Int($0) }
+        if parts.count == 4 {
+            switch (parts[0], parts[1]) {
+            case (10, _), (127, _), (192, 168):
+                return true
+            case (172, let b) where (16...31).contains(b):
+                return true
+            default:
+                break
+            }
+        }
+
+        return false
     }
 }

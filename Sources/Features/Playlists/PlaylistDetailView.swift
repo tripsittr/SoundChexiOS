@@ -10,6 +10,7 @@ import PhotosUI
 struct PlaylistDetailView: View {
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
+    @Environment(ThemeStore.self) private var theme
     @Environment(\.dismiss) private var dismiss
 
     let playlist: Playlist
@@ -62,6 +63,7 @@ struct PlaylistDetailView: View {
         .sheet(isPresented: $editing) {
             EditPlaylistSheet(playlist: displayPlaylist) { Task { await load(); onChange() } }
                 .presentationDetents([.medium])
+                .soundchexTheme(theme)
         }
         .confirmationDialog("Delete this playlist?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { delete() }

@@ -7,6 +7,7 @@ import SwiftUI
 /// plays. Tapping it opens the full-screen player.
 struct NowPlayingBar: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(ThemeStore.self) private var theme
     @State private var showingPlayer = false
 
     var body: some View {
@@ -60,7 +61,7 @@ struct NowPlayingBar: View {
                 Rectangle().fill(SoundChexTheme.base700).frame(height: 0.5)
             }
             .fullScreenCover(isPresented: $showingPlayer) {
-                NowPlayingPage()
+                NowPlayingPage().soundchexTheme(theme)
             }
         }
     }

@@ -9,6 +9,7 @@ import SwiftUI
 /// native equivalent of the web now-playing sheet.
 struct NowPlayingPage: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(ThemeStore.self) private var theme
     @Environment(\.dismiss) private var dismiss
 
     @State private var scrubbing = false
@@ -159,6 +160,7 @@ struct NowPlayingPage: View {
         .sheet(isPresented: $addingToPlaylist) {
             AddToPlaylistSheet(item: item)
                 .presentationDetents([.medium, .large])
+                .soundchexTheme(theme)
         }
     }
 

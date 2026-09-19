@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeStore.self) private var theme
 
     @State private var switching = false
 
@@ -129,7 +130,7 @@ struct SettingsView: View {
                 }
             }
             .fullScreenCover(isPresented: $switching) {
-                ProfileSwitcherView { dismiss() }
+                ProfileSwitcherView { dismiss() }.soundchexTheme(theme)
             }
         }
     }

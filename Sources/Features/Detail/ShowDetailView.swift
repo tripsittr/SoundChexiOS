@@ -8,6 +8,7 @@ import SwiftUI
 struct ShowDetailView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(PlaybackController.self) private var playback
+    @Environment(ThemeStore.self) private var theme
     let item: MediaItem
 
     /// The item to play in the video player, when one is tapped.
@@ -35,7 +36,7 @@ struct ShowDetailView: View {
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
-            VideoPlayerView(item: toPlay)
+            VideoPlayerView(item: toPlay).soundchexTheme(theme)
         }
     }
 

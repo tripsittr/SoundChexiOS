@@ -172,11 +172,15 @@ final class LibraryStore {
         var artwork: URL? { tracks.first?.artwork }
     }
 
-    /// Albums, grouped from the music tracks by artist + album.
+    /// Albums, grouped from the music tracks by primary artist + album.
+    ///
+    /// Grouping on the *primary* artist (not the raw credit) keeps every track
+    /// of an album together even when some are tagged "Artist, Someone" — those
+    /// would otherwise scatter into one-track albums and split the artist.
     var albums: [Album] {
         let music = items(of: .music)
         let groups = Dictionary(grouping: music) { item in
-            "\(item.meta?.artist ?? "")|\(item.meta?.album ?? item.title)"
+            "\(item.meta?.groupingArtist ?? "")|\(item.meta?.album ?? item.title)"
         }
         return groups.compactMap { key, tracks -> Album? in
             guard let first = tracks.first else { return nil }
@@ -187,7 +191,7 @@ final class LibraryStore {
             return Album(
                 id: key,
                 title: first.meta?.album ?? "Unknown album",
-                artist: first.meta?.artist ?? "Unknown artist",
+                artist: first.meta?.groupingArtist ?? "Unknown artist",
                 tracks: sorted
             )
         }

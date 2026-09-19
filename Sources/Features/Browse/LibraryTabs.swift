@@ -21,17 +21,19 @@ struct LibraryTabs: View {
         // inset on the TabView itself overlapped the tab bar.
         // The Search tab is gone: search lives in the persistent header (AppHeader)
         // on every page instead, alongside the account button.
+        // Icons match the web media UI (SoundChexIcons) rather than SF Symbols,
+        // so the native app reads as the same product and not as Apple Music.
         TabView {
             HomeView().nowPlayingInset()
-                .tabItem { Label("Home", systemImage: "house.fill") }
+                .tabItem { Label { Text("Home") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Home()) } }
             MusicView().nowPlayingInset()
-                .tabItem { Label("Music", systemImage: "music.note") }
+                .tabItem { Label { Text("Music") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Music()) } }
             MediaGridView(type: .movie, title: "Movies").nowPlayingInset()
-                .tabItem { Label("Movies", systemImage: "film") }
+                .tabItem { Label { Text("Movies") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Watch()) } }
             MediaGridView(type: .show, title: "Shows").nowPlayingInset()
-                .tabItem { Label("Shows", systemImage: "tv") }
+                .tabItem { Label { Text("Shows") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Watch()) } }
             MediaGridView(type: .book, title: "Books").nowPlayingInset()
-                .tabItem { Label("Books", systemImage: "book") }
+                .tabItem { Label { Text("Books") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Book()) } }
         }
         .environment(store)
         .tint(SoundChexTheme.accent)

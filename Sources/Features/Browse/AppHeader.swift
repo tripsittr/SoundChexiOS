@@ -21,8 +21,10 @@ struct AppHeader: View {
         HStack(spacing: 12) {
             Button { searching = true } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 15, weight: .semibold))
+                    // The web nav's own magnifier, not SF Symbols.
+                    SoundChexIcons.Search()
+                        .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+                        .frame(width: 15, height: 15)
                     Text("Search")
                         .font(.system(size: 15))
                     Spacer(minLength: 0)
@@ -33,10 +35,18 @@ struct AppHeader: View {
             }
             .buttonStyle(.plain)
 
+            // A brand-accent chip rather than the system person.crop.circle —
+            // the web account button is a coloured chip, so this echoes it and
+            // stops the header reading as Apple Music's.
             Button { showingSettings = true } label: {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 26))
-                    .foregroundStyle(SoundChexTheme.ink100)
+                Circle()
+                    .fill(SoundChexTheme.accent)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                    )
             }
             .buttonStyle(.plain)
         }

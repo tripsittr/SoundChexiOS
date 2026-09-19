@@ -41,6 +41,7 @@ struct MediaGridView: View {
                             }
                             .padding(16)
                         }
+                        .refreshable { await store.load() }
                     }
                 }
             }

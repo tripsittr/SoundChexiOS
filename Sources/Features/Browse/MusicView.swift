@@ -25,6 +25,9 @@ struct MusicView: View {
                 AppHeader()
                 subNav
                 content
+                    // Pull down to sync the library — the quick way to reflect a
+                    // server change (a merged duplicate, new music) on demand.
+                    .refreshable { await store.load() }
             }
             .background(SoundChexTheme.base900)
             .toolbar(.hidden, for: .navigationBar)

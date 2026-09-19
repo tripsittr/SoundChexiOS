@@ -78,6 +78,33 @@ struct SettingsView: View {
                     }
                 }
 
+                // Transparency: the same project links the served web app puts
+                // in its footer, so the source, licence and policies are
+                // reachable from inside the iOS app too. SoundChex is AGPLv3 and
+                // stores none of the user's media off their own machine; saying
+                // so here, with every link to prove it, is the point.
+                Section {
+                    Link(destination: ProjectLinks.source) {
+                        Label("Source (AGPLv3)", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                    Link(destination: ProjectLinks.licence) {
+                        Label("Licence", systemImage: "doc.text")
+                    }
+                    Link(destination: ProjectLinks.privacy) {
+                        Label("Privacy", systemImage: "hand.raised")
+                    }
+                    Link(destination: ProjectLinks.terms) {
+                        Label("Terms", systemImage: "text.book.closed")
+                    }
+                    Link(destination: ProjectLinks.credits) {
+                        Label("Open-source credits", systemImage: "heart")
+                    }
+                } header: {
+                    Text("About")
+                } footer: {
+                    Text("Free and open source. Your media stays on your own server — SoundChex neither acquires your files nor helps you to.")
+                }
+
                 Section {
                     LabeledContent("Version", value: appVersion)
                 } footer: {

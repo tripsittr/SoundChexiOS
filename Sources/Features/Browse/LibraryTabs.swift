@@ -14,6 +14,7 @@ struct LibraryTabs: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     @State private var store = LibraryStore()
 
     var body: some View {
@@ -44,6 +45,13 @@ struct LibraryTabs: View {
             downloads.attach(api: session.api)
             await session.refreshIdentity()
             await store.loadIfNeeded()
+        }
+        // Coming back to the app syncs the library, so changes made on the
+        // server while it was backgrounded (a duplicate merge, new imports)
+        // show without a manual pull-to-refresh or a cold relaunch.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await store.load() }
         }
     }
 }

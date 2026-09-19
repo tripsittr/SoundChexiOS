@@ -73,6 +73,10 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
 
     struct Meta: Codable, Hashable, Sendable {
         let artist: String?
+        /// The headline artist for grouping — a track credited "Artist, Someone"
+        /// belongs under "Artist". The server derives it; nil falls back to
+        /// `artist` via `groupingArtist`.
+        let primaryArtist: String?
         let album: String?
         let author: String?
         let director: String?
@@ -84,22 +88,29 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         let releaseYear: Int?
         let durationMs: Int?
 
+        /// The artist to group and browse by: the primary when known, else the
+        /// full credit. Everything that lists artists should use this, not
+        /// `artist`, or featured tracks split into their own artists.
+        var groupingArtist: String? {
+            (primaryArtist?.isEmpty == false ? primaryArtist : nil) ?? artist
+        }
+
         // Names already transformed by .convertFromSnakeCase, so the raw values
         // here are camelCase and equal to the property names — the enum is kept
         // explicit only so the mapping is visible and cannot silently drift.
         enum CodingKeys: String, CodingKey {
-            case artist, album, author, director
+            case artist, primaryArtist, album, author, director
             case episodeTitle, trackNumber, discNumber
             case seasonNumber, episodeNumber, releaseYear, durationMs
         }
 
         /// Direct initialiser for building from stored data (offline entries).
-        init(artist: String? = nil, album: String? = nil, author: String? = nil,
+        init(artist: String? = nil, primaryArtist: String? = nil, album: String? = nil, author: String? = nil,
              director: String? = nil, episodeTitle: String? = nil,
              trackNumber: Int? = nil, discNumber: Int? = nil,
              seasonNumber: Int? = nil, episodeNumber: Int? = nil,
              releaseYear: Int? = nil, durationMs: Int? = nil) {
-            self.artist = artist; self.album = album; self.author = author
+            self.artist = artist; self.primaryArtist = primaryArtist; self.album = album; self.author = author
             self.director = director; self.episodeTitle = episodeTitle
             self.trackNumber = trackNumber; self.discNumber = discNumber
             self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
@@ -109,6 +120,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             artist = try? c.decodeIfPresent(String.self, forKey: .artist)
+            primaryArtist = try? c.decodeIfPresent(String.self, forKey: .primaryArtist)
             album = try? c.decodeIfPresent(String.self, forKey: .album)
             author = try? c.decodeIfPresent(String.self, forKey: .author)
             director = try? c.decodeIfPresent(String.self, forKey: .director)

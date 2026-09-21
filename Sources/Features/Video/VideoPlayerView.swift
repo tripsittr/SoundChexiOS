@@ -17,15 +17,68 @@ struct VideoPlayerView: View {
     @Environment(\.dismiss) private var dismiss
     let item: MediaItem
 
+    @State private var subtitles = SubtitleModel()
+
     var body: some View {
-        VideoPlayerContainer(item: item, api: session.api)
+        VideoPlayerContainer(item: item, api: session.api, subtitles: subtitles)
             .ignoresSafeArea()
             .background(.black)
+            // The current caption, drawn over the video (S-160). AVPlayer can't
+            // easily carry an external, auth-headed WebVTT track, so the line is
+            // parsed and shown here, synced to the player's time.
+            .overlay(alignment: .bottom) {
+                if let line = subtitles.currentLine {
+                    Text(line)
+                        .font(.system(size: 18, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black, radius: 3)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(.black.opacity(0.5), in: .rect(cornerRadius: 6))
+                        .padding(.bottom, 60)
+                        .padding(.horizontal, 20)
+                        .transition(.opacity)
+                }
+            }
+            // A caption picker, top-trailing, shown once tracks are known.
+            .overlay(alignment: .topTrailing) {
+                if !subtitles.tracks.isEmpty {
+                    subtitleMenu
+                        .padding(.top, 50).padding(.trailing, 16)
+                }
+            }
+            .task {
+                subtitles.configure(api: session.api, itemID: item.id)
+                await subtitles.loadTracks()
+            }
             .onAppear {
                 // Video takes over audio: stop the music player so the two don't
                 // both hold the audio session.
                 if playback.isPlaying { playback.togglePlayPause() }
             }
+    }
+
+    private var subtitleMenu: some View {
+        Menu {
+            Button {
+                Task { await subtitles.select(nil) }
+            } label: {
+                Label("Off", systemImage: subtitles.selected == nil ? "checkmark" : "")
+            }
+            ForEach(subtitles.tracks) { track in
+                Button {
+                    Task { await subtitles.select(track) }
+                } label: {
+                    Label(track.label, systemImage: subtitles.selected?.id == track.id ? "checkmark" : "")
+                }
+            }
+        } label: {
+            Image(systemName: "captions.bubble\(subtitles.selected != nil ? ".fill" : "")")
+                .font(.title3)
+                .foregroundStyle(.white)
+                .padding(10)
+                .background(.black.opacity(0.5), in: .circle)
+        }
     }
 }
 
@@ -34,6 +87,7 @@ struct VideoPlayerView: View {
 private struct VideoPlayerContainer: UIViewControllerRepresentable {
     let item: MediaItem
     let api: APIClient?
+    let subtitles: SubtitleModel
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
@@ -50,7 +104,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
 
-        context.coordinator.attach(player: player, item: item, api: api)
+        context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
         player.play()
 
         return controller
@@ -83,14 +137,17 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     final class Coordinator {
         private var player: AVPlayer?
         private var timeObserver: Any?
+        private var subtitleObserver: Any?
         private var api: APIClient?
         private var itemID = 0
         private var lastReported = -1
+        private var subtitles: SubtitleModel?
 
-        func attach(player: AVPlayer, item: MediaItem, api: APIClient) {
+        func attach(player: AVPlayer, item: MediaItem, api: APIClient, subtitles: SubtitleModel) {
             self.player = player
             self.api = api
             self.itemID = item.id
+            self.subtitles = subtitles
 
             Task { @MainActor [weak player] in
                 let resume = (try? await api.progress(itemID: item.id))?.position ?? 0
@@ -107,6 +164,15 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             ) { [weak self] time in
                 self?.report(seconds: time.seconds)
             }
+
+            // A finer observer for captions — ~4×/second so a line changes on
+            // time. Its own observer so the 5s progress cadence is unaffected.
+            subtitleObserver = player.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main
+            ) { [weak self] time in
+                guard let model = self?.subtitles else { return }
+                MainActor.assumeIsolated { model.update(time: time.seconds) }
+            }
         }
 
         private func report(seconds: Double) {
@@ -122,7 +188,9 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
 
         func stop() {
             if let timeObserver { player?.removeTimeObserver(timeObserver) }
+            if let subtitleObserver { player?.removeTimeObserver(subtitleObserver) }
             timeObserver = nil
+            subtitleObserver = nil
         }
     }
 }

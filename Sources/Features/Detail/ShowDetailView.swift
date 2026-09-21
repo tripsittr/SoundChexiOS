@@ -13,6 +13,8 @@ struct ShowDetailView: View {
 
     /// The item to play in the video player, when one is tapped.
     @State private var playing: MediaItem?
+    /// The book to open in the reader.
+    @State private var reading: MediaItem?
 
     private var episodes: [MediaItem] { store.children(of: item.id) }
 
@@ -20,7 +22,17 @@ struct ShowDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 header
-                if episodes.isEmpty {
+                if item.type == .book {
+                    // A book opens the reader rather than the video player.
+                    Button {
+                        reading = item
+                    } label: {
+                        Label("Read", systemImage: "book")
+                            .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
+                            .background(SoundChexTheme.accent, in: .capsule).foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 16)
+                } else if episodes.isEmpty {
                     // A film, or a show with no episodes catalogued.
                     if item.playable {
                         playButton(for: item, label: "Play")
@@ -37,6 +49,9 @@ struct ShowDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
             VideoPlayerView(item: toPlay).soundchexTheme(theme)
+        }
+        .fullScreenCover(item: $reading) { toRead in
+            NavigationStack { ReaderView(item: toRead) }.soundchexTheme(theme)
         }
     }
 

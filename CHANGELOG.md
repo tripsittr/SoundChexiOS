@@ -3,6 +3,19 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.7.0 “Cadence” — 2026-09-21
+
+### Added
+- **Video subtitles** (S-160) — a captions button on the video player lists the
+  film's subtitle tracks; choosing one shows it over the video, synced to
+  playback. Tracks and their WebVTT come from the new token-authed subtitle API.
+  (The line is parsed and drawn as an overlay rather than merged into the stream,
+  which keeps it working over the auth-headed remote video.)
+- **Book reader — PDF** (S-161) — books now open a reader (a **Read** button on a
+  book's page). **PDFs** render with PDFKit, resume to the page you left off, and
+  report progress back to the server. **EPUB** shows a "coming soon" for now — it
+  needs an archive dependency the app doesn't carry yet; a follow-up.
+
 ## 0.6.0 “Refrain” — 2026-09-21
 
 ### Added

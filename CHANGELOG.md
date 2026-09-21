@@ -3,6 +3,19 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.5.1 “Bridge” — 2026-09-21
+
+### Fixed
+- **Crash on playing any song** — the app trapped (`EXC_BREAKPOINT`) as soon as a
+  track started. The lock-screen artwork code built the `MPMediaItemArtwork`
+  request-handler closure inside the `@MainActor` `PlaybackController`, so it
+  inherited main-actor isolation; MediaPlayer invokes that closure on its own
+  background queue to render the bitmap, and the Swift concurrency runtime traps
+  when a main-actor closure runs off-main. The artwork is now built by a
+  `nonisolated` factory whose `@Sendable` closure captures only the (Sendable)
+  `UIImage`, so it runs safely on any thread. (This fix was written for 0.4.2 but
+  a merge mistake left it out of the shipped build; it is really in now.)
+
 ## 0.5.0 “Bridge” — 2026-09-21
 
 ### Changed

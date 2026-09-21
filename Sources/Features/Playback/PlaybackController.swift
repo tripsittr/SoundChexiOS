@@ -361,12 +361,24 @@ final class PlaybackController {
             guard let image = await ImageCache.shared.image(for: url) else { return }
             guard let self, self.current?.id == item.id else { return }
 
-            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            let artwork = Self.artwork(from: image)
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
             info[MPMediaItemPropertyArtwork] = artwork
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
             self.artworkItemID = item.id
         }
+    }
+
+    /// Wraps a cover image as `MPMediaItemArtwork`.
+    ///
+    /// `nonisolated` on purpose: MediaPlayer invokes the request-handler closure
+    /// on its own background queue when it needs the bitmap. Built inside the
+    /// `@MainActor` class, the closure inherits main-actor isolation and the
+    /// concurrency runtime traps (EXC_BREAKPOINT) when it runs off-main — the
+    /// crash after starting playback. A `nonisolated` factory whose `@Sendable`
+    /// closure captures only the Sendable `UIImage` runs safely on any thread.
+    private nonisolated static func artwork(from image: UIImage) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in image }
     }
 }
 

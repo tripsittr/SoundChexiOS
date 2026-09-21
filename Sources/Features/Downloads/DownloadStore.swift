@@ -53,6 +53,12 @@ final class DownloadStore: NSObject {
 
     func attach(api: APIClient?) {
         self.api = api
+
+        // With an API to build stream URLs from, pick up any transfer that was
+        // interrupted before the app was last closed.
+        if api != nil {
+            resumeInterrupted()
+        }
     }
 
     // MARK: - Queries
@@ -73,17 +79,31 @@ final class DownloadStore: NSObject {
 
     // MARK: - Actions
 
-    /// Starts (or restarts) a download for an item.
+    /// Starts (or resumes) a download for an item.
+    ///
+    /// If a partial transfer was interrupted earlier — the app was killed, the
+    /// network dropped — its resume data is picked up so a large file continues
+    /// from where it stopped rather than starting over. Otherwise it starts fresh.
     func download(_ item: MediaItem) {
         guard let api, let url = api.streamURL(itemID: item.id) else { return }
         guard state(for: item.id) != .stored else { return }
 
-        var request = URLRequest(url: url)
-        if let token = api.token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let task: URLSessionDownloadTask
+
+        if let resumeData = Self.resumeData(for: item.id) {
+            // Continue the interrupted transfer. If the server no longer accepts
+            // the resume (the file changed, or it doesn't support ranges), the
+            // task fails and the next attempt starts fresh — see the delegate.
+            task = session.downloadTask(withResumeData: resumeData)
+            Self.clearResumeData(for: item.id)
+        } else {
+            var request = URLRequest(url: url)
+            if let token = api.token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            task = session.downloadTask(with: request)
         }
 
-        let task = session.downloadTask(with: request)
         tasks[task.taskIdentifier] = item.id
         states[item.id] = .downloading(progress: 0)
 
@@ -92,6 +112,14 @@ final class DownloadStore: NSObject {
         writeSidecar(for: item)
 
         task.resume()
+    }
+
+    /// Resumes every download that was interrupted and left resume data behind —
+    /// called after a relaunch so a partial transfer picks up on its own.
+    func resumeInterrupted() {
+        for item in stored where state(for: item.id) != .stored && Self.hasResumeData(for: item.id) {
+            download(item.asMediaItem)
+        }
     }
 
     /// Downloads a batch — an album, or the whole library.
@@ -133,6 +161,7 @@ final class DownloadStore: NSObject {
     func remove(_ itemID: Int) {
         try? FileManager.default.removeItem(at: Self.mediaURL(for: itemID))
         try? FileManager.default.removeItem(at: Self.sidecarURL(for: itemID))
+        Self.clearResumeData(for: itemID)
         states[itemID] = .idle
         stored.removeAll { $0.id == itemID }
     }
@@ -158,6 +187,27 @@ final class DownloadStore: NSObject {
 
     static func sidecarURL(for itemID: Int) -> URL {
         directory.appendingPathComponent("\(itemID).json")
+    }
+
+    /// Where a partial transfer's resume data is parked between attempts.
+    private static func resumeURL(for itemID: Int) -> URL {
+        directory.appendingPathComponent("\(itemID).resume")
+    }
+
+    private static func saveResumeData(_ data: Data, for itemID: Int) {
+        try? data.write(to: resumeURL(for: itemID))
+    }
+
+    private static func resumeData(for itemID: Int) -> Data? {
+        try? Data(contentsOf: resumeURL(for: itemID))
+    }
+
+    private static func hasResumeData(for itemID: Int) -> Bool {
+        FileManager.default.fileExists(atPath: resumeURL(for: itemID).path)
+    }
+
+    private static func clearResumeData(for itemID: Int) {
+        try? FileManager.default.removeItem(at: resumeURL(for: itemID))
     }
 
     private func writeSidecar(for item: MediaItem) {
@@ -245,12 +295,21 @@ extension DownloadStore: URLSessionDownloadDelegate {
                                 didCompleteWithError error: Error?) {
         guard let error else { return }
         let identifier = task.taskIdentifier
+
+        // If the interruption produced resume data, the transfer can pick up
+        // where it stopped rather than restarting — capture it before clearing
+        // the task. A cancel-without-resume (the user removed the download) has
+        // none, and simply fails.
+        let resumeData = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+
         Task { @MainActor in
             if let itemID = tasks[identifier] {
+                if let resumeData {
+                    Self.saveResumeData(resumeData, for: itemID)
+                }
                 states[itemID] = .failed
                 tasks[identifier] = nil
             }
-            _ = error
         }
     }
 }

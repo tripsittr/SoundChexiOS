@@ -3,6 +3,22 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.6.0 “Refrain” — 2026-09-21
+
+### Added
+- **Multiple server addresses, fastest wins** — the same server can be reached at
+  a fast LAN address at home and a tunnel/relay hostname away from it. The app now
+  races the known addresses on launch (against the server's `/up` health route)
+  and uses the fastest that answers — the ~20ms local path at home, the tunnel
+  elsewhere — instead of being pinned to whichever address was typed at sign-in.
+  Add alternates under **Settings → Server → Address**, where the one in use is
+  marked and a **Re-check connection** re-runs the race after moving between home
+  and away. One token is shared across a server's addresses. (S-162)
+- **Resumable downloads** — a large download interrupted midway (the app killed,
+  the network dropped) now resumes from where it stopped rather than starting
+  over, using the background `URLSession`'s resume data. Interrupted transfers
+  pick up automatically on the next launch. (S-159)
+
 ## 0.5.1 “Bridge” — 2026-09-21
 
 ### Fixed

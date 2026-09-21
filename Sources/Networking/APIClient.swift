@@ -357,8 +357,17 @@ struct APIClient {
             let text: String
             var id: Int { position }
         }
+        /// An illustration, keyed to the page it belongs on, for inline placement.
+        struct Image: Decodable, Sendable, Identifiable, Hashable {
+            let page: Int
+            let url: URL
+            let width: Int?
+            let height: Int?
+            var id: URL { url }
+        }
         let status: String
         let chapters: [Chapter]?
+        let images: [Image]?
     }
 
     func readerContent(itemID: Int) async throws -> BookContent {

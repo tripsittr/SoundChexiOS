@@ -12,6 +12,10 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   you left off. Because the text comes parsed from the server, **EPUB now works**
   (no on-device unzipping) and a **scanned PDF reads via its OCR text**, the same
   as any other book. Replaces the PDF-only page viewer from 0.7.0.
+- **Books show their pictures inline** — a book's illustrations (and a scanned
+  page's image) are placed with the text on their page, the same text-and-images
+  read the desktop reader gives, so an illustrated or scanned book no longer loses
+  its images to the text-only reflow.
 
 ## 0.7.0 âCadenceâ â 2026-09-21
 

@@ -18,6 +18,7 @@ struct ReaderView: View {
     let item: MediaItem
 
     @State private var chapters: [APIClient.BookContent.Chapter] = []
+    @State private var images: [APIClient.BookContent.Image] = []
     @State private var phase: Phase = .loading
     @State private var settings = ReaderSettings.load()
     @State private var showingSettings = false
@@ -63,7 +64,8 @@ struct ReaderView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .ready:
-            ReaderScroll(chapters: chapters, settings: settings, startChapter: startChapter) { position in
+            ReaderScroll(chapters: chapters, images: images, token: session.api?.token,
+                         settings: settings, startChapter: startChapter) { position in
                 let percent = chapters.isEmpty ? 0
                     : Int(Double(position - 1) / Double(max(chapters.count - 1, 1)) * 100)
                 Task {
@@ -107,6 +109,7 @@ struct ReaderView: View {
             switch result.status {
             case "ready":
                 chapters = result.chapters ?? []
+                images = result.images ?? []
                 phase = chapters.isEmpty ? .empty : .ready
                 return
             case "empty":
@@ -127,31 +130,47 @@ struct ReaderView: View {
     }
 }
 
-/// The scrolling text, chapter by chapter, resuming to a chapter and reporting
-/// the chapter that scrolls into view.
+/// The scrolling text, chapter by chapter, with each page's images placed inline
+/// after its text — so an illustrated or scanned book reads with its pictures,
+/// the same as the desktop reader. Resumes to a chapter and reports the one that
+/// scrolls into view.
 private struct ReaderScroll: View {
     let chapters: [APIClient.BookContent.Chapter]
+    let images: [APIClient.BookContent.Image]
+    let token: String?
     let settings: ReaderSettings
     let startChapter: Int
     let onReachChapter: (Int) -> Void
 
     @State private var reported = 0
 
+    /// Images grouped by the page they belong on, for O(1) lookup per chapter.
+    private var imagesByPage: [Int: [APIClient.BookContent.Image]] {
+        Dictionary(grouping: images, by: \.page)
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 28) {
                     ForEach(chapters) { chapter in
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 16) {
                             if let title = chapter.title, !title.isEmpty {
                                 Text(title)
                                     .font(.system(size: settings.fontSize + 4, weight: .bold, design: settings.serif ? .serif : .default))
                                     .foregroundStyle(settings.theme.text)
                             }
-                            Text(chapter.text)
-                                .font(.system(size: settings.fontSize, design: settings.serif ? .serif : .default))
-                                .foregroundStyle(settings.theme.text)
-                                .lineSpacing(settings.fontSize * 0.4)
+                            if !chapter.text.isEmpty {
+                                Text(chapter.text)
+                                    .font(.system(size: settings.fontSize, design: settings.serif ? .serif : .default))
+                                    .foregroundStyle(settings.theme.text)
+                                    .lineSpacing(settings.fontSize * 0.4)
+                            }
+                            // The page's images, inline (a scanned page's image, a
+                            // plate, a diagram) — the text-and-images read.
+                            ForEach(imagesByPage[chapter.position] ?? []) { image in
+                                ReaderImage(image: image, token: token)
+                            }
                         }
                         .id(chapter.position)
                         .onAppear {
@@ -173,5 +192,50 @@ private struct ReaderScroll: View {
                 }
             }
         }
+    }
+}
+
+/// One inline book image, loaded with the bearer header (the asset route is
+/// token-authed), sized to the reading column.
+private struct ReaderImage: View {
+    let image: APIClient.BookContent.Image
+    let token: String?
+
+    @State private var uiImage: UIImage?
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .clipShape(.rect(cornerRadius: 4))
+            } else {
+                Rectangle()
+                    .fill(.gray.opacity(0.15))
+                    .aspectRatio(image.aspect, contentMode: .fit)
+                    .overlay { ProgressView() }
+            }
+        }
+        .task(id: image.url) { await load() }
+    }
+
+    private func load() async {
+        var request = URLRequest(url: image.url)
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let (data, response) = try? await URLSession.shared.data(for: request),
+           (response as? HTTPURLResponse)?.statusCode == 200,
+           let loaded = UIImage(data: data) {
+            uiImage = loaded
+        }
+    }
+}
+
+private extension APIClient.BookContent.Image {
+    /// A placeholder aspect ratio while loading, from the known dimensions.
+    var aspect: CGFloat {
+        guard let width, let height, width > 0, height > 0 else { return 0.7 }
+        return CGFloat(width) / CGFloat(height)
     }
 }

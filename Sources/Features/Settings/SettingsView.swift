@@ -11,6 +11,7 @@ struct SettingsView: View {
     @Environment(ThemeStore.self) private var theme
 
     @State private var switching = false
+    @State private var diagnosticsSent = false
 
     var body: some View {
         NavigationStack {
@@ -70,6 +71,19 @@ struct SettingsView: View {
                     } label: {
                         Label("Appearance", systemImage: "paintpalette")
                     }
+                }
+
+                Section {
+                    Button {
+                        DeviceReporter.shared.sendDiagnostics(reason: "manual")
+                        diagnosticsSent = true
+                    } label: {
+                        Label(diagnosticsSent ? "Diagnostics sent" : "Send diagnostics",
+                              systemImage: diagnosticsSent ? "checkmark.circle" : "stethoscope")
+                    }
+                    .disabled(diagnosticsSent)
+                } footer: {
+                    Text("Sends recent app logs to your server's Device Reports, and crash reports are sent automatically on the next launch. No media or account details are included.")
                 }
 
                 Section("Profile") {

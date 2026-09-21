@@ -383,18 +383,25 @@ struct APIClient {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
+            AppLog.warning("\(method) \(path) — unreachable: \(error.localizedDescription)", category: "net")
             throw APIError.unreachable(underlying: error)
         }
 
         guard let http = response as? HTTPURLResponse else {
+            AppLog.error("\(method) \(path) — non-HTTP response", category: "net")
             throw APIError.http(status: -1)
         }
 
-        if http.statusCode == 401 { throw APIError.unauthorized }
+        if http.statusCode == 401 {
+            AppLog.warning("\(method) \(path) — 401 unauthorized", category: "net")
+            throw APIError.unauthorized
+        }
         guard (200..<300).contains(http.statusCode) else {
+            AppLog.warning("\(method) \(path) — HTTP \(http.statusCode)", category: "net")
             throw APIError.http(status: http.statusCode)
         }
 
+        AppLog.debug("\(method) \(path) — \(http.statusCode)", category: "net")
         return data
     }
 

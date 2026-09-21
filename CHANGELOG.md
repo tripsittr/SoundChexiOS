@@ -3,6 +3,17 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.4.2 “Interlude” — 2026-09-21
+
+### Fixed
+- **Lock-screen & Control Center artwork** — the cover now shows while music
+  plays. `updateNowPlayingInfo()` set the title, artist and timing but never
+  `MPMediaItemPropertyArtwork`, so the lock screen showed a blank square. The
+  cover is loaded from the shared disk cache (so it appears instantly and works
+  offline) and attached, refreshing when the track changes. A track change that
+  lands mid-load drops the stale image rather than painting it onto the new
+  track (S-290).
+
 ## 0.4.1 “Interlude” — 2026-09-17
 
 ### Fixed

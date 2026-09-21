@@ -42,17 +42,77 @@ final class Session {
 
     private let defaults = UserDefaults.standard
     private let serverKey = "soundchex.serverURL"
+    private let alternatesKey = "soundchex.alternateURLs"
 
-    /// Rebuilds the session from stored credentials on launch.
+    /// Other addresses that reach the *same* server — a fast LAN address, a
+    /// tunnel/relay hostname. One server, several paths; the token is shared
+    /// across them (it is the server that authenticates it, not the URL). Kept in
+    /// preference order, primary first, as a tie-break for the reachability race.
+    private(set) var alternateURLs: [URL] = []
+
+    /// The primary address — the one sign-in was done against and the token is
+    /// keyed to in the Keychain. Alternates are extra paths to it.
+    private(set) var primaryURL: URL?
+
+    /// Rebuilds the session from stored credentials on launch, choosing the
+    /// fastest reachable address (S-162).
     func restore() async {
         guard let stored = defaults.string(forKey: serverKey),
-              let url = URL(string: stored) else { return }
+              let primary = URL(string: stored) else { return }
 
-        serverURL = url
+        primaryURL = primary
+        alternateURLs = loadAlternates()
 
-        if let saved = Keychain.token(for: url) {
-            token = saved
-            api = APIClient(baseURL: url, token: saved)
+        guard let saved = Keychain.token(for: primary) else {
+            // No token: land on the primary address for the sign-in screen.
+            serverURL = primary
+            return
+        }
+
+        token = saved
+
+        // Prefer the fastest currently-reachable path — the LAN address at home,
+        // the tunnel away from it — reusing the one token across them.
+        let candidates = [primary] + alternateURLs
+        let chosen = await ServerReachability.fastest(among: candidates) ?? primary
+
+        serverURL = chosen
+        api = APIClient(baseURL: chosen, token: saved)
+    }
+
+    /// The alternate addresses stored for this server.
+    private func loadAlternates() -> [URL] {
+        (defaults.stringArray(forKey: alternatesKey) ?? []).compactMap(URL.init(string:))
+    }
+
+    /// Registers another address that reaches the same server. Deduplicated and
+    /// never equal to the primary; persisted for the next launch's race.
+    func addAlternateURL(_ url: URL) {
+        guard url != primaryURL, url != serverURL else { return }
+        guard !alternateURLs.contains(url) else { return }
+
+        alternateURLs.append(url)
+        defaults.set(alternateURLs.map(\.absoluteString), forKey: alternatesKey)
+    }
+
+    /// Forgets an alternate address.
+    func removeAlternateURL(_ url: URL) {
+        alternateURLs.removeAll { $0 == url }
+        defaults.set(alternateURLs.map(\.absoluteString), forKey: alternatesKey)
+    }
+
+    /// Re-runs the reachability race now and switches to the fastest path — for a
+    /// "the app can't reach the server" moment, or after adding an address.
+    func reselectFastestAddress() async {
+        guard let token, let primary = primaryURL else { return }
+
+        let candidates = [primary] + alternateURLs
+        guard let chosen = await ServerReachability.fastest(among: candidates) else { return }
+
+        if chosen != serverURL {
+            serverURL = chosen
+            api = APIClient(baseURL: chosen, token: token)
+            identityGeneration += 1
         }
     }
 
@@ -79,6 +139,7 @@ final class Session {
         )
 
         serverURL = server
+        primaryURL = server
         token = issued
         api = APIClient(baseURL: server, token: issued)
 
@@ -146,6 +207,9 @@ final class Session {
     func changeServer() async {
         await signOut()
         defaults.removeObject(forKey: serverKey)
+        defaults.removeObject(forKey: alternatesKey)
         serverURL = nil
+        primaryURL = nil
+        alternateURLs = []
     }
 }

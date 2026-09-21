@@ -26,35 +26,36 @@ struct AlbumDetailView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
+            // The cover sits large over a gradient from a muted tint of the
+            // ground to base-900, Spotify-style (spec §3).
             CachedImage(url: album.artwork) { $0.resizable().scaledToFill() } placeholder: {
                 SoundChexTheme.base700.overlay(Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500))
             }
-            .frame(width: 200, height: 200)
+            .frame(width: 220, height: 220)
             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusLargeArt))
-            .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+            .shadow(color: .black.opacity(0.5), radius: 24, y: 10)
+            .padding(.top, 8)
 
-            VStack(spacing: 6) {
-                Text("Album")
-                    .font(.caption2.bold())
-                    .tracking(1.5)
-                    .foregroundStyle(SoundChexTheme.ink500)
-                Text(album.title).font(.title3.bold()).foregroundStyle(SoundChexTheme.ink100)
-                    .multilineTextAlignment(.center)
-                Text(metaLine).font(.subheadline).foregroundStyle(SoundChexTheme.ink500)
-            }
-
-            HStack(spacing: 12) {
-                // Primary: accent Play pill.
-                Button {
-                    playback.play(album.tracks)
-                } label: {
-                    Label("Play", systemImage: "play.fill")
-                        .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
-                        .background(SoundChexTheme.accent, in: .capsule).foregroundStyle(.white)
+            // Title + meta, left-aligned, with the dominant round accent Play
+            // FAB pulled to the trailing edge — the reference's play button.
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(album.title)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(SoundChexTheme.ink100)
+                        .lineLimit(2)
+                    Text(metaLine)
+                        .font(.system(size: 13))
+                        .foregroundStyle(SoundChexTheme.ink400)
                 }
+                Spacer(minLength: 12)
+                playFAB
+            }
+            .padding(.horizontal, 16)
 
-                // Secondary: 44px bordered circles for shuffle and download.
+            // Secondary actions in a row under the title: shuffle and download.
+            HStack(spacing: 20) {
                 circleButton(system: "shuffle") {
                     if !playback.isShuffled { playback.toggleShuffle() }
                     playback.play(album.tracks)
@@ -66,14 +67,37 @@ struct AlbumDetailView: View {
                     case .nothingToDo: flash("Already downloaded.")
                     }
                 }
+                Spacer()
             }
-            .padding(.horizontal, 16).padding(.top, 4)
+            .padding(.horizontal, 16)
 
             if let batchMessage {
                 Text(batchMessage).font(.caption).foregroundStyle(SoundChexTheme.ink500)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
             }
         }
-        .padding(.top, 12)
+        .padding(.top, 4)
+        .background(
+            LinearGradient(
+                colors: [SoundChexTheme.base700.opacity(0.6), SoundChexTheme.base900],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .top)
+        )
+    }
+
+    /// The dominant round accent Play button — Spotify's green circle, here red.
+    private var playFAB: some View {
+        Button {
+            playback.play(album.tracks)
+        } label: {
+            Image(systemName: "play.fill")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(SoundChexTheme.accent, in: .circle)
+                .shadow(color: SoundChexTheme.accent.opacity(0.4), radius: 12, y: 4)
+        }
     }
 
     /// A 44px bordered circle icon button — the secondary detail-screen action
@@ -105,15 +129,26 @@ struct AlbumDetailView: View {
     private var trackList: some View {
         LazyVStack(spacing: 0) {
             ForEach(Array(album.tracks.enumerated()), id: \.element.id) { pair in
+                let isCurrent = playback.current?.id == pair.element.id
                 Button {
                     playback.play(album.tracks, startAt: pair.offset)
                 } label: {
                     HStack(spacing: 12) {
-                        Text("\(pair.element.meta?.trackNumber ?? pair.offset + 1)")
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(SoundChexTheme.ink500)
-                            .frame(width: 28)
-                        Text(pair.element.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                        // The playing track shows the equalizer in place of its
+                        // number (spec §4).
+                        Group {
+                            if isCurrent {
+                                PlayingEqualizer(isAnimating: playback.isPlaying, size: 20)
+                            } else {
+                                Text("\(pair.element.meta?.trackNumber ?? pair.offset + 1)")
+                                    .font(.subheadline.monospacedDigit())
+                                    .foregroundStyle(SoundChexTheme.ink500)
+                            }
+                        }
+                        .frame(width: 28)
+                        Text(pair.element.title)
+                            .foregroundStyle(isCurrent ? SoundChexTheme.accent : SoundChexTheme.ink100)
+                            .lineLimit(1)
                         Spacer()
                     }
                     .padding(.horizontal, 16).padding(.vertical, 11)

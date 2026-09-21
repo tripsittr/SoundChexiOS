@@ -44,16 +44,29 @@ struct SongRow: View {
     @State private var addingToPlaylist = false
     @State private var editing = false
 
+    /// Whether this row is the track playing now — drives the equalizer overlay
+    /// and the accent title.
+    private var isCurrent: Bool { playback.current?.id == item.id }
+
     var body: some View {
         HStack(spacing: 12) {
             Button {
                 playback.play(queue.isEmpty ? [item] : queue, startAt: index)
             } label: {
                 HStack(spacing: 12) {
-                    Artwork(item: item, size: 44)
+                    // The current track shows an animated equalizer over its
+                    // cover — the Spotify "now playing" tell (S-288).
+                    Artwork(item: item, size: 48)
+                        .overlay {
+                            if isCurrent {
+                                SoundChexTheme.base900.opacity(0.55)
+                                    .clipShape(.rect(cornerRadius: 6))
+                                PlayingEqualizer(isAnimating: playback.isPlaying, size: 28)
+                            }
+                        }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)
-                            .foregroundStyle(SoundChexTheme.ink100)
+                            .foregroundStyle(isCurrent ? SoundChexTheme.accent : SoundChexTheme.ink100)
                             .lineLimit(1)
                         if let subtitle = item.subtitle {
                             Text(subtitle)

@@ -39,6 +39,11 @@ final class PlaybackController {
     private var timeObserver: Any?
     private var lastReportedSecond = -1
 
+    /// The item whose cover is currently attached to the now-playing info, so a
+    /// text-only refresh keeps the artwork and a track change reloads it. Not UI
+    /// state — internal bookkeeping for the lock screen.
+    @ObservationIgnored private var artworkItemID: Int?
+
     init() {
         configureSession()
         observeTime()
@@ -315,15 +320,53 @@ final class PlaybackController {
 
     private func updateNowPlayingInfo() {
         guard let item = current else { return }
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: item.title,
-            MPMediaItemPropertyArtist: item.subtitle ?? "",
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: position,
-            MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
-        ]
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPMediaItemPropertyTitle] = item.title
+        info[MPMediaItemPropertyArtist] = item.subtitle ?? ""
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position
+        info[MPMediaItemPropertyPlaybackDuration] = duration
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         info[MPMediaItemPropertyMediaType] = MPMediaType.music.rawValue
+
+        // Carry the artwork already loaded for this item across a text-only
+        // refresh (a play/pause, a position tick), so it does not blink out
+        // between the sync update and the async reload below.
+        if artworkItemID != item.id {
+            info[MPMediaItemPropertyArtwork] = nil
+        }
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+
+        loadNowPlayingArtwork(for: item)
+    }
+
+    /// Loads the current track's cover and attaches it to the now-playing info,
+    /// so the lock screen and Control Center show artwork rather than a blank
+    /// square (IOS bug: it was never set). Prefers the shared disk cache, so a
+    /// cover already seen appears instantly and works offline.
+    ///
+    /// Guarded against a stale attach: if the track changes while the image is
+    /// loading, the finished image is dropped rather than painted onto whatever
+    /// is playing now.
+    private func loadNowPlayingArtwork(for item: MediaItem) {
+        guard let url = item.artwork else {
+            artworkItemID = nil
+            return
+        }
+
+        // Already showing this item's art — nothing to reload.
+        if artworkItemID == item.id { return }
+
+        Task { [weak self] in
+            guard let image = await ImageCache.shared.image(for: url) else { return }
+            guard let self, self.current?.id == item.id else { return }
+
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+            info[MPMediaItemPropertyArtwork] = artwork
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            self.artworkItemID = item.id
+        }
     }
 }
 

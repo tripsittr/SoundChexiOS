@@ -17,6 +17,12 @@ struct SoundChexApp: App {
 
     init() {
         configureBarAppearance()
+        // Start the crash/diagnostics reporter at launch so its MetricKit
+        // subscription is live to receive a crash captured on the *previous* run
+        // (MetricKit delivers on the next launch). The server address is set once
+        // restore() has it (S-293).
+        _ = DeviceReporter.shared
+        AppLog.info("App launched — \(AppRelease.display)", category: "lifecycle")
     }
 
     var body: some Scene {
@@ -78,6 +84,10 @@ private struct RootView: View {
         }
         .task {
             await session.restore()
+            // Point the reporter at the server now that the address is known, so
+            // it can send this launch's diagnostics and flush any crash captured
+            // before the address was restored.
+            DeviceReporter.shared.configure(serverURL: session.serverURL)
         }
     }
 }

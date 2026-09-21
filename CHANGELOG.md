@@ -18,6 +18,16 @@ music-themed name per minor release — see `Plans/Versioning.md`.
   the network dropped) now resumes from where it stopped rather than starting
   over, using the background `URLSession`'s resume data. Interrupted transfers
   pick up automatically on the next launch. (S-159)
+- **Crash & diagnostic reporting to the server** (S-293) — the app now reports to
+  your server's **Device Reports** (the admin page the old app used), so a
+  device-only problem is diagnosable from the server instead of by pulling logs
+  off the phone. Crash reports are collected via **MetricKit** (`MXCrashDiagnostic`,
+  delivered on the next launch after a crash — no third-party SDK) and sent
+  automatically; a recent app-log buffer rides along with every report. Verbose
+  logging runs through `AppLog` (every network call, playback load, lifecycle
+  event), and **Settings → Send diagnostics** posts the current logs on demand.
+  Reports carry no media or account details, and the endpoint is unauthenticated
+  by design so a broken session can still be reported.
 
 ## 0.5.1 “Bridge” — 2026-09-21
 

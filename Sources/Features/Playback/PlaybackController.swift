@@ -172,6 +172,8 @@ final class PlaybackController {
         let item = queue[index]
         current = item
 
+        AppLog.info("Play #\(item.id) “\(item.title)” (\(index + 1)/\(queue.count))", category: "playback")
+
         let asset: AVURLAsset
 
         if let local = DownloadStore.shared.localURL(for: item.id) {

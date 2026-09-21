@@ -303,6 +303,62 @@ struct APIClient {
         }
     }
 
+    // MARK: - Subtitles
+
+    /// One caption track for a video.
+    struct SubtitleTrack: Decodable, Sendable, Identifiable, Hashable {
+        let id: Int
+        let label: String
+        let language: String
+        let forced: Bool
+        let sdh: Bool
+        let `default`: Bool
+        let url: URL
+    }
+
+    /// A video's caption tracks. Empty when there are none.
+    func subtitles(itemID: Int) async throws -> [SubtitleTrack] {
+        struct Response: Decodable { let subtitles: [SubtitleTrack] }
+        do {
+            let response: Response = try await send("/api/v1/items/\(itemID)/subtitles", method: "GET")
+            return response.subtitles
+        } catch APIError.http(404) {
+            return []
+        }
+    }
+
+    // MARK: - Reader (books)
+
+    struct BookReader: Decodable, Sendable {
+        struct Progress: Decodable, Sendable {
+            let location: String?
+            let percent: Int
+            let finished: Bool
+        }
+        let id: Int
+        let title: String
+        let format: String
+        let fileUrl: URL
+        let progress: Progress?
+    }
+
+    /// A book's format and resume point.
+    func reader(itemID: Int) async throws -> BookReader {
+        try await send("/api/v1/items/\(itemID)/reader", method: "GET")
+    }
+
+    /// The URL of a book's file, for the reader to load with the bearer header.
+    func bookURL(itemID: Int) -> URL? {
+        baseURL.appendingPathComponent("/api/v1/items/\(itemID)/book")
+    }
+
+    /// Saves a reading position — an opaque location token and a percent.
+    func saveReadingProgress(itemID: Int, location: String?, percent: Int) async throws {
+        struct Body: Encodable { let location: String?; let percent: Int }
+        _ = try await sendRaw("/api/v1/items/\(itemID)/reader/progress", method: "POST",
+                              body: Body(location: location, percent: percent))
+    }
+
     // MARK: - Progress
 
     struct Progress: Decodable, Sendable { let position: Int; let completed: Bool }

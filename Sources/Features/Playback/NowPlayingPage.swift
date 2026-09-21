@@ -15,33 +15,52 @@ struct NowPlayingPage: View {
     @State private var scrubbing = false
     @State private var scrubValue: Double = 0
     @State private var addingToPlaylist = false
+    @State private var showingQueue = false
+    @State private var showingLyrics = false
 
     var body: some View {
         ZStack {
             SoundChexTheme.base900.ignoresSafeArea()
 
             if let item = playback.current {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        header
-                        Artwork(item: item, size: 300, aspect: 1)
-                            .shadow(color: .black.opacity(0.6), radius: 30, y: 12)
-                            .padding(.top, 24)
-                        titleBlock(item)
-                        scrubber
-                        transport
-                        actionsRow(item)
-                        LyricsSection(item: item)
-                        upNextList
-                    }
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 24)
+                // Spotify's player is a fixed layout, not a long scroll: art,
+                // title, scrubber and transport fill the screen, with Lyrics and
+                // the queue raised as their own sheets from the bottom bar.
+                VStack(spacing: 0) {
+                    header(item)
+                    Spacer(minLength: 12)
+                    Artwork(item: item, size: artworkSide, aspect: 1)
+                        .shadow(color: .black.opacity(0.6), radius: 30, y: 12)
+                    Spacer(minLength: 12)
+                    titleBlock(item)
+                    scrubber
+                    transport
+                    bottomBar(item)
+                }
+                .padding(.horizontal, 28)
+                .padding(.bottom, 20)
+                .sheet(isPresented: $showingQueue) {
+                    QueueSheet()
+                        .presentationDetents([.medium, .large])
+                        .soundchexTheme(theme)
+                }
+                .sheet(isPresented: $showingLyrics) {
+                    ScrollView { LyricsSection(item: item).padding(20) }
+                        .background(SoundChexTheme.base900)
+                        .presentationDetents([.medium, .large])
+                        .soundchexTheme(theme)
                 }
             }
         }
     }
 
-    private var header: some View {
+    /// The artwork side — most of the width, capped so it never crowds the
+    /// controls on a short screen.
+    private var artworkSide: CGFloat {
+        min(UIScreen.main.bounds.width - 56, 360)
+    }
+
+    private func header(_ item: MediaItem) -> some View {
         HStack {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.down")
@@ -51,31 +70,67 @@ struct NowPlayingPage: View {
                     .background(SoundChexTheme.base800, in: .circle)
             }
             Spacer()
-            Text("Now playing")
-                .font(.system(size: 12, weight: .semibold))
-                .tracking(1.5)
-                .textCase(.uppercase)
-                .foregroundStyle(SoundChexTheme.ink500)
+            // "PLAYING FROM <ALBUM>" — the context line, derived from the track's
+            // album since the queue carries no separate source label.
+            VStack(spacing: 2) {
+                Text("Playing from")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(SoundChexTheme.ink500)
+                if let context = playbackContext(item) {
+                    Text(context)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(SoundChexTheme.ink200)
+                        .lineLimit(1)
+                }
+            }
             Spacer()
-            Color.clear.frame(width: 40, height: 40)
+            Menu {
+                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.headline)
+                    .foregroundStyle(SoundChexTheme.ink200)
+                    .frame(width: 40, height: 40)
+            }
         }
         .padding(.top, 12)
+        .sheet(isPresented: $addingToPlaylist) {
+            AddToPlaylistSheet(item: item)
+                .presentationDetents([.medium, .large])
+                .soundchexTheme(theme)
+        }
+    }
+
+    /// The album (or author) the current track belongs to, for the context line.
+    private func playbackContext(_ item: MediaItem) -> String? {
+        if let album = item.meta?.album, !album.isEmpty { return album }
+        return item.subtitle
     }
 
     private func titleBlock(_ item: MediaItem) -> some View {
-        VStack(spacing: 4) {
-            Text(item.title)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(SoundChexTheme.ink100)
-                .lineLimit(1)
-            if let subtitle = item.subtitle {
-                Text(subtitle)
-                    .font(.system(size: 15))
-                    .foregroundStyle(SoundChexTheme.ink400)
+        HStack(alignment: .center) {
+            // Left-aligned, Spotify-style — not centred.
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(SoundChexTheme.ink100)
                     .lineLimit(1)
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 16))
+                        .foregroundStyle(SoundChexTheme.ink300)
+                        .lineLimit(1)
+                }
             }
+            Spacer()
+            // Download stands in for Spotify's save/heart — the app has no
+            // like/favourite concept, and inventing one needs a server endpoint
+            // (out of scope for the redesign). Download is the real "keep this".
+            DownloadButton(item: item, size: 22)
         }
-        .padding(.top, 28)
+        .padding(.top, 24)
     }
 
     private var scrubber: some View {
@@ -139,59 +194,24 @@ struct NowPlayingPage: View {
         .padding(.top, 24)
     }
 
-    /// A row of secondary actions under the transport: download and the kebab.
-    private func actionsRow(_ item: MediaItem) -> some View {
-        HStack(spacing: 28) {
-            // Persistent download control (wired to the download store in IOS-05).
-            DownloadButton(item: item)
-
-            Spacer()
-
-            Menu {
-                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18))
+    /// The bottom bar under the transport: Lyrics and the queue, each raising its
+    /// own sheet — Spotify keeps them off the main player rather than inline.
+    private func bottomBar(_ item: MediaItem) -> some View {
+        HStack {
+            Button { showingLyrics = true } label: {
+                Label("Lyrics", systemImage: "quote.bubble")
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(SoundChexTheme.ink300)
-                    .frame(width: 44, height: 44)
+            }
+            Spacer()
+            Button { showingQueue = true } label: {
+                Label("Queue", systemImage: "list.bullet")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(SoundChexTheme.ink300)
             }
         }
-        .padding(.top, 20)
-        .sheet(isPresented: $addingToPlaylist) {
-            AddToPlaylistSheet(item: item)
-                .presentationDetents([.medium, .large])
-                .soundchexTheme(theme)
-        }
-    }
-
-    @ViewBuilder private var upNextList: some View {
-        let items = playback.upNext
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Up next")
-                    .font(.system(size: 13, weight: .semibold))
-                    .tracking(1)
-                    .textCase(.uppercase)
-                    .foregroundStyle(SoundChexTheme.ink500)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                ForEach(Array(items.prefix(20))) { item in
-                    HStack(spacing: 12) {
-                        Artwork(item: item, size: 40)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title).font(.subheadline)
-                                .foregroundStyle(SoundChexTheme.ink200).lineLimit(1)
-                            if let subtitle = item.subtitle {
-                                Text(subtitle).font(.caption)
-                                    .foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-            }
-            .padding(.top, 36)
-        }
+        .buttonStyle(.plain)
+        .padding(.top, 22)
     }
 
     private func timeString(_ seconds: Double) -> String {

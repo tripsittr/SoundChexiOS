@@ -11,10 +11,13 @@ import SwiftUI
 /// slot (a segmented control, not the spec's pills).
 struct MusicView: View {
     @Environment(LibraryStore.self) private var store
-    @State private var section: Section = .songs
+
+    /// The active filter chip. `nil` is "everything" — the Recents landing
+    /// (spec §1); a chip narrows to that one kind.
+    @State private var section: Section?
 
     enum Section: String, CaseIterable {
-        case songs = "Songs", albums = "Albums", artists = "Artists", playlists = "Playlists"
+        case playlists = "Playlists", albums = "Albums", artists = "Artists", songs = "Songs"
     }
 
     private let grid = [GridItem(.adaptive(minimum: 150), spacing: 16)]
@@ -23,7 +26,7 @@ struct MusicView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 AppHeader()
-                subNav
+                FilterChipRow(options: Section.allCases, selection: $section) { $0.rawValue }
                 content
                     // Pull down to sync the library — the quick way to reflect a
                     // server change (a merged duplicate, new music) on demand.
@@ -34,36 +37,15 @@ struct MusicView: View {
         }
     }
 
-    /// The pill row. Horizontally scrollable so four pills never crowd a narrow
-    /// phone. Its own bar so it never collapses to an empty header.
-    private var subNav: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Section.allCases, id: \.self) { item in
-                    let active = item == section
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) { section = item }
-                    } label: {
-                        Text(item.rawValue)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(active ? .white : SoundChexTheme.ink400)
-                            .padding(.horizontal, 16).padding(.vertical, 8)
-                            .background(active ? SoundChexTheme.accent : SoundChexTheme.base700, in: .capsule)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-        }
-        .background(SoundChexTheme.base900)
-    }
-
     @ViewBuilder private var content: some View {
         if store.isLoading && store.items.isEmpty {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(SoundChexTheme.base900)
         } else {
             switch section {
+            case .none:
+                recents
+
             case .songs:
                 let songs = store.items(of: .music)
                 List(Array(songs.enumerated()), id: \.element.id) { pair in
@@ -112,6 +94,68 @@ struct MusicView: View {
                 .listStyle(.plain)
             }
         }
+    }
+
+    /// The "everything" landing (no chip active) — the Recents surface from the
+    /// references. It summarises the library (albums, then artists); the chips
+    /// above do the exhaustive browse, and Playlists is a chip of its own since
+    /// those live in a separate store. Kept to what LibraryStore actually holds.
+    private var recents: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                if !store.albums.isEmpty {
+                    shelfHeader("Albums")
+                    LazyVGrid(columns: grid, spacing: 20) {
+                        ForEach(store.albums.prefix(6)) { album in
+                            NavigationLink { AlbumDetailView(album: album) } label: { albumCell(album) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                if !store.artists.isEmpty {
+                    shelfHeader("Artists")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(store.artists.prefix(10)) { artist in
+                                NavigationLink { ArtistDetailView(artist: artist) } label: { artistCircle(artist) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .background(SoundChexTheme.base900)
+    }
+
+    /// A circular artist tile for the recents shelf — artist art is a circle
+    /// everywhere but the artist's own banner (spec).
+    private func artistCircle(_ artist: LibraryStore.Artist) -> some View {
+        VStack(spacing: 8) {
+            CachedImage(url: artist.artwork) { $0.resizable().scaledToFill() } placeholder: {
+                SoundChexTheme.base700.overlay(
+                    Image(systemName: "music.mic").foregroundStyle(SoundChexTheme.ink500))
+            }
+            .frame(width: 112, height: 112)
+            .clipShape(.circle)
+            Text(artist.name)
+                .font(.caption)
+                .foregroundStyle(SoundChexTheme.ink200)
+                .lineLimit(1)
+                .frame(width: 112)
+        }
+    }
+
+    private func shelfHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(SoundChexTheme.ink100)
+            .padding(.horizontal, 16)
     }
 
     private func albumCell(_ album: LibraryStore.Album) -> some View {

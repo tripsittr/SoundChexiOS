@@ -3,6 +3,32 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release — see `Plans/Versioning.md`.
 
+## 0.5.0 “Bridge” — 2026-09-21
+
+### Changed
+- **The Music space is redesigned Spotify-style** (S-288), keeping SoundChex's
+  own red accent and palette — only the Music tab changes; Home, Movies, Shows
+  and Books stay as they were.
+  - **Music landing** — the tab opens on a Recents surface (an Albums grid and a
+    circular-artist shelf) with a **filter-chip row** (Playlists / Albums /
+    Artists / Songs). A chip narrows to one kind with a clear-×; no chip shows
+    the recents. This replaces the old fixed pill sub-nav.
+  - **Now-playing sheet** — a fixed Spotify-style layout: big art, left-aligned
+    title, an accent scrubber, a 64px play button, and **Lyrics** and **Queue**
+    raised as their own sheets from a bottom bar (no longer one long scroll). The
+    header reads "PLAYING FROM <album>".
+  - **Album & artist detail** — a cover/banner that fades into the list, a
+    **dominant round accent Play button**, and the playing track marked with an
+    animated equalizer and an accent title. The artist page gains a hero banner
+    and a **Popular** list.
+  - **Track rows** everywhere show the equalizer + accent title on the track
+    that is playing. Artist artwork is now circular, album/song/playlist art a
+    rounded square, per the reference designs.
+
+Note: there is no "save/like" concept in the app yet, so the player uses the
+existing **Download** control where Spotify shows a heart; a real favourite would
+need a server endpoint (out of scope here).
+
 ## 0.4.2 “Interlude” — 2026-09-21
 
 ### Fixed

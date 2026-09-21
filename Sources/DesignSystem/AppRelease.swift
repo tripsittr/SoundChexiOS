@@ -16,6 +16,7 @@ enum AppRelease {
         "0.5": "Bridge",
         "0.6": "Refrain",
         "0.7": "Cadence",
+        "0.8": "Reprise",
         "1.0": "Encore",
     ]
 

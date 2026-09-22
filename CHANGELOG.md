@@ -3,6 +3,28 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.12.1 — 2026-09-22
+
+### Fixed
+- **Skipping back no longer lands mid-song, or on a song that looks finished**
+  (S-326). A track change did not clear the last one's position and duration, so
+  the bar kept showing where the previous song was skipped at — or showed the
+  new track as already over. Songs now always start at the start; only
+  audiobooks resume where they stopped, which is what that was for.
+- **Skipping sometimes played nothing** (S-326). Loading a track waits on the
+  network before playback starts, and a second skip arriving during that wait
+  left the older load to seek and play against the track that had just replaced
+  it. Each load now knows when it has been superseded and stops.
+- **A track that could not play no longer pretends to** (S-326). A failed item
+  (an expired token, a file that has moved) left the UI showing playback with no
+  audio and a frozen timeline; the failure is now noticed, playback stops, and
+  the reason is logged.
+- **Play/pause recovers from a stall in one press** (S-326). The button read its
+  own flag rather than the player, so when the two disagreed the first press
+  only changed the label.
+- Reaching the end of the queue with repeat off now stops, rather than leaving
+  the bar showing a finished track as playing.
+
 ## 0.12.0 “Ledger” — 2026-09-22
 
 ### Changed

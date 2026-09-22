@@ -39,6 +39,23 @@ final class PlaybackController {
     private var timeObserver: Any?
     private var lastReportedSecond = -1
 
+    /// Bumped on every load, so work started for an earlier track can tell that
+    /// it has been superseded and stop.
+    ///
+    /// Loading is asynchronous — the saved position is fetched over the network
+    /// before playback starts — and a listener skipping twice quickly starts a
+    /// second load while the first is still awaiting. Without this the older
+    /// task would come back and seek or play against the newer track, which
+    /// showed up as a skip that left the UI playing with no audio.
+    @ObservationIgnored private var loadGeneration = 0
+
+    /// The item the current load produced, so the end-of-track check can tell a
+    /// real ending from the moment between tracks.
+    @ObservationIgnored private var currentPlayerItem: AVPlayerItem?
+
+    /// Watches the player item for failure and for a stall that never clears.
+    @ObservationIgnored private var statusObservation: NSKeyValueObservation?
+
     /// The item whose cover is currently attached to the now-playing info, so a
     /// text-only refresh keeps the artwork and a track change reloads it. Not UI
     /// state — internal bookkeeping for the lock screen.
@@ -103,9 +120,17 @@ final class PlaybackController {
     }
 
     func togglePlayPause() {
-        if isPlaying { player.pause() } else { player.play() }
-        isPlaying.toggle()
-        updateNowPlayingInfo()
+        // Read the player rather than the flag. If playback stalled, the flag
+        // can say "playing" while nothing is — toggling from the flag then just
+        // relabels the button, and the listener has to press twice to recover.
+        if player.timeControlStatus == .playing {
+            pause()
+        } else {
+            // A track that ran to its end needs rewinding, or play() resumes at
+            // the end and stops again immediately.
+            if duration > 0, position >= duration - 0.5 { seek(to: 0) }
+            resume()
+        }
     }
 
     /// Inserts an item to play right after the current one.
@@ -146,6 +171,9 @@ final class PlaybackController {
             // Wrap to the top of the queue.
             index = 0
         } else {
+            // The end of the queue with repeat off. Stop rather than returning
+            // silently, which left the bar claiming to play a finished track.
+            pause()
             return
         }
         loadCurrent(api: api)
@@ -169,8 +197,23 @@ final class PlaybackController {
     // MARK: - Loading
 
     private func loadCurrent(api: APIClient) {
+        guard queue.indices.contains(index) else { return }
+
         let item = queue[index]
         current = item
+
+        // A new track starts from nothing known. Without this the previous
+        // track's values survived the change: going back a song showed the
+        // position it was skipped at, or showed as already finished, and the
+        // stale duration could fire the end-of-track check immediately and skip
+        // the song that had just started.
+        position = 0
+        duration = 0
+        lastReportedSecond = -1
+
+        // Anything still in flight for the previous track is now stale.
+        loadGeneration &+= 1
+        let generation = loadGeneration
 
         AppLog.info("Play #\(item.id) “\(item.title)” (\(index + 1)/\(queue.count))", category: "playback")
 
@@ -196,6 +239,8 @@ final class PlaybackController {
         }
 
         let playerItem = AVPlayerItem(asset: asset)
+        currentPlayerItem = playerItem
+        observeStatus(of: playerItem, generation: generation)
         player.replaceCurrentItem(with: playerItem)
 
         // Activate the session now, right before audio starts — a failed
@@ -204,12 +249,52 @@ final class PlaybackController {
 
         // Resume where this track was left off, then play.
         Task {
-            let resume = (try? await api.progress(itemID: item.id))?.position ?? 0
+            // Only long-form media resumes. A song is meant to start at the
+            // start: skipping past one records the position it was abandoned
+            // at, so resuming would drop the listener back mid-song — or, for a
+            // track that had played out, at its very end, which looked like the
+            // song was already over the moment it was selected.
+            let resume = item.type == .book
+                ? (try? await api.progress(itemID: item.id))?.position ?? 0
+                : 0
+
+            // The await above gives another skip time to start its own load. If
+            // one did, this task belongs to a track the listener has already
+            // left — seeking or playing here would fight the new one.
+            guard generation == self.loadGeneration else { return }
+
             if resume > 3 { seek(to: Double(resume)) }
             player.play()
             isPlaying = true
             await readDuration(of: playerItem)
+
+            guard generation == self.loadGeneration else { return }
             updateNowPlayingInfo()
+        }
+    }
+
+    /// Reports a track that cannot play instead of leaving the UI insisting it
+    /// is playing.
+    ///
+    /// A failed item (an expired token, a file that has gone, a stream that
+    ///404s) leaves AVPlayer with nothing to do: no audio, no time observer
+    /// ticks, and — before this — `isPlaying` still true and a frozen timeline.
+    private func observeStatus(of item: AVPlayerItem, generation: Int) {
+        statusObservation?.invalidate()
+        statusObservation = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+            guard observed.status == .failed else { return }
+
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.loadGeneration else { return }
+
+                AppLog.error(
+                    "Playback failed: \(observed.error?.localizedDescription ?? "unknown error")",
+                    category: "playback"
+                )
+
+                self.isPlaying = false
+                self.updateNowPlayingInfo()
+            }
         }
     }
 
@@ -247,14 +332,19 @@ final class PlaybackController {
     }
 
     private func advanceAtEnd() {
+        // Only the item this tick actually belongs to may end the track. A tick
+        // can arrive while the player is between items, when `duration` still
+        // describes the track just left — which read as "finished" and skipped
+        // straight past the song that had only just started.
+        guard let item = currentPlayerItem, player.currentItem === item else { return }
+
         guard duration > 0, position >= duration - 0.5 else { return }
 
         // Repeat-one loops the same track; otherwise advance (which wraps when
         // repeat-all is on).
-        if repeatMode == .one, let api {
+        if repeatMode == .one {
             seek(to: 0)
             player.play()
-            _ = api
         } else {
             next()
         }

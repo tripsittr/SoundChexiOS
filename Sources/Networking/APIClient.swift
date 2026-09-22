@@ -290,14 +290,26 @@ struct APIClient {
 
     // MARK: - Lyrics
 
-    /// The lyrics for a track, or nil when the server has none. The server
-    /// fetches and caches them from a lyric provider; the app just reads them.
-    func lyrics(itemID: Int) async throws -> String? {
-        struct Response: Decodable { let lyrics: String? }
+    /// A track's lyrics: the plain words, and — when available — time-synced LRC
+    /// text for the scroll-highlight. Either may be nil. The server fetches and
+    /// caches these; the app just reads them.
+    struct Lyrics: Decodable, Sendable {
+        let plain: String?
+        let synced: String?
+
+        enum CodingKeys: String, CodingKey {
+            case plain = "lyrics"
+            case synced
+        }
+    }
+
+    /// The lyrics for a track, or nil when the server has none.
+    func lyrics(itemID: Int) async throws -> Lyrics? {
         // A 404 (no lyrics) is not an error worth surfacing — return nil.
         do {
-            let response: Response = try await send("/api/v1/items/\(itemID)/lyrics", method: "GET")
-            return response.lyrics
+            let lyrics: Lyrics = try await send("/api/v1/items/\(itemID)/lyrics", method: "GET")
+            if lyrics.plain == nil, lyrics.synced == nil { return nil }
+            return lyrics
         } catch APIError.http(404) {
             return nil
         }

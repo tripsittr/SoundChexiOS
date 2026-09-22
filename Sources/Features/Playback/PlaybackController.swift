@@ -221,7 +221,10 @@ final class PlaybackController {
     // MARK: - Time / progress
 
     private func observeTime() {
-        let interval = CMTime(seconds: 1, preferredTimescale: 600)
+        // A quarter-second tick keeps synced lyrics landing on the right line
+        // without noticeable lag. Progress reporting is still gated to whole
+        // seconds below, so the finer tick costs nothing there.
+        let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
             MainActor.assumeIsolated {

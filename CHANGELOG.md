@@ -3,6 +3,16 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.10.0 “Verse” — 2026-09-22
+
+### Added
+- **Synced lyrics** (S-300) — when the server has time-synced (LRC) lyrics for a
+  track, the Now Playing lyrics panel scrolls and highlights the current line in
+  time with the music, and you can tap a line to jump to it. Tracks with only
+  plain lyrics still show them as before; tracks with none show nothing. The
+  player position now updates four times a second so the highlighted line lands
+  on the right words.
+
 ## 0.9.0 “Coda” — 2026-09-22
 
 ### Changed

@@ -3,15 +3,17 @@
 
 import SwiftUI
 
-/// A reflowable, Kindle-style book reader (S-295).
+/// A paginated, Kindle-style book reader (S-295, S-304).
 ///
 /// The server parses the book (PDF text, scanned-page OCR, or EPUB chapters) and
-/// serves it as ordered text; this renders it as one continuous, resizable read
-/// with an adjustable font size and page theme. The same reader works for every
-/// format because the device never touches the file — it reads the parsed text.
+/// serves it as ordered text; this lays the text out into fixed, screen-sized
+/// pages and turns them one at a time — tap the right side or swipe left for the
+/// next page, the left side or swipe right for the previous, the centre to show
+/// or hide the bars. The same reader works for every format because the device
+/// renders the parsed text itself.
 ///
 /// Resume is by chapter: the saved location is the chapter position, and opening
-/// the book scrolls to it. Progress is reported back as it is read.
+/// the book jumps to that chapter's first page. Progress is reported as it reads.
 struct ReaderView: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -24,12 +26,21 @@ struct ReaderView: View {
     @State private var showingSettings = false
     @State private var startChapter = 1
 
-    /// Where the reader is right now, tracked as they scroll so the top shows the
-    /// page and chapter and a live reading percentage.
-    @State private var currentChapter: APIClient.BookContent.Chapter?
-    @State private var percent = 0
+    /// The laid-out pages and where we are in them.
+    @State private var pages: [BookPaginator.Page] = []
+    @State private var pageIndex = 0
+    /// The area the last pagination was computed for, so we only re-paginate when
+    /// the size or the settings actually change.
+    @State private var paginatedFor: CGSize = .zero
+    /// The reader chrome (bars) — hidden by default for an immersive read, toggled
+    /// by a centre tap.
+    @State private var chromeVisible = true
 
     enum Phase { case loading, processing, ready, empty, failed }
+
+    private var imagesByPage: [Int: [APIClient.BookContent.Image]] {
+        Dictionary(grouping: images, by: \.page)
+    }
 
     var body: some View {
         NavigationStack {
@@ -37,12 +48,11 @@ struct ReaderView: View {
                 .background(settings.theme.background)
                 .navigationTitle(item.title)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar(chromeVisible ? .visible : .hidden, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Done") { dismiss() }
                     }
-                    // The place in the book: page and chapter, with the reading
-                    // percentage — the reader's "where am I" line, under the title.
                     ToolbarItem(placement: .principal) {
                         VStack(spacing: 1) {
                             Text(item.title)
@@ -71,15 +81,16 @@ struct ReaderView: View {
                         .presentationDetents([.height(220)])
                 }
         }
+        .statusBarHidden(!chromeVisible)
         .task { await load() }
     }
 
-    /// "Page 42 · Chapter 3: Don't Try · 18%" — only the parts that exist for
-    /// this book: EPUB has no page number, so it shows the chapter; the chapter
-    /// carries forward from the last heading so a page mid-chapter still names it.
+    /// "Page 42 · Chapter 3: Don't Try · 18%" — only the parts that exist for this
+    /// book: EPUB has no page number, so it shows the chapter; the percentage is
+    /// how far through the laid-out pages we are.
     private var locationSubtitle: String {
         var parts: [String] = []
-        if let page = currentChapter?.page {
+        if let page = pages[safe: pageIndex]?.sourcePage {
             parts.append("Page \(page)")
         }
         if let chapter = effectiveChapterTitle {
@@ -89,19 +100,16 @@ struct ReaderView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// A coarse percentage from a chapter's position — the iOS 17 fallback when
-    /// live scroll geometry isn't available.
-    private func chapterPercent(for chapter: APIClient.BookContent.Chapter) -> Int {
-        guard chapters.count > 1,
-              let index = chapters.firstIndex(where: { $0.position == chapter.position })
-        else { return 0 }
-        return Int(Double(index) / Double(chapters.count - 1) * 100)
+    /// How far through the book, by page count.
+    private var percent: Int {
+        guard pages.count > 1 else { return pages.isEmpty ? 0 : 100 }
+        return Int(Double(pageIndex) / Double(pages.count - 1) * 100)
     }
 
-    /// The chapter title in effect at the current position — the nearest heading
-    /// at or before it, so it persists through the pages of that chapter.
+    /// The chapter title in effect at the current page — the nearest heading at or
+    /// before this page's chapter, so a page mid-chapter still names its chapter.
     private var effectiveChapterTitle: String? {
-        guard let position = currentChapter?.position else { return nil }
+        guard let position = pages[safe: pageIndex]?.chapterPosition else { return nil }
         return chapters
             .prefix(while: { $0.position <= position })
             .last(where: { !($0.title ?? "").isEmpty })?
@@ -119,20 +127,23 @@ struct ReaderView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .ready:
-            ReaderScroll(
-                chapters: chapters, images: images, token: session.api?.token,
-                settings: settings, startChapter: startChapter,
-                onReachChapter: { chapter in
-                    currentChapter = chapter
-                    // On iOS 17 (no scroll geometry) this is the percentage; on 18+
-                    // the smoother scroll value below takes over.
-                    if #unavailable(iOS 18.0) {
-                        percent = chapterPercent(for: chapter)
-                    }
-                    saveProgress()
-                },
-                onScrollPercent: { percent = $0 }
-            )
+            GeometryReader { geo in
+                let insets = EdgeInsets(top: 24, leading: 26, bottom: 40, trailing: 26)
+                let area = CGSize(
+                    width: geo.size.width - insets.leading - insets.trailing,
+                    height: geo.size.height - insets.top - insets.bottom)
+
+                ReaderPager(
+                    pages: pages, token: session.api?.token, settings: settings,
+                    insets: insets, pageIndex: $pageIndex,
+                    onTurn: { onPageChanged() },
+                    onToggleChrome: { withAnimation(.easeInOut(duration: 0.2)) { chromeVisible.toggle() } }
+                )
+                // Lay out (and re-lay out) whenever the area or the settings change.
+                .task(id: PaginationKey(size: area, settings: settings)) {
+                    repaginate(area: area)
+                }
+            }
 
         case .empty:
             unavailable("Nothing to read", "This book has no text the reader could extract.")
@@ -140,6 +151,29 @@ struct ReaderView: View {
         case .failed:
             unavailable("Couldn't open this book", "The book could not be loaded from the server.")
         }
+    }
+
+    /// Re-lay the book into pages for a reading area, keeping the reader roughly
+    /// where it was (by the chapter it was on) across a font-size or size change.
+    private func repaginate(area: CGSize) {
+        let anchorChapter = pages[safe: pageIndex]?.chapterPosition ?? startChapter
+
+        let laidOut = BookPaginator.paginate(
+            chapters: chapters, imagesByPage: imagesByPage, size: area, settings: settings)
+
+        pages = laidOut
+        paginatedFor = area
+
+        // Land on the first page of the chapter we were reading (or resuming to).
+        if let idx = laidOut.firstIndex(where: { $0.chapterPosition >= anchorChapter }) {
+            pageIndex = idx
+        } else {
+            pageIndex = min(pageIndex, max(laidOut.count - 1, 0))
+        }
+    }
+
+    private func onPageChanged() {
+        saveProgress()
     }
 
     private func unavailable(_ title: String, _ message: String) -> some View {
@@ -177,7 +211,6 @@ struct ReaderView: View {
                 return
             case "processing":
                 phase = .processing
-                // Back off a little between polls.
                 try? await Task.sleep(for: .seconds(attempt < 5 ? 1 : 3))
             default:
                 phase = .failed
@@ -189,12 +222,10 @@ struct ReaderView: View {
         phase = .processing
     }
 
-    /// Saves the reading place — the current chapter position (to resume to) and
-    /// the scroll percentage (to display). Called as chapters scroll by; the
-    /// server keeps the furthest point, so an occasional out-of-order save is
-    /// harmless.
+    /// Saves the reading place — the current page's chapter (to resume to) and the
+    /// page-based percentage (to display). The server keeps the furthest point.
     private func saveProgress() {
-        guard let position = currentChapter?.position else { return }
+        guard let position = pages[safe: pageIndex]?.chapterPosition else { return }
         let percent = self.percent
         Task {
             try? await session.api?.saveReadingProgress(
@@ -203,114 +234,100 @@ struct ReaderView: View {
     }
 }
 
-/// The scrolling text, chapter by chapter, with each page's images placed inline
-/// after its text — so an illustrated or scanned book reads with its pictures,
-/// the same as the desktop reader. Resumes to a chapter and reports the one that
-/// scrolls into view.
-private struct ReaderScroll: View {
-    let chapters: [APIClient.BookContent.Chapter]
-    let images: [APIClient.BookContent.Image]
+/// A key that changes when either the reading area or the settings change, so the
+/// pager re-paginates exactly then and no more often.
+private struct PaginationKey: Equatable {
+    let size: CGSize
+    let settings: ReaderSettings
+}
+
+/// The paged book: one full page at a time, turned by tap zones (left/right
+/// thirds) and swipes, with the centre tapping the bars on and off.
+private struct ReaderPager: View {
+    let pages: [BookPaginator.Page]
     let token: String?
     let settings: ReaderSettings
-    let startChapter: Int
-    /// The chapter/page scrolled into view, for the "where am I" line and resume.
-    let onReachChapter: (APIClient.BookContent.Chapter) -> Void
-    /// How far through the whole book the reader has scrolled, 0–100, updated
-    /// continuously as they read (not just at chapter boundaries).
-    let onScrollPercent: (Int) -> Void
-
-    @State private var reported = 0
-
-    /// Images grouped by the page they belong on, for O(1) lookup per chapter.
-    private var imagesByPage: [Int: [APIClient.BookContent.Image]] {
-        Dictionary(grouping: images, by: \.page)
-    }
+    let insets: EdgeInsets
+    @Binding var pageIndex: Int
+    let onTurn: () -> Void
+    let onToggleChrome: () -> Void
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 28) {
-                    ForEach(chapters) { chapter in
-                        VStack(alignment: .leading, spacing: 16) {
-                            if let title = chapter.title, !title.isEmpty {
-                                Text(title)
-                                    .font(.system(size: settings.fontSize + 4, weight: .bold, design: settings.serif ? .serif : .default))
-                                    .foregroundStyle(settings.theme.text)
-                            }
-                            if !chapter.text.isEmpty {
-                                Text(chapter.text)
-                                    .font(.system(size: settings.fontSize, design: settings.serif ? .serif : .default))
-                                    .foregroundStyle(settings.theme.text)
-                                    .lineSpacing(settings.fontSize * 0.4)
-                            }
-                            // The page's images, inline (a scanned page's image, a
-                            // plate, a diagram) — the text-and-images read. Images
-                            // are keyed by source page, so match on the chapter's
-                            // page; position is reading order and can differ from
-                            // the page once blank pages are dropped.
-                            ForEach(imagesByPage[chapter.page ?? chapter.position] ?? []) { image in
-                                ReaderImage(image: image, token: token)
-                            }
-                        }
-                        .id(chapter.position)
-                        .onAppear {
-                            if chapter.position != reported {
-                                reported = chapter.position
-                                onReachChapter(chapter)
-                            }
-                        }
-                    }
+        ZStack {
+            settings.theme.background.ignoresSafeArea()
+
+            TabView(selection: $pageIndex) {
+                ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+                    ReaderPageView(page: page, token: token, settings: settings, insets: insets)
+                        .tag(index)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 20)
-                .frame(maxWidth: 720)
-                .frame(maxWidth: .infinity)
             }
-            // A continuous read-through percentage from the scroll offset: how far
-            // the content has moved past the top over its total scrollable height.
-            // Smoother and more honest than "chapter N of M", which jumps.
-            // iOS 18+ has scroll geometry; on 17 we fall back to chapter progress
-            // (reported from onReachChapter), so the percentage still moves.
-            .modifier(ScrollPercentTracker(onScrollPercent: onScrollPercent))
-            .onAppear {
-                if startChapter > 1 {
-                    proxy.scrollTo(startChapter, anchor: .top)
-                }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .onChange(of: pageIndex) { _, _ in onTurn() }
+
+            // Tap zones sit above the pages: left third = back, right third =
+            // forward, centre = toggle the bars. Swiping still works because the
+            // zones only claim taps, and the TabView handles the drag underneath.
+            HStack(spacing: 0) {
+                tapZone { turn(by: -1) }
+                tapZone { onToggleChrome() }
+                tapZone { turn(by: 1) }
             }
         }
     }
-}
 
-/// Reports a 0–100 read-through percentage from live scroll geometry where the
-/// OS supports it (iOS 18+); on iOS 17 it is a no-op and the reader falls back to
-/// chapter-based progress.
-private struct ScrollPercentTracker: ViewModifier {
-    let onScrollPercent: (Int) -> Void
+    private func tapZone(_ action: @escaping () -> Void) -> some View {
+        Color.clear
+            .contentShape(.rect)
+            .onTapGesture { action() }
+    }
 
-    func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.onScrollGeometryChange(for: Int.self) { geometry in
-                let scrollable = geometry.contentSize.height - geometry.containerSize.height
-                guard scrollable > 0 else { return 0 }
-                let offset = geometry.contentOffset.y + geometry.contentInsets.top
-                return Int((offset / scrollable * 100).rounded().clamped(to: 0 ... 100))
-            } action: { _, percent in
-                onScrollPercent(percent)
-            }
-        } else {
-            content
-        }
+    private func turn(by delta: Int) {
+        let next = pageIndex + delta
+        guard next >= 0, next < pages.count else { return }
+        withAnimation(.easeInOut(duration: 0.25)) { pageIndex = next }
     }
 }
 
-private extension Double {
-    func clamped(to range: ClosedRange<Double>) -> Double {
-        min(max(self, range.lowerBound), range.upperBound)
+/// One laid-out page: an optional chapter heading, the page's text, or a
+/// full-page image.
+private struct ReaderPageView: View {
+    let page: BookPaginator.Page
+    let token: String?
+    let settings: ReaderSettings
+    let insets: EdgeInsets
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let title = page.title, !title.isEmpty {
+                Text(title)
+                    .font(.system(size: settings.fontSize + 4, weight: .bold,
+                                  design: settings.serif ? .serif : .default))
+                    .foregroundStyle(settings.theme.text)
+            }
+
+            if let image = page.image {
+                Spacer(minLength: 0)
+                ReaderImage(image: image, token: token)
+                    .frame(maxWidth: .infinity)
+                Spacer(minLength: 0)
+            } else if !page.text.isEmpty {
+                Text(page.text)
+                    .font(.system(size: settings.fontSize, design: settings.serif ? .serif : .default))
+                    .foregroundStyle(settings.theme.text)
+                    .lineSpacing(settings.fontSize * 0.4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(insets)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
 /// One inline book image, loaded with the bearer header (the asset route is
-/// token-authed), sized to the reading column.
+/// token-authed), sized to the page.
 private struct ReaderImage: View {
     let image: APIClient.BookContent.Image
     let token: String?
@@ -351,5 +368,13 @@ private extension APIClient.BookContent.Image {
     var aspect: CGFloat {
         guard let width, let height, width > 0, height > 0 else { return 0.7 }
         return CGFloat(width) / CGFloat(height)
+    }
+}
+
+private extension Array {
+    /// Safe indexed access — nil rather than a crash when the index is stale
+    /// (e.g. mid-repagination).
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

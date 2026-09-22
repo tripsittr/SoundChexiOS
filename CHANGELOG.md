@@ -3,6 +3,16 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.12.0 “Ledger” — 2026-09-22
+
+### Changed
+- **Albums no longer show twice for different editions** (S-308). The library
+  groups albums by the server's canonical album key, so "Album" and "Album
+  (Deluxe)" / "(Remastered 2016)" — or the same album with different bracket or
+  quote styles — collapse into one album with all its tracks, showing the plain
+  title. Numbered sequels and volumes ("(Part IV)", "(II)") stay separate, as
+  they should. (Pairs with the server's `album_key`.)
+
 ## 0.10.0 “Verse” — 2026-09-22
 
 ### Added

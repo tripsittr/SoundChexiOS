@@ -165,22 +165,24 @@ final class LibraryStore {
 
     /// One album: its tracks, in disc/track order.
     struct Album: Identifiable, Hashable {
-        let id: String            // artist|album, so two albums of a name don't merge
+        let id: String            // artist|albumKey, so variants merge but two different albums of a name don't
         let title: String
         let artist: String
         let tracks: [MediaItem]
         var artwork: URL? { tracks.first?.artwork }
     }
 
-    /// Albums, grouped from the music tracks by primary artist + album.
+    /// Albums, grouped from the music tracks by primary artist + album key.
     ///
-    /// Grouping on the *primary* artist (not the raw credit) keeps every track
-    /// of an album together even when some are tagged "Artist, Someone" — those
-    /// would otherwise scatter into one-track albums and split the artist.
+    /// Grouping on the *primary* artist (not the raw credit) keeps every track of
+    /// an album together even when some are tagged "Artist, Someone", and on the
+    /// canonical *album key* (not the raw title) so edition/punctuation variants
+    /// of one album — "Album" and "Album (Deluxe)" — collapse into one rather than
+    /// showing twice (S-308).
     var albums: [Album] {
         let music = items(of: .music)
         let groups = Dictionary(grouping: music) { item in
-            "\(item.meta?.groupingArtist ?? "")|\(item.meta?.album ?? item.title)"
+            "\(item.meta?.groupingArtist ?? "")|\(item.meta?.groupingAlbum ?? item.title)"
         }
         return groups.compactMap { key, tracks -> Album? in
             guard let first = tracks.first else { return nil }
@@ -188,9 +190,16 @@ final class LibraryStore {
                 ($0.meta?.discNumber ?? 0, $0.meta?.trackNumber ?? 0)
                     < ($1.meta?.discNumber ?? 0, $1.meta?.trackNumber ?? 0)
             }
+            // Show the plainest spelling in the group — the shortest album title,
+            // which is the one without a "(Deluxe)" / "(Remastered)" tail.
+            let title = tracks
+                .compactMap { $0.meta?.album }
+                .filter { !$0.isEmpty }
+                .min { $0.count < $1.count } ?? "Unknown album"
+
             return Album(
                 id: key,
-                title: first.meta?.album ?? "Unknown album",
+                title: title,
                 artist: first.meta?.groupingArtist ?? "Unknown artist",
                 tracks: sorted
             )

@@ -244,8 +244,11 @@ private struct ReaderScroll: View {
                                     .lineSpacing(settings.fontSize * 0.4)
                             }
                             // The page's images, inline (a scanned page's image, a
-                            // plate, a diagram) — the text-and-images read.
-                            ForEach(imagesByPage[chapter.position] ?? []) { image in
+                            // plate, a diagram) — the text-and-images read. Images
+                            // are keyed by source page, so match on the chapter's
+                            // page; position is reading order and can differ from
+                            // the page once blank pages are dropped.
+                            ForEach(imagesByPage[chapter.page ?? chapter.position] ?? []) { image in
                                 ReaderImage(image: image, token: token)
                             }
                         }

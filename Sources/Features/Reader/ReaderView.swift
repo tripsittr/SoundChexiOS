@@ -24,6 +24,11 @@ struct ReaderView: View {
     @State private var showingSettings = false
     @State private var startChapter = 1
 
+    /// Where the reader is right now, tracked as they scroll so the top shows the
+    /// page and chapter and a live reading percentage.
+    @State private var currentChapter: APIClient.BookContent.Chapter?
+    @State private var percent = 0
+
     enum Phase { case loading, processing, ready, empty, failed }
 
     var body: some View {
@@ -35,6 +40,22 @@ struct ReaderView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Done") { dismiss() }
+                    }
+                    // The place in the book: page and chapter, with the reading
+                    // percentage — the reader's "where am I" line, under the title.
+                    ToolbarItem(placement: .principal) {
+                        VStack(spacing: 1) {
+                            Text(item.title)
+                                .font(.headline)
+                                .lineLimit(1)
+                                .foregroundStyle(settings.theme.text)
+                            if phase == .ready {
+                                Text(locationSubtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(settings.theme.text.opacity(0.6))
+                                    .lineLimit(1)
+                            }
+                        }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingSettings.toggle() } label: {
@@ -53,6 +74,40 @@ struct ReaderView: View {
         .task { await load() }
     }
 
+    /// "Page 42 · Chapter 3: Don't Try · 18%" — only the parts that exist for
+    /// this book: EPUB has no page number, so it shows the chapter; the chapter
+    /// carries forward from the last heading so a page mid-chapter still names it.
+    private var locationSubtitle: String {
+        var parts: [String] = []
+        if let page = currentChapter?.page {
+            parts.append("Page \(page)")
+        }
+        if let chapter = effectiveChapterTitle {
+            parts.append(chapter)
+        }
+        parts.append("\(percent)%")
+        return parts.joined(separator: " · ")
+    }
+
+    /// A coarse percentage from a chapter's position — the iOS 17 fallback when
+    /// live scroll geometry isn't available.
+    private func chapterPercent(for chapter: APIClient.BookContent.Chapter) -> Int {
+        guard chapters.count > 1,
+              let index = chapters.firstIndex(where: { $0.position == chapter.position })
+        else { return 0 }
+        return Int(Double(index) / Double(chapters.count - 1) * 100)
+    }
+
+    /// The chapter title in effect at the current position — the nearest heading
+    /// at or before it, so it persists through the pages of that chapter.
+    private var effectiveChapterTitle: String? {
+        guard let position = currentChapter?.position else { return nil }
+        return chapters
+            .prefix(while: { $0.position <= position })
+            .last(where: { !($0.title ?? "").isEmpty })?
+            .title
+    }
+
     @ViewBuilder private var content: some View {
         switch phase {
         case .loading, .processing:
@@ -64,15 +119,20 @@ struct ReaderView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .ready:
-            ReaderScroll(chapters: chapters, images: images, token: session.api?.token,
-                         settings: settings, startChapter: startChapter) { position in
-                let percent = chapters.isEmpty ? 0
-                    : Int(Double(position - 1) / Double(max(chapters.count - 1, 1)) * 100)
-                Task {
-                    try? await session.api?.saveReadingProgress(
-                        itemID: item.id, location: String(position), percent: percent)
-                }
-            }
+            ReaderScroll(
+                chapters: chapters, images: images, token: session.api?.token,
+                settings: settings, startChapter: startChapter,
+                onReachChapter: { chapter in
+                    currentChapter = chapter
+                    // On iOS 17 (no scroll geometry) this is the percentage; on 18+
+                    // the smoother scroll value below takes over.
+                    if #unavailable(iOS 18.0) {
+                        percent = chapterPercent(for: chapter)
+                    }
+                    saveProgress()
+                },
+                onScrollPercent: { percent = $0 }
+            )
 
         case .empty:
             unavailable("Nothing to read", "This book has no text the reader could extract.")
@@ -128,6 +188,19 @@ struct ReaderView: View {
         // Gave up waiting — leave it processing so a re-open tries again.
         phase = .processing
     }
+
+    /// Saves the reading place — the current chapter position (to resume to) and
+    /// the scroll percentage (to display). Called as chapters scroll by; the
+    /// server keeps the furthest point, so an occasional out-of-order save is
+    /// harmless.
+    private func saveProgress() {
+        guard let position = currentChapter?.position else { return }
+        let percent = self.percent
+        Task {
+            try? await session.api?.saveReadingProgress(
+                itemID: item.id, location: String(position), percent: percent)
+        }
+    }
 }
 
 /// The scrolling text, chapter by chapter, with each page's images placed inline
@@ -140,7 +213,11 @@ private struct ReaderScroll: View {
     let token: String?
     let settings: ReaderSettings
     let startChapter: Int
-    let onReachChapter: (Int) -> Void
+    /// The chapter/page scrolled into view, for the "where am I" line and resume.
+    let onReachChapter: (APIClient.BookContent.Chapter) -> Void
+    /// How far through the whole book the reader has scrolled, 0–100, updated
+    /// continuously as they read (not just at chapter boundaries).
+    let onScrollPercent: (Int) -> Void
 
     @State private var reported = 0
 
@@ -176,7 +253,7 @@ private struct ReaderScroll: View {
                         .onAppear {
                             if chapter.position != reported {
                                 reported = chapter.position
-                                onReachChapter(chapter.position)
+                                onReachChapter(chapter)
                             }
                         }
                     }
@@ -186,12 +263,46 @@ private struct ReaderScroll: View {
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
+            // A continuous read-through percentage from the scroll offset: how far
+            // the content has moved past the top over its total scrollable height.
+            // Smoother and more honest than "chapter N of M", which jumps.
+            // iOS 18+ has scroll geometry; on 17 we fall back to chapter progress
+            // (reported from onReachChapter), so the percentage still moves.
+            .modifier(ScrollPercentTracker(onScrollPercent: onScrollPercent))
             .onAppear {
                 if startChapter > 1 {
                     proxy.scrollTo(startChapter, anchor: .top)
                 }
             }
         }
+    }
+}
+
+/// Reports a 0–100 read-through percentage from live scroll geometry where the
+/// OS supports it (iOS 18+); on iOS 17 it is a no-op and the reader falls back to
+/// chapter-based progress.
+private struct ScrollPercentTracker: ViewModifier {
+    let onScrollPercent: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: Int.self) { geometry in
+                let scrollable = geometry.contentSize.height - geometry.containerSize.height
+                guard scrollable > 0 else { return 0 }
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return Int((offset / scrollable * 100).rounded().clamped(to: 0 ... 100))
+            } action: { _, percent in
+                onScrollPercent(percent)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+private extension Double {
+    func clamped(to range: ClosedRange<Double>) -> Double {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 

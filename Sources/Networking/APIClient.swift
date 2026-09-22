@@ -353,6 +353,8 @@ struct APIClient {
     struct BookContent: Decodable, Sendable {
         struct Chapter: Decodable, Sendable, Identifiable, Hashable {
             let position: Int
+            /// The source page (PDF); nil for EPUB, which has no fixed pages.
+            let page: Int?
             let title: String?
             let text: String
             var id: Int { position }

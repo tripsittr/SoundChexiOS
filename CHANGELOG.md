@@ -3,6 +3,20 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.9.0 “Coda” — 2026-09-22
+
+### Changed
+- **The reader shows where you are** (S-298) — under the book title, the reader
+  now shows the current **page**, the current **chapter**, and a live **reading
+  percentage** (e.g. "Page 42 · Chapter 3: Don't Try · 18%"). The chapter carries
+  forward from the last heading, so a page mid-chapter still names its chapter,
+  and the percentage tracks the actual scroll position so it moves smoothly as you
+  read rather than jumping chapter to chapter. Progress is saved as you go.
+- **No more "Page N" stacked down the page.** A reflowed book flowed with a bold
+  "Page 1 / Page 2 / …" heading atop every screen, which read as jumbled and left
+  empty blocks on blank front-matter pages. Those headings are gone; a heading now
+  appears only where a real chapter begins. (Server side: S-298.)
+
 ## 0.8.0 “Reprise” — 2026-09-21
 
 ### Changed

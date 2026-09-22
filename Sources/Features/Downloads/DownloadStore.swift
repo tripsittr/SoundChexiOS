@@ -77,6 +77,25 @@ final class DownloadStore: NSObject {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
+    /// The on-disk file only when it is worth handing to the player.
+    ///
+    /// A download that stored a refused request's error body is present but
+    /// unplayable (S-327). Streaming instead turns a song that was silent into
+    /// one that plays, and the bad file is cleared so it can be fetched again.
+    func playableLocalURL(for itemID: Int) -> URL? {
+        guard let url = localURL(for: itemID) else { return nil }
+
+        guard !Self.isTooSmallToBeMedia(url) else {
+            try? FileManager.default.removeItem(at: url)
+            states[itemID] = .idle
+            AppLog.error("Stored file for #\(itemID) was not media; streaming instead", category: "downloads")
+
+            return nil
+        }
+
+        return url
+    }
+
     // MARK: - Actions
 
     /// Starts (or resumes) a download for an item.
@@ -234,11 +253,40 @@ final class DownloadStore: NSObject {
             guard let data = try? Data(contentsOf: sidecar),
                   let item = try? JSONDecoder().decode(DownloadedItem.self, from: data) else { continue }
             stored.append(item)
+
             // Stored only if the media file actually landed; a lone sidecar means
             // an interrupted download.
-            states[item.id] = fm.fileExists(atPath: Self.mediaURL(for: item.id).path)
-                ? .stored : .idle
+            let media = Self.mediaURL(for: item.id)
+
+            guard fm.fileExists(atPath: media.path) else {
+                states[item.id] = .idle
+                continue
+            }
+
+            // Builds before S-327 stored a refused request's error body as the
+            // song — a few dozen bytes of JSON that played as silence. Clear
+            // those out rather than leaving the library full of tracks that
+            // cannot play; they can simply be downloaded again.
+            if Self.isTooSmallToBeMedia(media) {
+                try? fm.removeItem(at: media)
+                states[item.id] = .idle
+                AppLog.info("Discarded a failed download for #\(item.id)", category: "downloads")
+                continue
+            }
+
+            states[item.id] = .stored
         }
+    }
+
+    /// Whether a stored file is too small to be real media.
+    ///
+    /// An error body is tens of bytes; the shortest plausible encoded track is
+    /// still tens of kilobytes, so this separates the two without having to
+    /// decode anything.
+    private static func isTooSmallToBeMedia(_ url: URL) -> Bool {
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+
+        return size < 16_384
     }
 }
 
@@ -264,8 +312,31 @@ extension DownloadStore: URLSessionDownloadDelegate {
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.moveItem(at: location, to: temp)
 
+        // URLSession reports a 404 as a *successful* download whose body is the
+        // error page. Without this check that body was stored as the song: the
+        // app believed the track was downloaded and played a 21-byte JSON error
+        // as audio, which is silence, a motionless timeline, and a UI insisting
+        // it is playing (S-327).
+        let response = downloadTask.response as? HTTPURLResponse
+        let status = response?.statusCode ?? 0
+        let mime = response?.mimeType ?? ""
+        let isAudio = mime.hasPrefix("audio/") || mime.hasPrefix("video/")
+            || mime == "application/octet-stream"
+
         Task { @MainActor in
             guard let itemID = tasks[identifier] else { try? FileManager.default.removeItem(at: temp); return }
+            tasks[identifier] = nil
+
+            guard (200...299).contains(status), isAudio else {
+                try? FileManager.default.removeItem(at: temp)
+                states[itemID] = .failed
+                AppLog.error(
+                    "Download of #\(itemID) refused: HTTP \(status), \(mime.isEmpty ? "no content type" : mime)",
+                    category: "downloads"
+                )
+                return
+            }
+
             let dest = Self.mediaURL(for: itemID)
             try? FileManager.default.removeItem(at: dest)
             do {
@@ -274,7 +345,6 @@ extension DownloadStore: URLSessionDownloadDelegate {
             } catch {
                 states[itemID] = .failed
             }
-            tasks[identifier] = nil
         }
     }
 

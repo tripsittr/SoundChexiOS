@@ -219,7 +219,7 @@ final class PlaybackController {
 
         let asset: AVURLAsset
 
-        if let local = DownloadStore.shared.localURL(for: item.id) {
+        if let local = DownloadStore.shared.playableLocalURL(for: item.id) {
             // Downloaded: play from disk. Works with no network, and needs no
             // auth header since it is a local file.
             asset = AVURLAsset(url: local)

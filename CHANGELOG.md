@@ -3,6 +3,21 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.12.2 — 2026-09-22
+
+### Fixed
+- **Downloaded songs that played silence** (S-327). A refused request (a track
+  whose file is missing on the server answers 404) was stored as the song
+  itself: URLSession treats an error body as a successful download, so a 21-byte
+  JSON error became the audio file and the item was marked downloaded. Playing
+  it gave no sound, a motionless timeline, and a UI that insisted it was
+  playing. Downloads now check the status and content type before storing, and
+  refuse anything that is not media.
+- **Existing bad downloads are cleared on launch**, so a library full of
+  unplayable tracks repairs itself; those items can be downloaded again.
+- **A stored file that is not media no longer blocks playback** — the player
+  falls back to streaming rather than playing a file it cannot decode.
+
 ## 0.12.1 — 2026-09-22
 
 ### Fixed

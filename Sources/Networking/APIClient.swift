@@ -347,6 +347,33 @@ struct APIClient {
         try await send("/api/v1/items/\(itemID)/reader", method: "GET")
     }
 
+    /// A book's reflowable text — ordered chapters the reader renders itself.
+    /// `processing` while the server extracts (poll again), `empty` when there is
+    /// no text, `ready` with the chapters.
+    struct BookContent: Decodable, Sendable {
+        struct Chapter: Decodable, Sendable, Identifiable, Hashable {
+            let position: Int
+            let title: String?
+            let text: String
+            var id: Int { position }
+        }
+        /// An illustration, keyed to the page it belongs on, for inline placement.
+        struct Image: Decodable, Sendable, Identifiable, Hashable {
+            let page: Int
+            let url: URL
+            let width: Int?
+            let height: Int?
+            var id: URL { url }
+        }
+        let status: String
+        let chapters: [Chapter]?
+        let images: [Image]?
+    }
+
+    func readerContent(itemID: Int) async throws -> BookContent {
+        try await send("/api/v1/items/\(itemID)/reader/content", method: "GET")
+    }
+
     /// The URL of a book's file, for the reader to load with the bearer header.
     func bookURL(itemID: Int) -> URL? {
         baseURL.appendingPathComponent("/api/v1/items/\(itemID)/book")

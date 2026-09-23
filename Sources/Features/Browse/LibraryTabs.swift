@@ -43,8 +43,18 @@ struct LibraryTabs: View {
             store.attach(api: session.api)
             playback.attach(api: session.api)
             downloads.attach(api: session.api)
-            await session.refreshIdentity()
+
+            // The cached catalogue first, and without waiting on anything that
+            // touches the network. `refreshIdentity()` is one request with a
+            // 20-second timeout, and awaiting it here meant that offline — or
+            // with the server down — the library sat empty for that whole
+            // timeout before the disk cache was even read, which read as "the
+            // app cannot work without the server" (S-337).
             await store.loadIfNeeded()
+
+            // Admin-ness only decides whether an extra tab appears, so it can
+            // settle whenever the network allows, or never.
+            Task { await session.refreshIdentity() }
         }
         // Coming back to the app syncs the library, so changes made on the
         // server while it was backgrounded (a duplicate merge, new imports)

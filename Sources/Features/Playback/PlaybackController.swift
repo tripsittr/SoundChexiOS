@@ -53,6 +53,10 @@ final class PlaybackController {
     /// real ending from the moment between tracks.
     @ObservationIgnored private var currentPlayerItem: AVPlayerItem?
 
+    /// Whether audio was actually playing when an interruption began, so a
+    /// paused track is not started by the interruption ending (S-345).
+    @ObservationIgnored private var wasPlayingBeforeInterruption = false
+
     /// Watches the player item for failure and for a stall that never clears.
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
 
@@ -680,11 +684,24 @@ final class PlaybackController {
 
         switch type {
         case .began:
+            // Remember whether this interrupted actual playback. A paused track
+            // that is interrupted must stay paused when the interruption ends.
+            wasPlayingBeforeInterruption = player.timeControlStatus == .playing
             isPlaying = false
             updateNowPlayingInfo()
         case .ended:
             // Resume only if the system says we should (the user did not switch
-            // to something else deliberately).
+            // to something else deliberately) *and* something was actually
+            // playing when it began. Without the second test, a paused track
+            // could start on its own when the app came back — which is how
+            // reopening the app sometimes began playing the last song (S-345).
+            guard wasPlayingBeforeInterruption else {
+                wasPlayingBeforeInterruption = false
+                return
+            }
+
+            wasPlayingBeforeInterruption = false
+
             if let optionsRaw,
                AVAudioSession.InterruptionOptions(rawValue: optionsRaw).contains(.shouldResume) {
                 activateSession()

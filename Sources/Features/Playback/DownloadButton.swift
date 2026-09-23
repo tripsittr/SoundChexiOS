@@ -39,6 +39,10 @@ struct DownloadButton: View {
         case .idle:
             Image(systemName: "arrow.down.circle")
                 .foregroundStyle(SoundChexTheme.ink300)
+        case .queued:
+            // Asked for, waiting its turn in the download window (S-341).
+            Image(systemName: "clock")
+                .foregroundStyle(SoundChexTheme.ink500)
         case .downloading(let progress):
             ZStack {
                 Circle()

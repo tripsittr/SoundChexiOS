@@ -45,10 +45,20 @@ struct NowPlayingPage: View {
                         .soundchexTheme(theme)
                 }
                 .sheet(isPresented: $showingLyrics) {
-                    ScrollView { LyricsSection(item: item).padding(20) }
-                        .background(SoundChexTheme.base900)
-                        .presentationDetents([.medium, .large])
-                        .soundchexTheme(theme)
+                    // The background goes behind the sheet, not behind the
+                    // content: a ScrollView sizes to what it holds, so while
+                    // the lyrics were still loading it painted a thin strip
+                    // across the top of an otherwise transparent sheet (S-338).
+                    ScrollView {
+                        LyricsSection(item: item)
+                            .padding(20)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(SoundChexTheme.base900)
+                    .presentationDetents([.medium, .large])
+                    .presentationBackground(SoundChexTheme.base900)
+                    .soundchexTheme(theme)
                 }
             }
         }

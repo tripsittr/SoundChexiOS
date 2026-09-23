@@ -45,10 +45,20 @@ struct NowPlayingPage: View {
                         .soundchexTheme(theme)
                 }
                 .sheet(isPresented: $showingLyrics) {
-                    ScrollView { LyricsSection(item: item).padding(20) }
-                        .background(SoundChexTheme.base900)
-                        .presentationDetents([.medium, .large])
-                        .soundchexTheme(theme)
+                    // The background goes behind the sheet, not behind the
+                    // content: a ScrollView sizes to what it holds, so while
+                    // the lyrics were still loading it painted a thin strip
+                    // across the top of an otherwise transparent sheet (S-338).
+                    ScrollView {
+                        LyricsSection(item: item)
+                            .padding(20)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(SoundChexTheme.base900)
+                    .presentationDetents([.medium, .large])
+                    .presentationBackground(SoundChexTheme.base900)
+                    .soundchexTheme(theme)
                 }
             }
         }
@@ -147,6 +157,16 @@ struct NowPlayingPage: View {
                 }
             )
             .tint(SoundChexTheme.accent)
+            // A new song releases the scrubber. `scrubbing` is only cleared by
+            // the Slider's editing-ended callback, and a track change while it
+            // is held — or a gesture whose end is never reported — left the
+            // view showing the old `scrubValue` and ignoring `position`
+            // entirely: the audio restarted while the thumb stayed frozen at
+            // the time it was dragged to (S-342).
+            .onChange(of: playback.current?.id) { _, _ in
+                scrubbing = false
+                scrubValue = 0
+            }
 
             HStack {
                 Text(timeString(scrubbing ? scrubValue : playback.position))

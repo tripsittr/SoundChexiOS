@@ -39,6 +39,43 @@ final class PlaybackController {
     private var timeObserver: Any?
     private var lastReportedSecond = -1
 
+    /// Bumped on every load, so work started for an earlier track can tell that
+    /// it has been superseded and stop.
+    ///
+    /// Loading is asynchronous — the saved position is fetched over the network
+    /// before playback starts — and a listener skipping twice quickly starts a
+    /// second load while the first is still awaiting. Without this the older
+    /// task would come back and seek or play against the newer track, which
+    /// showed up as a skip that left the UI playing with no audio.
+    @ObservationIgnored private var loadGeneration = 0
+
+    /// The item the current load produced, so the end-of-track check can tell a
+    /// real ending from the moment between tracks.
+    @ObservationIgnored private var currentPlayerItem: AVPlayerItem?
+
+    /// Whether audio was actually playing when an interruption began, so a
+    /// paused track is not started by the interruption ending (S-345).
+    @ObservationIgnored private var wasPlayingBeforeInterruption = false
+
+    /// Watches the player item for failure and for a stall that never clears.
+    @ObservationIgnored private var statusObservation: NSKeyValueObservation?
+
+    /// Tracks the real AVPlayer state so the UI only says "playing" when the
+    /// system has actually moved from waiting into the playing state.
+    @ObservationIgnored private var playbackStateObservation: NSKeyValueObservation?
+
+    /// Fires if a newly requested track never reaches audible playback.
+    @ObservationIgnored private var startupDiagnosticTask: Task<Void, Never>?
+
+    /// Human-readable source currently handed to AVPlayer (local file or stream URL).
+    @ObservationIgnored private var currentPlaybackTarget = "unknown"
+
+    /// Prevents an infinite retry loop when a broken local file cannot open.
+    @ObservationIgnored private var recoveringFromLocalFailureItemID: Int?
+
+    /// Forces one stream attempt even when a local download exists.
+    @ObservationIgnored private var forceStreamForItemID: Int?
+
     /// The item whose cover is currently attached to the now-playing info, so a
     /// text-only refresh keeps the artwork and a track change reloads it. Not UI
     /// state — internal bookkeeping for the lock screen.
@@ -47,7 +84,26 @@ final class PlaybackController {
     init() {
         configureSession()
         observeTime()
+        observePlaybackState()
         configureRemoteCommands()
+    }
+
+    private func observePlaybackState() {
+        playbackStateObservation?.invalidate()
+        playbackStateObservation = player.observe(\.timeControlStatus, options: [.new, .old]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.syncPlaybackState()
+            }
+        }
+    }
+
+    private func syncPlaybackState() {
+        let shouldBePlaying = player.timeControlStatus == .playing
+        if shouldBePlaying != isPlaying {
+            isPlaying = shouldBePlaying
+            updateNowPlayingInfo()
+        }
     }
 
     func attach(api: APIClient?) {
@@ -59,7 +115,12 @@ final class PlaybackController {
     /// Plays a list from a starting index — a whole album, or one tapped song
     /// with the rest queued behind it.
     func play(_ items: [MediaItem], startAt start: Int = 0) {
-        guard !items.isEmpty, let api else { return }
+        guard !items.isEmpty else { return }
+        guard let api else {
+            AppLog.error("Playback ignored because API client is unavailable", category: "playback")
+            DeviceReporter.shared.sendDiagnostics(reason: "playback request ignored: api client unavailable")
+            return
+        }
 
         originalQueue = items
         queue = items
@@ -103,9 +164,17 @@ final class PlaybackController {
     }
 
     func togglePlayPause() {
-        if isPlaying { player.pause() } else { player.play() }
-        isPlaying.toggle()
-        updateNowPlayingInfo()
+        // Read the player rather than the flag. If playback stalled, the flag
+        // can say "playing" while nothing is — toggling from the flag then just
+        // relabels the button, and the listener has to press twice to recover.
+        if player.timeControlStatus == .playing {
+            pause()
+        } else {
+            // A track that ran to its end needs rewinding, or play() resumes at
+            // the end and stops again immediately.
+            if duration > 0, position >= duration - 0.5 { seek(to: 0) }
+            resume()
+        }
     }
 
     /// Inserts an item to play right after the current one.
@@ -138,6 +207,65 @@ final class PlaybackController {
         return Array(queue[(index + 1)...])
     }
 
+    /// Jumps to a queued item and starts playing it immediately.
+    func playFromQueue(itemID: Int) {
+        guard let api, let target = queue.firstIndex(where: { $0.id == itemID }) else { return }
+        guard target != index else { return }
+        index = target
+        loadCurrent(api: api)
+    }
+
+    /// Reorders the upcoming queue (everything after the current track).
+    func moveUpNext(from source: IndexSet, to destination: Int) {
+        let start = index + 1
+        guard start < queue.count else { return }
+
+        var upcoming = Array(queue[start...])
+        upcoming.move(fromOffsets: source, toOffset: destination)
+        queue.replaceSubrange(start..<queue.count, with: upcoming)
+        if !isShuffled { originalQueue = queue }
+    }
+
+    /// Removes an item from the queue.
+    func removeFromQueue(itemID: Int) {
+        guard let target = queue.firstIndex(where: { $0.id == itemID }) else { return }
+
+        if target < index {
+            queue.remove(at: target)
+            index -= 1
+        } else if target == index {
+            queue.remove(at: target)
+            if queue.isEmpty {
+                startupDiagnosticTask?.cancel()
+                statusObservation?.invalidate()
+                player.replaceCurrentItem(with: nil)
+                current = nil
+                duration = 0
+                position = 0
+                isPlaying = false
+                updateNowPlayingInfo()
+            } else if let api {
+                index = min(index, queue.count - 1)
+                loadCurrent(api: api)
+            }
+        } else {
+            queue.remove(at: target)
+        }
+
+        if !isShuffled { originalQueue = queue }
+    }
+
+    /// Moves an upcoming item to the first "up next" position.
+    func moveToPlayNext(itemID: Int) {
+        guard let target = queue.firstIndex(where: { $0.id == itemID }) else { return }
+        let nextSlot = index + 1
+        guard target > nextSlot, nextSlot < queue.count else { return }
+
+        let item = queue.remove(at: target)
+        queue.insert(item, at: nextSlot)
+        if !isShuffled { originalQueue = queue }
+    }
+
     func next() {
         guard let api else { return }
         if index + 1 < queue.count {
@@ -146,6 +274,9 @@ final class PlaybackController {
             // Wrap to the top of the queue.
             index = 0
         } else {
+            // The end of the queue with repeat off. Stop rather than returning
+            // silently, which left the bar claiming to play a finished track.
+            pause()
             return
         }
         loadCurrent(api: api)
@@ -163,25 +294,63 @@ final class PlaybackController {
     }
 
     func seek(to seconds: Double) {
+        // Move the published position with the request, not only when the next
+        // tick lands. Releasing the scrubber otherwise let the thumb snap back
+        // to where the song was for a frame before the seek reported in.
+        position = seconds
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
     }
 
     // MARK: - Loading
 
-    private func loadCurrent(api: APIClient) {
+    /// Loads the current queue entry.
+    ///
+    /// `startingAt` exists only for restoring a track that was interrupted
+    /// mid-play (S-342); every ordinary load starts at zero, because moving
+    /// between songs always restarts them.
+    private func loadCurrent(api: APIClient, startingAt startPosition: Double = 0, autoplay: Bool = true) {
+        guard queue.indices.contains(index) else { return }
+
         let item = queue[index]
         current = item
+        startupDiagnosticTask?.cancel()
+        if recoveringFromLocalFailureItemID != item.id {
+            recoveringFromLocalFailureItemID = nil
+        }
+
+        // A new track starts from nothing known. Without this the previous
+        // track's values survived the change: going back a song showed the
+        // position it was skipped at, or showed as already finished, and the
+        // stale duration could fire the end-of-track check immediately and skip
+        // the song that had just started.
+        position = 0
+        duration = 0
+        lastReportedSecond = -1
+
+        // Anything still in flight for the previous track is now stale.
+        loadGeneration &+= 1
+        let generation = loadGeneration
 
         AppLog.info("Play #\(item.id) “\(item.title)” (\(index + 1)/\(queue.count))", category: "playback")
 
         let asset: AVURLAsset
+        let sourceDescription: String
 
-        if let local = DownloadStore.shared.localURL(for: item.id) {
+          if forceStreamForItemID != item.id,
+              let local = DownloadStore.shared.playableLocalURL(for: item.id) {
             // Downloaded: play from disk. Works with no network, and needs no
             // auth header since it is a local file.
             asset = AVURLAsset(url: local)
+            sourceDescription = "local"
+            currentPlaybackTarget = "local:\(local.lastPathComponent)"
         } else {
-            guard let url = api.streamURL(itemID: item.id) else { return }
+            guard let url = api.streamURL(itemID: item.id) else {
+                AppLog.error("Playback failed: stream URL missing for #\(item.id)", category: "playback")
+                DeviceReporter.shared.sendDiagnostics(reason: "playback failed for item #\(item.id): stream URL missing")
+                isPlaying = false
+                updateNowPlayingInfo()
+                return
+            }
 
             // The stream route authenticates with a Sanctum bearer *header* — a
             // query-param token is ignored, which is why playback started but no
@@ -193,9 +362,16 @@ final class PlaybackController {
                 options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": "Bearer \(token)"]
             }
             asset = AVURLAsset(url: url, options: options)
+            sourceDescription = "stream"
+            currentPlaybackTarget = "stream:\(url.absoluteString)"
+            if forceStreamForItemID == item.id {
+                forceStreamForItemID = nil
+            }
         }
 
         let playerItem = AVPlayerItem(asset: asset)
+        currentPlayerItem = playerItem
+        observeStatus(of: playerItem, generation: generation)
         player.replaceCurrentItem(with: playerItem)
 
         // Activate the session now, right before audio starts — a failed
@@ -204,12 +380,125 @@ final class PlaybackController {
 
         // Resume where this track was left off, then play.
         Task {
-            let resume = (try? await api.progress(itemID: item.id))?.position ?? 0
-            if resume > 3 { seek(to: Double(resume)) }
+            // Only long-form media resumes. A song is meant to start at the
+            // start: skipping past one records the position it was abandoned
+            // at, so resuming would drop the listener back mid-song — or, for a
+            // track that had played out, at its very end, which looked like the
+            // song was already over the moment it was selected.
+            // A restored track carries its own position; otherwise only
+            // long-form media resumes. A song is meant to start at the start —
+            // skipping past one records the position it was abandoned at, so
+            // resuming would drop the listener back mid-song.
+            let resume: Double = startPosition > 0
+                ? startPosition
+                : (item.type == .book
+                    ? Double((try? await api.progress(itemID: item.id))?.position ?? 0)
+                    : 0)
+
+            // The await above gives another skip time to start its own load. If
+            // one did, this task belongs to a track the listener has already
+            // left — seeking or playing here would fight the new one.
+            guard generation == self.loadGeneration else { return }
+
+            if resume > 3 {
+                seek(to: resume)
+                position = resume
+            }
+
+            guard autoplay else {
+                // Restored from a previous run: the track is ready where it
+                // stopped, but nothing plays until the listener says so.
+                await readDuration(of: playerItem)
+                syncPlaybackState()
+                updateNowPlayingInfo()
+                return
+            }
+
             player.play()
-            isPlaying = true
+            syncPlaybackState()
+            scheduleStartupDiagnostic(generation: generation, itemID: item.id, source: sourceDescription)
             await readDuration(of: playerItem)
+
+            guard generation == self.loadGeneration else { return }
             updateNowPlayingInfo()
+        }
+    }
+
+    /// Reports a track that cannot play instead of leaving the UI insisting it
+    /// is playing.
+    ///
+    /// A failed item (an expired token, a file that has gone, a stream that
+    ///404s) leaves AVPlayer with nothing to do: no audio, no time observer
+    /// ticks, and — before this — `isPlaying` still true and a frozen timeline.
+    private func observeStatus(of item: AVPlayerItem, generation: Int) {
+        statusObservation?.invalidate()
+        statusObservation = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+            guard observed.status == .failed else { return }
+
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.loadGeneration else { return }
+
+                AppLog.error(
+                    "Playback failed: \(observed.error?.localizedDescription ?? "unknown error")",
+                    category: "playback"
+                )
+
+                if self.currentPlaybackTarget.hasPrefix("local:"),
+                   let itemID = self.current?.id,
+                   self.recoveringFromLocalFailureItemID != itemID,
+                   let api = self.api {
+                    self.recoveringFromLocalFailureItemID = itemID
+                    AppLog.error(
+                        "Local playback failed for #\(itemID); retrying stream without deleting local copy",
+                        category: "playback"
+                    )
+                    DeviceReporter.shared.sendDiagnostics(
+                        reason: "local playback failed for item #\(itemID); retrying stream without deleting local copy"
+                    )
+
+                    self.forceStreamForItemID = itemID
+                    self.loadCurrent(api: api)
+                    return
+                }
+
+                DeviceReporter.shared.sendDiagnostics(
+                    reason: "playback failed for item #\(self.current?.id ?? -1): \(observed.error?.localizedDescription ?? "unknown error") target=\(self.currentPlaybackTarget)"
+                )
+
+                self.startupDiagnosticTask?.cancel()
+
+                self.isPlaying = false
+                self.updateNowPlayingInfo()
+            }
+        }
+    }
+
+    /// Captures silent-start failures where `AVPlayerItem.status` never flips to
+    /// `.failed` but playback still does not begin.
+    private func scheduleStartupDiagnostic(generation: Int, itemID: Int, source: String) {
+        startupDiagnosticTask?.cancel()
+        startupDiagnosticTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            guard let self, generation == self.loadGeneration, self.current?.id == itemID else { return }
+
+            let neverAdvanced = self.position < 0.25
+            let notPlaying = self.player.timeControlStatus != .playing
+            guard neverAdvanced || notPlaying else { return }
+
+            let waiting = self.player.reasonForWaitingToPlay?.rawValue ?? "none"
+            let itemStatus = self.player.currentItem?.status.rawValue ?? -1
+            let error = self.player.currentItem?.error?.localizedDescription ?? "none"
+
+            self.isPlaying = false
+            self.updateNowPlayingInfo()
+
+            AppLog.error(
+                "Playback stalled at start for #\(itemID) (source=\(source), waiting=\(waiting), status=\(itemStatus), error=\(error))",
+                category: "playback"
+            )
+            DeviceReporter.shared.sendDiagnostics(
+                reason: "playback stalled for item #\(itemID): source=\(source), waiting=\(waiting), status=\(itemStatus), error=\(error), target=\(self.currentPlaybackTarget)"
+            )
         }
     }
 
@@ -228,11 +517,106 @@ final class PlaybackController {
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
             MainActor.assumeIsolated {
+                // The scrubber belongs to the track on screen, and to no other.
+                // A tick can arrive for the item being replaced — during a skip,
+                // or from the old item just before `replaceCurrentItem` takes
+                // effect — and writing that into `position` made the next song
+                // start partway along, wherever the last one was abandoned.
+                guard let item = self.currentPlayerItem,
+                      self.player.currentItem === item else { return }
+
                 self.position = time.seconds.isFinite ? time.seconds : 0
                 self.reportProgressIfNeeded()
                 self.advanceAtEnd()
+                self.rememberPlaybackState()
             }
         }
+    }
+
+    // MARK: - Remembering where playback was (S-342)
+
+    /// What was playing, and where, so closing or crashing the app does not
+    /// lose the listener's place.
+    ///
+    /// Deliberately *not* a resume position for the track itself: between songs
+    /// playback always restarts, and skipping a song restarts it. This is only
+    /// the one track that was interrupted mid-play, restored exactly where it
+    /// stopped and left paused so nothing starts playing on its own.
+    private struct RememberedPlayback: Codable {
+        let itemID: Int
+        let position: Double
+        let queue: [Int]
+        let index: Int
+    }
+
+    private static let rememberedKey = "playback.remembered"
+
+    /// Throttles the write — the time observer ticks four times a second and
+    /// UserDefaults does not need that.
+    @ObservationIgnored private var lastRememberedSecond = -1
+
+    private func rememberPlaybackState() {
+        guard let item = current else { return }
+
+        let second = Int(position)
+        guard second != lastRememberedSecond else { return }
+        lastRememberedSecond = second
+
+        writeRememberedState(itemID: item.id, position: position)
+    }
+
+    /// Writes the remembered position now, whatever the throttle says — for
+    /// pausing and for the app leaving the foreground, where the next tick may
+    /// never come.
+    func rememberPlaybackStateNow() {
+        guard let item = current else { return }
+
+        writeRememberedState(itemID: item.id, position: position)
+    }
+
+    private func writeRememberedState(itemID: Int, position: Double) {
+        // A track sitting at its end has nothing worth restoring — it would
+        // reopen finished. Between songs means starting over.
+        guard position > 3, duration == 0 || position < duration - 1 else {
+            UserDefaults.standard.removeObject(forKey: Self.rememberedKey)
+            return
+        }
+
+        let state = RememberedPlayback(
+            itemID: itemID,
+            position: position,
+            queue: queue.map(\.id),
+            index: index
+        )
+
+        guard let data = try? JSONEncoder().encode(state) else { return }
+
+        UserDefaults.standard.set(data, forKey: Self.rememberedKey)
+    }
+
+    /// Restores the interrupted track, paused, at the position it stopped.
+    ///
+    /// Called once the library is loaded, since the queue is rebuilt from ids.
+    /// Nothing starts playing — the listener presses play.
+    func restoreRememberedState(from library: [MediaItem]) {
+        guard current == nil,
+              let data = UserDefaults.standard.data(forKey: Self.rememberedKey),
+              let state = try? JSONDecoder().decode(RememberedPlayback.self, from: data),
+              let api else { return }
+
+        let byID = Dictionary(uniqueKeysWithValues: library.map { ($0.id, $0) })
+        let restoredQueue = state.queue.compactMap { byID[$0] }
+
+        guard let position = restoredQueue.firstIndex(where: { $0.id == state.itemID })
+            ?? (byID[state.itemID].map { _ in 0 }) else { return }
+
+        queue = restoredQueue.isEmpty ? [byID[state.itemID]].compactMap { $0 } : restoredQueue
+        originalQueue = queue
+        index = restoredQueue.isEmpty ? 0 : position
+
+        guard queue.indices.contains(index) else { return }
+
+        loadCurrent(api: api, startingAt: state.position, autoplay: false)
     }
 
     private func reportProgressIfNeeded() {
@@ -247,14 +631,19 @@ final class PlaybackController {
     }
 
     private func advanceAtEnd() {
+        // Only the item this tick actually belongs to may end the track. A tick
+        // can arrive while the player is between items, when `duration` still
+        // describes the track just left — which read as "finished" and skipped
+        // straight past the song that had only just started.
+        guard let item = currentPlayerItem, player.currentItem === item else { return }
+
         guard duration > 0, position >= duration - 0.5 else { return }
 
         // Repeat-one loops the same track; otherwise advance (which wraps when
         // repeat-all is on).
-        if repeatMode == .one, let api {
+        if repeatMode == .one {
             seek(to: 0)
             player.play()
-            _ = api
         } else {
             next()
         }
@@ -295,16 +684,29 @@ final class PlaybackController {
 
         switch type {
         case .began:
+            // Remember whether this interrupted actual playback. A paused track
+            // that is interrupted must stay paused when the interruption ends.
+            wasPlayingBeforeInterruption = player.timeControlStatus == .playing
             isPlaying = false
             updateNowPlayingInfo()
         case .ended:
             // Resume only if the system says we should (the user did not switch
-            // to something else deliberately).
+            // to something else deliberately) *and* something was actually
+            // playing when it began. Without the second test, a paused track
+            // could start on its own when the app came back — which is how
+            // reopening the app sometimes began playing the last song (S-345).
+            guard wasPlayingBeforeInterruption else {
+                wasPlayingBeforeInterruption = false
+                return
+            }
+
+            wasPlayingBeforeInterruption = false
+
             if let optionsRaw,
                AVAudioSession.InterruptionOptions(rawValue: optionsRaw).contains(.shouldResume) {
                 activateSession()
                 player.play()
-                isPlaying = true
+                syncPlaybackState()
                 updateNowPlayingInfo()
             }
         @unknown default:
@@ -320,8 +722,21 @@ final class PlaybackController {
         center.previousTrackCommand.addTarget { [weak self] _ in self?.previous(); return .success }
     }
 
-    private func resume() { player.play(); isPlaying = true; updateNowPlayingInfo() }
-    private func pause() { player.pause(); isPlaying = false; updateNowPlayingInfo() }
+    private func resume() {
+        player.play()
+        syncPlaybackState()
+        if let id = current?.id {
+            scheduleStartupDiagnostic(generation: loadGeneration, itemID: id, source: "resume")
+        }
+        updateNowPlayingInfo()
+    }
+    private func pause() {
+        player.pause()
+        isPlaying = false
+        updateNowPlayingInfo()
+        // Pausing is exactly the state worth surviving a relaunch (S-342).
+        rememberPlaybackStateNow()
+    }
 
     private func updateNowPlayingInfo() {
         guard let item = current else { return }

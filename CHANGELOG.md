@@ -3,6 +3,85 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.13.0 “Anchor” — 2026-09-23
+
+Named for the scrubber finally staying put.
+
+### Fixed
+- **The app opens offline** (S-337). Launching with no network — airplane mode,
+  out of service, or the server simply down — showed the connection screen
+  instead of the downloaded library. Two network calls blocked startup: the
+  address race in `Session.restore()`, and `refreshIdentity()` with its
+  20-second timeout ahead of the disk cache. The cache is read first now.
+- **Search works offline** (S-336). It asked the server first and only filtered
+  the cached catalogue if that failed, so every offline search waited out the
+  timeout. The device answers from its own catalogue immediately; the server
+  refines it when it replies.
+- **The scrubber is locked to the song** (S-342). The time observer wrote
+  `position` from any tick, including ticks for the track being replaced, so a
+  skip could start the next song wherever the last was abandoned. The full
+  player also kept its own drag state and never released it on a track change,
+  which froze the thumb at the time it was dragged to.
+- **Playback is remembered across a close or a crash** (S-342). Pausing,
+  backgrounding or being killed records the track and its position; the next
+  launch restores that one track where it stopped, paused. Moving between songs
+  still always restarts.
+- **Reopening the app no longer autoplays** (S-345). The interruption handler
+  resumed without checking whether anything had been playing when the
+  interruption began, so a paused track could be started by the interruption
+  ending.
+- **Download All no longer fails most of a playlist** (S-341). Every track was
+  handed to URLSession at once; the queue now runs three at a time and retries
+  a 5xx, a throttle or a dropped connection with a widening delay. A 404 or 401
+  still fails immediately.
+- **Download All no longer starts playback** (S-344). The playlist header's
+  Play, Shuffle and Download buttons share one List row, where the default
+  borderless style lets a tap anywhere fire every button in it.
+- **Pushed screens clear the now-playing bar** (S-343). `nowPlayingInset()` was
+  applied to tab roots, which a pushed view does not inherit — the last row of
+  a playlist, album, artist or show sat under the bar.
+- **The lyrics sheet fills its panel** (S-338). While loading, the section
+  rendered nothing, so the sheet sized to empty content and painted a sliver.
+  It now holds its space with a spinner and says so plainly when a track has no
+  lyrics.
+
+## 0.12.2 — 2026-09-22
+
+### Fixed
+- **Downloaded songs that played silence** (S-327). A refused request (a track
+  whose file is missing on the server answers 404) was stored as the song
+  itself: URLSession treats an error body as a successful download, so a 21-byte
+  JSON error became the audio file and the item was marked downloaded. Playing
+  it gave no sound, a motionless timeline, and a UI that insisted it was
+  playing. Downloads now check the status and content type before storing, and
+  refuse anything that is not media.
+- **Existing bad downloads are cleared on launch**, so a library full of
+  unplayable tracks repairs itself; those items can be downloaded again.
+- **A stored file that is not media no longer blocks playback** — the player
+  falls back to streaming rather than playing a file it cannot decode.
+
+## 0.12.1 — 2026-09-22
+
+### Fixed
+- **Skipping back no longer lands mid-song, or on a song that looks finished**
+  (S-326). A track change did not clear the last one's position and duration, so
+  the bar kept showing where the previous song was skipped at — or showed the
+  new track as already over. Songs now always start at the start; only
+  audiobooks resume where they stopped, which is what that was for.
+- **Skipping sometimes played nothing** (S-326). Loading a track waits on the
+  network before playback starts, and a second skip arriving during that wait
+  left the older load to seek and play against the track that had just replaced
+  it. Each load now knows when it has been superseded and stops.
+- **A track that could not play no longer pretends to** (S-326). A failed item
+  (an expired token, a file that has moved) left the UI showing playback with no
+  audio and a frozen timeline; the failure is now noticed, playback stops, and
+  the reason is logged.
+- **Play/pause recovers from a stall in one press** (S-326). The button read its
+  own flag rather than the player, so when the two disagreed the first press
+  only changed the label.
+- Reaching the end of the queue with repeat off now stops, rather than leaving
+  the bar showing a finished track as playing.
+
 ## 0.12.0 “Ledger” — 2026-09-22
 
 ### Changed

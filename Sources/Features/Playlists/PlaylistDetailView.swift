@@ -10,6 +10,7 @@ import PhotosUI
 struct PlaylistDetailView: View {
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
+    @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
     @Environment(\.dismiss) private var dismiss
 
@@ -22,6 +23,8 @@ struct PlaylistDetailView: View {
     @State private var loading = true
     @State private var editing = false
     @State private var confirmingDelete = false
+    @State private var downloadStatusMessage: String?
+    @State private var batchDownloadTrackIDs: Set<Int> = []
 
     var body: some View {
         List {
@@ -44,6 +47,9 @@ struct PlaylistDetailView: View {
         .listStyle(.plain)
         .environment(\.editMode, .constant(.active)) // drag handles always on, like Spotify's edit
         .background(SoundChexTheme.base900)
+        // A pushed screen does not inherit the tab root's inset, so without
+        // this the last track sits under the now-playing bar (S-343).
+        .nowPlayingInset()
         .navigationTitle(currentName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -60,6 +66,11 @@ struct PlaylistDetailView: View {
         }
         .overlay { if loading { ProgressView().tint(SoundChexTheme.accent) } }
         .task { await load() }
+        .onChange(of: batchRemainingCount) { remaining in
+            guard remaining == 0, !batchDownloadTrackIDs.isEmpty else { return }
+            downloadStatusMessage = "Playlist download complete"
+            batchDownloadTrackIDs = []
+        }
         .sheet(isPresented: $editing) {
             EditPlaylistSheet(playlist: displayPlaylist) { Task { await load(); onChange() } }
                 .presentationDetents([.medium])
@@ -95,6 +106,10 @@ struct PlaylistDetailView: View {
                 Text(metaLine).font(.caption).foregroundStyle(SoundChexTheme.ink500)
             }
 
+            // Each button styled .plain: inside a List row, the default
+            // borderless style lets a tap anywhere in the row trigger *every*
+            // button in it, so pressing Download All also started playback
+            // (S-344).
             HStack(spacing: 12) {
                 Button {
                     playback.play(tracks)
@@ -103,6 +118,8 @@ struct PlaylistDetailView: View {
                         .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
                         .background(SoundChexTheme.accent, in: .capsule).foregroundStyle(.white)
                 }
+                .buttonStyle(.plain)
+
                 Button {
                     if !playback.isShuffled { playback.toggleShuffle() }
                     playback.play(tracks)
@@ -113,8 +130,38 @@ struct PlaylistDetailView: View {
                         .foregroundStyle(SoundChexTheme.ink200)
                         .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
                 }
+                .buttonStyle(.plain)
+
+                Button {
+                    downloadAll()
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .foregroundStyle(SoundChexTheme.ink200)
+                            .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
+
+                        if batchRemainingCount > 0 {
+                            Text("\(batchRemainingCount)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(SoundChexTheme.accent, in: Capsule())
+                                .offset(x: 8, y: -8)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
+
+            if let downloadStatusMessage {
+                Text(downloadStatusMessage)
+                    .font(.caption)
+                    .foregroundStyle(SoundChexTheme.ink500)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 12).padding(.bottom, 8)
@@ -131,6 +178,10 @@ struct PlaylistDetailView: View {
         let h = total / 3600, m = (total % 3600) / 60
         if h > 0 { return "\(h) hr \(m) min" }
         return "\(m) min"
+    }
+
+    private var batchRemainingCount: Int {
+        batchDownloadTrackIDs.filter { !downloads.isStored($0) }.count
     }
 
     // MARK: - Data
@@ -161,6 +212,21 @@ struct PlaylistDetailView: View {
             try? await session.api?.deletePlaylist(playlist.id)
             onChange()
             dismiss()
+        }
+    }
+
+    private func downloadAll() {
+        let pendingIDs = Set(tracks.filter { $0.playable && !downloads.isStored($0.id) }.map(\.id))
+
+        switch downloads.downloadAll(tracks) {
+        case .started(let count):
+            batchDownloadTrackIDs = pendingIDs
+            downloadStatusMessage = "Downloading \(count) song\(count == 1 ? "" : "s")"
+        case .insufficientSpace:
+            downloadStatusMessage = "Not enough free space on this device"
+        case .nothingToDo:
+            batchDownloadTrackIDs = []
+            downloadStatusMessage = "Everything in this playlist is already downloaded"
         }
     }
 }

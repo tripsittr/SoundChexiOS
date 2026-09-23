@@ -6,34 +6,55 @@ import SwiftUI
 /// The play queue, raised as a sheet from the now-playing player (S-288).
 ///
 /// Spotify keeps "Now playing" and "Next up" here rather than inline under the
-/// player. Tapping a queued track jumps to it. Read-only reordering is deliberate
-/// for now — the queue model is index-based and a drag-to-reorder would need the
-/// controller to expose a move; that can come later without changing this shell.
+/// player. Queued tracks can be tapped to play, reordered, removed, or promoted
+/// to play next.
 struct QueueSheet: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let current = playback.current {
-                        section("Now playing") {
-                            row(current, isCurrent: true)
-                        }
-                    }
-
-                    let next = playback.upNext
-                    if !next.isEmpty {
-                        section("Next up") {
-                            ForEach(Array(next.prefix(50))) { item in
-                                row(item, isCurrent: false)
-                            }
-                        }
+            List {
+                if let current = playback.current {
+                    Section("Now playing") {
+                        row(current, isCurrent: true)
+                            .listRowBackground(SoundChexTheme.base900)
                     }
                 }
-                .padding(20)
+
+                let next = playback.upNext
+                if !next.isEmpty {
+                    Section("Next up") {
+                        ForEach(next) { item in
+                            row(item, isCurrent: false)
+                                .listRowBackground(SoundChexTheme.base900)
+                                .contentShape(.rect)
+                                .onTapGesture {
+                                    playback.playFromQueue(itemID: item.id)
+                                }
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        playback.removeFromQueue(itemID: item.id)
+                                    } label: {
+                                        Label("Remove", systemImage: "minus.circle")
+                                    }
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        playback.moveToPlayNext(itemID: item.id)
+                                    } label: {
+                                        Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                                    }
+                                    .tint(SoundChexTheme.accent)
+                                }
+                        }
+                        .onMove(perform: playback.moveUpNext)
+                    }
+                }
             }
+            .listStyle(.plain)
+            .environment(\.editMode, .constant(.active))
+            .scrollContentBackground(.hidden)
             .background(SoundChexTheme.base900)
             .navigationTitle("Queue")
             .navigationBarTitleDisplayMode(.inline)
@@ -43,17 +64,6 @@ struct QueueSheet: View {
                         .foregroundStyle(SoundChexTheme.ink200)
                 }
             }
-        }
-    }
-
-    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .tracking(1)
-                .textCase(.uppercase)
-                .foregroundStyle(SoundChexTheme.ink500)
-            content()
         }
     }
 
@@ -79,6 +89,5 @@ struct QueueSheet: View {
             }
             Spacer()
         }
-        .contentShape(.rect)
     }
 }

@@ -61,7 +61,12 @@ struct SearchResultsList: View {
         }
     }
 
-    /// Debounced search: the server first, the local catalogue as a fallback.
+    /// Debounced search: the cached catalogue at once, the server to refine it.
+    ///
+    /// The order used to be the other way round, which meant that offline —
+    /// airplane mode, out of service, or the server simply down — every search
+    /// waited out the request's 20-second timeout before falling back, and
+    /// looked like search was broken rather than slow (S-336).
     private func runSearch(_ query: String) {
         searchTask?.cancel()
 
@@ -71,22 +76,27 @@ struct SearchResultsList: View {
             return
         }
 
+        // Answer from what the device already holds, before anything is
+        // awaited. Offline this is the whole answer; online it is what the
+        // server's reply replaces a moment later.
+        results = store.search(trimmed)
+
         searchTask = Task {
             // Wait out a burst of typing before hitting the network.
             try? await Task.sleep(for: .milliseconds(300))
             if Task.isCancelled { return }
 
+            guard let api = session.api else { return }
+
             isSearching = true
             defer { isSearching = false }
 
-            if let api = session.api,
-               let found = try? await api.search(trimmed),
-               !Task.isCancelled {
-                results = found
-            } else if !Task.isCancelled {
-                // Offline or the request failed — filter what is already loaded.
-                results = store.search(trimmed)
-            }
+            // The server searches fields the device does not cache, so its
+            // answer is better when it arrives — but never at the cost of the
+            // one already on screen.
+            guard let found = try? await api.search(trimmed), !Task.isCancelled else { return }
+
+            results = found
         }
     }
 }

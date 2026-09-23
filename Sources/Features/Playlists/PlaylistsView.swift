@@ -57,6 +57,9 @@ struct PlaylistsGrid: View {
             .padding(16)
         }
         .background(SoundChexTheme.base900)
+        // Pushed screens do not inherit the tab root's inset, so the last
+        // row would sit under the now-playing bar (S-343).
+        .nowPlayingInset()
         .overlay {
             if store.loading && store.playlists.isEmpty {
                 ProgressView().tint(SoundChexTheme.accent)

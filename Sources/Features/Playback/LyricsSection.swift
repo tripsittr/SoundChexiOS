@@ -19,6 +19,7 @@ struct LyricsSection: View {
 
     @State private var lyrics: APIClient.Lyrics?
     @State private var synced: [LRCLine] = []
+    @State private var isLoading = true
 
     var body: some View {
         Group {
@@ -29,13 +30,27 @@ struct LyricsSection: View {
                 .padding(.top, 36)
             } else if let plain = lyrics?.plain, !plain.isEmpty {
                 plainLyrics(plain)
+            } else if isLoading {
+                // Hold the space while the request is in flight. Rendering
+                // nothing let the sheet collapse to a sliver until the words
+                // arrived (S-338).
+                ProgressView()
+                    .tint(SoundChexTheme.ink500)
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            } else {
+                Text("No lyrics for this track.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(SoundChexTheme.ink500)
+                    .frame(maxWidth: .infinity, minHeight: 220)
             }
         }
         .task(id: item.id) {
+            isLoading = true
             lyrics = nil
             synced = []
             lyrics = try? await session.api?.lyrics(itemID: item.id)
             synced = LRCLine.parse(lyrics?.synced)
+            isLoading = false
         }
     }
 

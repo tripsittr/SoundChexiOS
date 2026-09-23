@@ -288,6 +288,60 @@ struct APIClient {
         _ = try await sendRaw("/api/v1/playlists/\(id)", method: "DELETE")
     }
 
+    // MARK: - Playlist porting (S-313)
+
+    /// The result of porting a playlist: how many tracks matched the library, the
+    /// ones that didn't, and the playlist it created.
+    struct PlaylistImport: Decodable, Sendable, Identifiable {
+        struct Unmatched: Decodable, Sendable, Hashable, Identifiable {
+            let title: String?
+            let artist: String?
+            let album: String?
+            let sourceLabel: String?
+            var id: String { [title, artist, album, sourceLabel].compactMap { $0 }.joined(separator: "|") }
+
+            enum CodingKeys: String, CodingKey {
+                case title, artist, album, sourceLabel = "source_label"
+            }
+        }
+
+        let id: Int
+        let name: String?
+        let status: String
+        let total: Int
+        let matched: Int
+        let unmatched: [Unmatched]
+        let playlistID: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case id, name, status, total, matched, unmatched
+            case playlistID = "playlist_id"
+        }
+    }
+
+    /// Imports a playlist file (M3U/CSV/XSPF), returning the port's result.
+    func importPlaylistFile(_ data: Data, filename: String, name: String?) async throws -> PlaylistImport {
+        let responseData = try await sendMultipart(
+            "/api/v1/playlists/imports",
+            fileField: "file", filename: filename, mimeType: "application/octet-stream", fileData: data,
+            fields: name.map { ["name": $0] } ?? [:]
+        )
+        return try decoder.decode(PlaylistImport.self, from: responseData)
+    }
+
+    /// The current state of an import — for polling a queued one.
+    func playlistImport(_ id: Int) async throws -> PlaylistImport {
+        try await send("/api/v1/playlists/imports/\(id)", method: "GET")
+    }
+
+    /// Resolve an unmatched track by attaching a chosen library item.
+    func resolvePlaylistImport(_ id: Int, index: Int, itemID: Int) async throws -> PlaylistImport {
+        struct Body: Encodable { let index: Int; let itemId: Int }
+        let data = try await sendRaw("/api/v1/playlists/imports/\(id)/resolve", method: "POST",
+                                     body: Body(index: index, itemId: itemID))
+        return try decoder.decode(PlaylistImport.self, from: data)
+    }
+
     // MARK: - Lyrics
 
     /// A track's lyrics: the plain words, and — when available — time-synced LRC
@@ -510,7 +564,8 @@ struct APIClient {
         fileField: String,
         filename: String,
         mimeType: String,
-        fileData: Data
+        fileData: Data,
+        fields: [String: String] = [:]
     ) async throws -> Data {
         guard let url = URL(string: path, relativeTo: baseURL) else {
             throw APIError.badURL
@@ -530,6 +585,14 @@ struct APIClient {
 
         var body = Data()
         func append(_ string: String) { body.append(Data(string.utf8)) }
+
+        // Any plain text fields first (e.g. an optional playlist name).
+        for (name, value) in fields {
+            append("--\(boundary)\r\n")
+            append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+            append("\(value)\r\n")
+        }
+
         append("--\(boundary)\r\n")
         append("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(filename)\"\r\n")
         append("Content-Type: \(mimeType)\r\n\r\n")

@@ -71,10 +71,21 @@ final class Session {
 
         token = saved
 
+        // Be usable immediately on the primary address. The race below only
+        // picks a *faster* path; waiting for it first meant every offline
+        // launch paid the probe timeout before anything could be shown, and
+        // the app looked like it needed a server to open at all (S-337).
+        serverURL = primary
+        api = APIClient(baseURL: primary, token: saved)
+
+        guard !alternateURLs.isEmpty else { return }
+
         // Prefer the fastest currently-reachable path — the LAN address at home,
         // the tunnel away from it — reusing the one token across them.
         let candidates = [primary] + alternateURLs
-        let chosen = await ServerReachability.fastest(among: candidates) ?? primary
+
+        guard let chosen = await ServerReachability.fastest(among: candidates),
+              chosen != primary else { return }
 
         serverURL = chosen
         api = APIClient(baseURL: chosen, token: saved)

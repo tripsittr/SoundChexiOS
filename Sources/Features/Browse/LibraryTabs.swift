@@ -43,14 +43,36 @@ struct LibraryTabs: View {
             store.attach(api: session.api)
             playback.attach(api: session.api)
             downloads.attach(api: session.api)
-            await session.refreshIdentity()
+
+            // The cached catalogue first, and without waiting on anything that
+            // touches the network. `refreshIdentity()` is one request with a
+            // 20-second timeout, and awaiting it here meant that offline — or
+            // with the server down — the library sat empty for that whole
+            // timeout before the disk cache was even read, which read as "the
+            // app cannot work without the server" (S-337).
             await store.loadIfNeeded()
+
+            // Put the listener back on the track they were interrupted on,
+            // paused where it stopped (S-342). Needs the catalogue, since the
+            // queue is remembered as ids.
+            playback.restoreRememberedState(from: store.items)
+
+            // Admin-ness only decides whether an extra tab appears, so it can
+            // settle whenever the network allows, or never.
+            Task { await session.refreshIdentity() }
         }
         // Coming back to the app syncs the library, so changes made on the
         // server while it was backgrounded (a duplicate merge, new imports)
         // show without a manual pull-to-refresh or a cold relaunch.
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
+            guard phase == .active else {
+                // Leaving the foreground may be the last moment before the app
+                // is killed, so write the position now rather than waiting for
+                // a tick that will not come.
+                playback.rememberPlaybackStateNow()
+                return
+            }
+
             Task { await store.load() }
         }
     }

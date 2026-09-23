@@ -34,6 +34,9 @@ struct ArtistDetailView: View {
         }
         .background(SoundChexTheme.base900)
         .navigationTitle(artist.name)
+        // Pushed screens do not inherit the tab root's inset, so the last
+        // row would sit under the now-playing bar (S-343).
+        .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
     }

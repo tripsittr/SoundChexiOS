@@ -290,6 +290,10 @@ final class PlaybackController {
     }
 
     func seek(to seconds: Double) {
+        // Move the published position with the request, not only when the next
+        // tick lands. Releasing the scrubber otherwise let the thumb snap back
+        // to where the song was for a frame before the seek reported in.
+        position = seconds
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
     }
 

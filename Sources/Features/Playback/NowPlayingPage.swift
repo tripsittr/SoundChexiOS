@@ -147,6 +147,16 @@ struct NowPlayingPage: View {
                 }
             )
             .tint(SoundChexTheme.accent)
+            // A new song releases the scrubber. `scrubbing` is only cleared by
+            // the Slider's editing-ended callback, and a track change while it
+            // is held — or a gesture whose end is never reported — left the
+            // view showing the old `scrubValue` and ignoring `position`
+            // entirely: the audio restarted while the thumb stayed frozen at
+            // the time it was dragged to (S-342).
+            .onChange(of: playback.current?.id) { _, _ in
+                scrubbing = false
+                scrubValue = 0
+            }
 
             HStack {
                 Text(timeString(scrubbing ? scrubValue : playback.position))

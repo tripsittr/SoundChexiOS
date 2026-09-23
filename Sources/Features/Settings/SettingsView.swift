@@ -7,6 +7,7 @@ import SwiftUI
 /// out, and (later) downloads and playback preferences.
 struct SettingsView: View {
     @Environment(Session.self) private var session
+    @Environment(DownloadStore.self) private var downloads
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeStore.self) private var theme
 
@@ -75,7 +76,19 @@ struct SettingsView: View {
 
                 Section {
                     Button {
-                        DeviceReporter.shared.sendDiagnostics(reason: "manual")
+                        downloads.refreshStorageSnapshot()
+
+                        let formatter = ByteCountFormatter()
+                        formatter.countStyle = .file
+                        let used = formatter.string(fromByteCount: downloads.storedBytesUsed)
+                        let free = downloads.freeBytesAvailable == .max
+                            ? "unknown"
+                            : formatter.string(fromByteCount: downloads.freeBytesAvailable)
+                        let host = session.serverURL?.host() ?? "unknown"
+                        let reason = "manual from settings: host=\(host), downloaded_items=\(downloads.storedItemCount), downloaded_bytes=\(downloads.storedBytesUsed), downloaded_used=\(used), free_bytes=\(downloads.freeBytesAvailable), free=\(free)"
+
+                        AppLog.info("Manual diagnostics requested from settings", category: "diagnostics")
+                        DeviceReporter.shared.sendDiagnostics(reason: reason)
                         diagnosticsSent = true
                     } label: {
                         Label(diagnosticsSent ? "Diagnostics sent" : "Send diagnostics",

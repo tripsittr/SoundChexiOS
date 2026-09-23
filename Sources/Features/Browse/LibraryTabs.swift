@@ -52,6 +52,11 @@ struct LibraryTabs: View {
             // app cannot work without the server" (S-337).
             await store.loadIfNeeded()
 
+            // Put the listener back on the track they were interrupted on,
+            // paused where it stopped (S-342). Needs the catalogue, since the
+            // queue is remembered as ids.
+            playback.restoreRememberedState(from: store.items)
+
             // Admin-ness only decides whether an extra tab appears, so it can
             // settle whenever the network allows, or never.
             Task { await session.refreshIdentity() }
@@ -60,7 +65,14 @@ struct LibraryTabs: View {
         // server while it was backgrounded (a duplicate merge, new imports)
         // show without a manual pull-to-refresh or a cold relaunch.
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
+            guard phase == .active else {
+                // Leaving the foreground may be the last moment before the app
+                // is killed, so write the position now rather than waiting for
+                // a tick that will not come.
+                playback.rememberPlaybackStateNow()
+                return
+            }
+
             Task { await store.load() }
         }
     }

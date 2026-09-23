@@ -46,6 +46,9 @@ struct ShowDetailView: View {
         }
         .background(SoundChexTheme.base900)
         .navigationTitle(item.title)
+        // Pushed screens do not inherit the tab root's inset, so the last
+        // row would sit under the now-playing bar (S-343).
+        .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
             VideoPlayerView(item: toPlay).soundchexTheme(theme)

@@ -7,6 +7,9 @@ import SwiftUI
 /// and the swipe-left action.
 struct AddToPlaylistSheet: View {
     @Environment(Session.self) private var session
+    // Shared with the playlists grid, so one made here shows up there without
+    // waiting for a relaunch (S-372).
+    @Environment(PlaylistStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     let item: MediaItem
 
@@ -72,7 +75,10 @@ struct AddToPlaylistSheet: View {
 
     private func load() async {
         loading = true
-        playlists = (try? await session.api?.playlists()) ?? []
+        // Through the shared store, so this sheet and the grid cannot disagree
+        // about what playlists exist (S-372).
+        await store.reload()
+        playlists = store.playlists
         loading = false
     }
 
@@ -80,6 +86,10 @@ struct AddToPlaylistSheet: View {
         Task {
             do {
                 try await session.api?.addToPlaylist(playlist.id, itemID: item.id)
+                // The card shows a track count and a mosaic of its first few
+                // covers; both just changed.
+                await store.reload()
+                playlists = store.playlists
                 flash("Added to \(playlist.name)")
                 dismiss()
             } catch { flash("Couldn't add") }
@@ -94,6 +104,12 @@ struct AddToPlaylistSheet: View {
             do {
                 if let created = try await session.api?.createPlaylist(name: name) {
                     try await session.api?.addToPlaylist(created.id, itemID: item.id)
+                    // The grid caches its list and only loads it once, so a
+                    // playlist made here stayed invisible until the app was
+                    // relaunched — it looked as though nothing had been
+                    // created at all (S-372).
+                    await store.reload()
+                    playlists = store.playlists
                     flash("Added to \(name)")
                     dismiss()
                 }

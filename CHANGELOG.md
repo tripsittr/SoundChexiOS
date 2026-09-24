@@ -3,6 +3,21 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.16.2 “Tether” — 2026-09-24
+
+### Fixed
+- **A playlist made from "Add to playlist" now shows up** (S-372). Creating one
+  from the kebab looked like it had done nothing: the playlist and the track
+  were both saved on the server, but the playlists grid loads its list once and
+  kept the old copy, so the new playlist stayed invisible until the app was
+  relaunched.
+
+  The grid's store is shared through the environment now, the way downloads and
+  the theme already were, and the sheet reads and refreshes it — so the sheet
+  and the grid can no longer disagree about what playlists exist. Adding to an
+  *existing* playlist refreshes it too: the card shows a track count and a
+  mosaic of its first few covers, and both just changed.
+
 ## 0.16.1 “Tether” — 2026-09-24
 
 ### Fixed

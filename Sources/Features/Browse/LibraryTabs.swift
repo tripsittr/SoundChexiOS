@@ -13,6 +13,7 @@ struct LibraryTabs: View {
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
+    @Environment(Connectivity.self) private var connectivity
     @Environment(ThemeStore.self) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @State private var store = LibraryStore()
@@ -64,6 +65,14 @@ struct LibraryTabs: View {
         // Coming back to the app syncs the library, so changes made on the
         // server while it was backgrounded (a duplicate merge, new imports)
         // show without a manual pull-to-refresh or a cold relaunch.
+        // Coming back online picks up whatever was still owed. A "download
+        // all" started on a train stops when the signal goes and used to stay
+        // stopped until the app was relaunched (S-364).
+        .onChange(of: connectivity.isOnline) { _, online in
+            guard online else { return }
+
+            downloads.resumeInterrupted()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else {
                 // Leaving the foreground may be the last moment before the app
@@ -74,6 +83,11 @@ struct LibraryTabs: View {
             }
 
             Task { await store.load() }
+
+            // Anything still owed from before the app was backgrounded. The
+            // background session finishes what it had already started on its
+            // own; this is for what never got a slot (S-364).
+            downloads.resumeInterrupted()
         }
     }
 }

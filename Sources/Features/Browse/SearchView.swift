@@ -17,6 +17,8 @@ struct SearchResultsList: View {
     @Environment(LibraryStore.self) private var store
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
+    @Environment(DownloadStore.self) private var downloads
+    @Environment(Connectivity.self) private var connectivity
 
     @State private var term = ""
     @State private var results: [MediaItem] = []
@@ -26,37 +28,54 @@ struct SearchResultsList: View {
 
     var body: some View {
         List(results) { item in
+            let isCurrent = playback.current?.id == item.id
+            let canPlay = Playability.canPlay(item, downloads: downloads, online: connectivity.isOnline)
+
+            HStack(spacing: 0) {
             Button {
                 if item.type == .music { playback.play([item]) }
             } label: {
                 HStack(spacing: 12) {
-                    Artwork(item: item, size: 44, aspect: item.type == .music ? 1 : 1.4)
+                    // The now-playing tell, the same one the library and album
+                    // pages draw — a result you are listening to should look
+                    // like it, wherever you found it (S-362).
+                    TrackArtwork(item: item, size: 44, aspect: item.type == .music ? 1 : 1.4)
+
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
-                        if let subtitle = item.subtitle {
+                        Text(item.title).nowPlayingTitle(isCurrent).lineLimit(1)
+
+                        // Offline, say why a row will not respond rather than
+                        // leaving it inert and unexplained.
+                        if let reason = Playability.reason(item, downloads: downloads, online: connectivity.isOnline) {
+                            Text(reason).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
+                        } else if let subtitle = item.subtitle {
                             Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
                         }
                     }
                     Spacer()
-
-                    // The same actions a track carries everywhere else —
-                    // play next, queue, playlist, download — rather than a
-                    // result you can only play (S-361).
-                    Menu {
-                        TrackActions(item: item) { addingToPlaylist = item }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .foregroundStyle(SoundChexTheme.ink500)
-                            .frame(width: 32, height: 32)
-                            .contentShape(.rect)
-                    }
-                    // Plain, so tapping the kebab does not also fire the row's
-                    // own play button — they share a row (S-344).
-                    .buttonStyle(.plain)
                 }
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            // Only the play half dims and stops responding. The kebab stays
+            // live: remove a download, add to a playlist — the actions someone
+            // reaches for are exactly the ones that still work offline (S-362).
+            .playableRow(canPlay)
+
+            // The same actions a track carries everywhere else — play next,
+            // queue, playlist, download — rather than a result you can only
+            // play (S-361). A sibling of the button, not inside its label, so
+            // tapping it cannot fire the row's play action (S-344).
+            Menu {
+                TrackActions(item: item) { addingToPlaylist = item }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(SoundChexTheme.ink500)
+                    .frame(width: 32, height: 32)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            }
             .listRowBackground(SoundChexTheme.base900)
         }
         .sheet(item: $addingToPlaylist) { item in

@@ -3,6 +3,32 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.16.0 “Tether” — 2026-09-24
+
+### Added
+- **Offline, a track you have not downloaded is dimmed and does not respond**
+  (S-362). It said "Not downloaded" only after you tapped it and nothing
+  happened; now the row says so before you try. The kebab stays live, because
+  removing a download or adding to a playlist are exactly what you reach for
+  when a track will not play.
+- **The now-playing tell follows the track everywhere** (S-362). The accent
+  title and the animated equalizer over the cover were drawn by the library
+  list, the album page and the artist page — each separately — and not at all
+  in search. One component now, so a song you are listening to looks like it
+  wherever you find it.
+
+### Fixed
+- **The lock screen keeps up when you scrub** (S-363). Seeking never told the
+  system where playback had landed, so the lock screen and Control Centre went
+  on counting from the old position and only corrected when pausing and playing
+  forced a refresh. They are told on every seek now — and their own scrubber
+  works, which it never did: the control was drawn but nothing handled a drag.
+- **Queued downloads survive going offline and being closed** (S-364). Only a
+  transfer that had already begun was resumed; one still waiting for a slot
+  left no resume data and was simply forgotten, so a "download all" interrupted
+  early lost most of what it promised. Anything with a sidecar and no file is
+  owed, and is picked up when the app reopens or the network returns.
+
 ## 0.15.1 — 2026-09-24
 
 ### Fixed

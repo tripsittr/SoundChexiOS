@@ -37,6 +37,8 @@ struct MediaListView: View {
 struct SongRow: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(ThemeStore.self) private var theme
+    @Environment(DownloadStore.self) private var downloads
+    @Environment(Connectivity.self) private var connectivity
     let item: MediaItem
     var queue: [MediaItem] = []
     var index: Int = 0
@@ -56,14 +58,9 @@ struct SongRow: View {
                 HStack(spacing: 12) {
                     // The current track shows an animated equalizer over its
                     // cover — the Spotify "now playing" tell (S-288).
-                    Artwork(item: item, size: 48)
-                        .overlay {
-                            if isCurrent {
-                                SoundChexTheme.base900.opacity(0.55)
-                                    .clipShape(.rect(cornerRadius: 6))
-                                PlayingEqualizer(isAnimating: playback.isPlaying, size: 28)
-                            }
-                        }
+                    // One component for the now-playing tell, shared with
+                    // search, albums and artists (S-362).
+                    TrackArtwork(item: item, size: 48)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)
                             .foregroundStyle(isCurrent ? SoundChexTheme.accent : SoundChexTheme.ink100)
@@ -80,6 +77,9 @@ struct SongRow: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            // Offline, a track this device does not hold cannot play: dim it
+            // and stop it taking the tap (S-362). The kebab stays live.
+            .playableRow(Playability.canPlay(item, downloads: downloads, online: connectivity.isOnline))
 
             // Persistent download control, like the web row.
             DownloadButton(item: item, size: 18)
@@ -138,6 +138,7 @@ struct SongRow: View {
 struct TrackActions: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
+    @Environment(Connectivity.self) private var connectivity
     @Environment(Session.self) private var session
     let item: MediaItem
     var onAddToPlaylist: (() -> Void)?

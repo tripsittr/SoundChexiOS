@@ -298,7 +298,21 @@ final class PlaybackController {
         // tick lands. Releasing the scrubber otherwise let the thumb snap back
         // to where the song was for a frame before the seek reported in.
         position = seconds
-        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) { [weak self] _ in
+            // Tell the lock screen where we actually landed, once the player
+            // has landed there. Without this the lock screen and Control
+            // Centre kept the elapsed time from before the scrub and only
+            // caught up when pausing and playing forced a refresh — the
+            // system extrapolates from the last elapsed time it was given, so
+            // a stale one drifts on happily (S-363).
+            Task { @MainActor [weak self] in
+                self?.updateNowPlayingInfo()
+            }
+        }
+
+        // …and immediately, so the lock screen does not show the old time for
+        // the length of the seek.
+        updateNowPlayingInfo()
     }
 
     // MARK: - Loading
@@ -720,6 +734,19 @@ final class PlaybackController {
         center.pauseCommand.addTarget { [weak self] _ in self?.pause(); return .success }
         center.nextTrackCommand.addTarget { [weak self] _ in self?.next(); return .success }
         center.previousTrackCommand.addTarget { [weak self] _ in self?.previous(); return .success }
+
+        // Scrubbing *from* the lock screen. Without a handler the system draws
+        // the scrubber but drags do nothing, which reads as a broken control
+        // rather than an absent feature (S-363).
+        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let self,
+                  let event = event as? MPChangePlaybackPositionCommandEvent
+            else { return .commandFailed }
+
+            self.seek(to: event.positionTime)
+
+            return .success
+        }
     }
 
     private func resume() {

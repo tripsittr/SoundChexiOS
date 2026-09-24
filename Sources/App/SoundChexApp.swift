@@ -32,6 +32,7 @@ struct SoundChexApp: App {
                 .environment(playback)
                 .environment(downloads)
                 .environment(theme)
+                .environment(Connectivity.shared)
                 // The user's chosen appearance and accent, applied app-wide and
                 // live: changing either in Settings updates every screen at once
                 // because the tint and scheme flow from the store.

@@ -194,7 +194,23 @@ final class DownloadStore: NSObject {
     /// Resumes every download that was interrupted and left resume data behind —
     /// called after a relaunch so a partial transfer picks up on its own.
     func resumeInterrupted() {
-        for item in stored where state(for: item.id) != .stored && Self.hasResumeData(for: item.id) {
+        // Two different interruptions, both of which used to end the download.
+        //
+        // A transfer that had started leaves resume data, and picks up where it
+        // stopped. One that was only *queued* — waiting for a slot in the
+        // concurrency window when the app was closed or the network went — left
+        // nothing behind but its sidecar, so it was simply forgotten. A
+        // "download all" interrupted early therefore lost almost everything it
+        // had promised (S-364).
+        //
+        // The sidecar is the record: it is written when an item is asked for,
+        // and only removed when the download is removed. So anything with a
+        // sidecar and no media file is still owed, whether it had begun or not.
+        for item in stored where state(for: item.id) != .stored {
+            guard !tasks.values.contains(item.id),
+                  !waiting.contains(where: { $0.id == item.id })
+            else { continue }
+
             download(item.asMediaItem)
         }
     }

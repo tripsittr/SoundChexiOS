@@ -34,7 +34,7 @@ final class PlaylistStore {
 struct PlaylistsGrid: View {
     @Environment(Session.self) private var session
     @Environment(ThemeStore.self) private var theme
-    @State private var store = PlaylistStore()
+    @Environment(PlaylistStore.self) private var store
     @State private var creating = false
     @State private var importing = false
 

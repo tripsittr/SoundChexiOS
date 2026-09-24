@@ -14,6 +14,9 @@ struct SoundChexApp: App {
     @State private var playback = PlaybackController()
     @State private var downloads = DownloadStore.shared
     @State private var theme = ThemeStore()
+    // Shared, not view-local: a playlist can be created from the Add to
+    // Playlist sheet on any screen, and the grid has to hear about it (S-372).
+    @State private var playlists = PlaylistStore()
 
     init() {
         configureBarAppearance()
@@ -32,6 +35,7 @@ struct SoundChexApp: App {
                 .environment(playback)
                 .environment(downloads)
                 .environment(theme)
+                .environment(playlists)
                 .environment(Connectivity.shared)
                 // The user's chosen appearance and accent, applied app-wide and
                 // live: changing either in Settings updates every screen at once

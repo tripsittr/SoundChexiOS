@@ -3,6 +3,23 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.17.2 “Encore” — 2026-09-24
+
+### Changed
+- **The scrolling title rests at both ends** (S-379). It revolved without
+  stopping, so the title was always moving and never settled long enough to
+  read at a glance.
+
+  It now holds at the start, scrolls until the last word reaches the edge,
+  holds there, then carries on round. The second rest is at the end of the
+  *title*, not the end of the travel — pausing there would just be a blank gap
+  sitting still.
+
+  The wrap-around leg runs faster than the reading leg. Nothing is readable
+  while the tail goes off and the next copy comes in, and at reading speed
+  that stretch was the longest part of the cycle: the title spent most of its
+  time off screen.
+
 ## 0.17.1 “Encore” — 2026-09-24
 
 ### Changed

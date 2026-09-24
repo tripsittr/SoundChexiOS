@@ -17,6 +17,15 @@ enum AppRelease {
         "0.6": "Refrain",
         "0.7": "Cadence",
         "0.8": "Reprise",
+        "0.9": "Coda",
+        "0.10": "Verse",
+        "0.11": "Verse",
+        "0.12": "Ledger",
+        "0.13": "Anchor",
+        "0.14": "Folio",
+        "0.15": "Porter",
+        "0.16": "Tether",
+        "0.17": "Bridge",
         "1.0": "Encore",
     ]
 
@@ -36,6 +45,11 @@ enum AppRelease {
     }
 
     /// The name for a full version string like "0.2.1" — keyed on its minor.
+    ///
+    /// Every shipped minor must have an entry. The names lived only in the
+    /// CHANGELOG for a while and this map stopped at 0.8, so Settings showed a
+    /// bare number from 0.9 to 0.17 while the release notes called those
+    /// releases Coda, Verse, Ledger and the rest (S-380).
     static func name(for version: String) -> String? {
         let parts = version.split(separator: ".")
         guard parts.count >= 2 else { return nil }

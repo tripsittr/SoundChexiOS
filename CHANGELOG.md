@@ -3,6 +3,15 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.15.0 “Porter” — 2026-09-24
+
+### Added
+- **Import a playlist on the phone** (S-313). Playlists → Import takes an M3U,
+  M3U8, CSV or XSPF file — a Spotify export from Exportify works as-is — and
+  matches it against your library, showing how many tracks landed. Anything it
+  could not place is listed with a search box, so a track can be pointed at the
+  right recording rather than silently dropped.
+
 ## 0.14.0 “Folio” — 2026-09-23
 
 ### Added

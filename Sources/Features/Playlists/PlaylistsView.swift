@@ -36,6 +36,7 @@ struct PlaylistsGrid: View {
     @Environment(ThemeStore.self) private var theme
     @State private var store = PlaylistStore()
     @State private var creating = false
+    @State private var importing = false
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -69,9 +70,26 @@ struct PlaylistsGrid: View {
             store.attach(api: session.api)
             await store.loadIfNeeded()
         }
+        // Importing lives in the toolbar rather than as another grid tile: it
+        // is a thing you do occasionally, not a playlist, and a second tile
+        // beside "New" reads as though it were one (S-313).
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    importing = true
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                }
+                .tint(SoundChexTheme.accent)
+            }
+        }
         .sheet(isPresented: $creating) {
             EditPlaylistSheet(playlist: nil) { Task { await store.reload() } }
                 .presentationDetents([.medium])
+                .soundchexTheme(theme)
+        }
+        .sheet(isPresented: $importing) {
+            ImportPlaylistView { Task { await store.reload() } }
                 .soundchexTheme(theme)
         }
     }

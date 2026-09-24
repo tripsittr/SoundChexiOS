@@ -3,6 +3,19 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.17.1 “Encore” — 2026-09-24
+
+### Changed
+- **The scrolling title revolves instead of bouncing** (S-378). It ran to the
+  end and eased back, and the turn caught the eye every time — the motion
+  became the thing you noticed rather than the title.
+
+  It now travels one way and never turns round: a second copy of the text
+  follows the first, and once the first has gone the offset resets. The copies
+  are identical, so the reset is invisible and it reads as a revolving door.
+  Linear timing too, because a constant speed is what lets it fade into the
+  background; the old easing sped up and slowed down every pass.
+
 ## 0.17.0 “Encore” — 2026-09-24
 
 ### Added

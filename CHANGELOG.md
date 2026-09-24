@@ -3,6 +3,20 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.16.1 “Tether” — 2026-09-24
+
+### Fixed
+- **Playlist covers on the playlists list** (S-371). Every playlist without a
+  cover of its own showed a note glyph, while opening it showed the usual 2×2
+  mosaic of its tracks' art — so covers appeared only *inside* a playlist. The
+  list endpoint carries no tracks, and the card was passing an empty mosaic, so
+  there was never anything to draw. The server now sends up to four track
+  covers per playlist and the card uses them.
+
+  A server that has not been updated sends no mosaic at all; that decodes to
+  empty rather than failing the playlist, so an older server behaves exactly as
+  it did before.
+
 ## 0.16.0 “Tether” — 2026-09-24
 
 ### Added

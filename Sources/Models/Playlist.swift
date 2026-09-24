@@ -14,9 +14,13 @@ struct Playlist: Identifiable, Decodable, Hashable, Sendable {
     /// The playlist's own cover, or nil — then the UI draws a mosaic of the
     /// tracks' covers.
     let artworkURL: URL?
+    /// Up to four track covers for that mosaic. The list endpoint carries no
+    /// tracks, so without these a playlist with no cover of its own had
+    /// nothing to draw and fell back to a note glyph (S-371).
+    let mosaic: [URL]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, count
+        case id, name, description, count, mosaic
         case artworkURL = "artworkUrl" // artwork_url → artworkUrl after the key transform
     }
 
@@ -28,6 +32,10 @@ struct Playlist: Identifiable, Decodable, Hashable, Sendable {
         count = try? c.decodeIfPresent(Int.self, forKey: .count)
         artworkURL = (try? c.decodeIfPresent(String.self, forKey: .artworkURL))
             .flatMap { $0.flatMap(URL.init(string:)) }
+        // A server that has not been updated sends no mosaic at all, so this
+        // must degrade to empty rather than fail the whole playlist.
+        mosaic = ((try? c.decodeIfPresent([String].self, forKey: .mosaic)) ?? [])?
+            .compactMap(URL.init(string:)) ?? []
     }
 }
 

@@ -116,7 +116,7 @@ struct PlaylistCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            PlaylistCover(artworkURL: playlist.artworkURL, mosaic: [])
+            PlaylistCover(artworkURL: playlist.artworkURL, mosaic: playlist.mosaic)
             Text(playlist.name).font(.subheadline).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
             if let count = playlist.count {
                 Text("\(count) song\(count == 1 ? "" : "s")").font(.caption)

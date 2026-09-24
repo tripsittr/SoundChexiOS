@@ -3,7 +3,26 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
-## 0.17.2 “Encore” — 2026-09-24
+## 0.17.03 “Bridge” — 2026-09-24
+
+### Changed
+- **Versions are written `x.xx.xx`** (S-380). The patch is zero-padded to two
+  digits, so a version reads at a fixed width — `0.17.03`, not `0.17.3`. Each
+  field is still just a number, so nothing downstream cares. A minor bump
+  resets it plainly: `0.18.0`.
+- **0.17.x is “Bridge”, not “Encore”.** Encore is reserved in
+  `Plans/Versioning.md` for 1.0.0, and 0.17 took it by mistake, skipping the
+  planned Bridge. Renamed here and in the three release notes that shipped
+  under it; Encore goes back to 1.0.
+
+### Fixed
+- **Settings shows the release name again** (S-380). `AppRelease.names` stopped
+  at 0.8, so every release from 0.9 to 0.17 displayed a bare number while the
+  CHANGELOG called them Coda, Verse, Ledger, Anchor, Folio, Porter and Tether.
+  The names only ever existed in the release notes. All of them are in the map
+  now, and the plan says to add the entry at the minor bump rather than after.
+
+## 0.17.2 “Bridge” — 2026-09-24
 
 ### Changed
 - **The scrolling title rests at both ends** (S-379). It revolved without
@@ -20,7 +39,7 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   that stretch was the longest part of the cycle: the title spent most of its
   time off screen.
 
-## 0.17.1 “Encore” — 2026-09-24
+## 0.17.1 “Bridge” — 2026-09-24
 
 ### Changed
 - **The scrolling title revolves instead of bouncing** (S-378). It ran to the
@@ -33,7 +52,7 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   Linear timing too, because a constant speed is what lets it fade into the
   background; the old easing sped up and slowed down every pass.
 
-## 0.17.0 “Encore” — 2026-09-24
+## 0.17.0 “Bridge” — 2026-09-24
 
 ### Added
 - **Add to Playlist warns when the song is already there** (S-373). A playlist

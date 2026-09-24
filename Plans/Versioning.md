@@ -4,8 +4,14 @@ SoundChex uses **SemVer** (`MAJOR.MINOR.PATCH`) with a personality: every
 **minor** release gets a **music-themed name**, and that name holds for the
 whole minor — **it changes only at the next minor bump**, never on a patch.
 
-- **PATCH** (`0.4.0 → 0.4.1 → 0.4.2 …`) — fixes, no new features. **Same name.**
-  All of `0.4.x` is "Interlude"; the name does not change again until `0.5.0`.
+- **PATCH** (`0.17.00 → 0.17.01 → 0.17.02 …`) — fixes, no new features.
+  **Same name.** All of `0.17.x` is "Bridge"; the name does not change again
+  until `0.18.0`.
+
+  The patch is written **zero-padded to two digits** (S-380), so a version is
+  a fixed width — `0.17.03`, not `0.17.3`. Each field is still just a number,
+  so Apple accepts it and it sorts correctly. A minor or major bump resets the
+  patch to `0`, written plainly: `0.18.0`, not `0.18.00`.
 - **MINOR** (`0.4.x → 0.5.0`) — new features. **New name** (the next unused one).
 - **MAJOR** (`0.x → 1.0.0`) — the first stable, feature-complete release.
 
@@ -24,9 +30,24 @@ resolves. Pick the next unused one at each minor bump.
 | 0.2.0 | **Overture** | The first native Swift iOS app: sign-in, browse, playback, downloads/offline, playlists, admin, detail screens, lyrics. |
 | 0.3.0 | **Crescendo** | Batch "download all" gated on free space, and incremental library delta sync (`/library/delta`) instead of a full re-fetch each launch. |
 | 0.4.0 | **Interlude** | Persistent search + account header on every page (Search tab removed); a Playlists pill in Music with Spotify-style create/edit/reorder/cover playlists. |
-| 0.5.0 | Bridge | _(next)_ |
-| 0.6.0 | Refrain | |
+| 0.8.0 | **Reprise** | |
+| 0.9.0 | **Coda** | |
+| 0.10.0 | **Verse** | |
+| 0.12.0 | **Ledger** | |
+| 0.13.0 | **Anchor** | |
+| 0.14.0 | **Folio** | |
+| 0.15.0 | **Porter** | |
+| 0.16.0 | **Tether** | Offline playback fixes, search kebab, now-playing indicators, resuming downloads. |
+| 0.17.0 | **Bridge** | Playlist duplicate warning, the sheet pinned to the song it was opened for, remove-from-playlist in the kebab, scrolling titles. |
+| 0.18.0 | Refrain | _(next)_ |
+| 0.19.0 | Cadence | |
 | 1.0.0 | Encore | The first stable release. |
+
+Names are **keyed on `MAJOR.MINOR` in `AppRelease.names`**, and that map is what
+Settings reads. A name written only in the CHANGELOG is not shipped: the map
+stopped at 0.8 for a while and Settings showed a bare number from 0.9 to 0.17
+while the release notes called those releases Coda, Verse, Ledger and the rest
+(S-380). Add the entry when the minor is bumped, not afterwards.
 
 ## Where the version lives
 

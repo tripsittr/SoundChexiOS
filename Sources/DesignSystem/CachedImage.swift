@@ -11,6 +11,8 @@ import SwiftUI
 /// shared `URLCache` (memory + disk), so a cover already seen comes from disk.
 /// The loader is small and dependency-free.
 struct CachedImage<Content: View, Placeholder: View>: View {
+    @Environment(Session.self) private var session
+
     let url: URL?
     @ViewBuilder let content: (Image) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
@@ -32,7 +34,16 @@ struct CachedImage<Content: View, Placeholder: View>: View {
         uiImage = nil
         guard let url else { return }
 
-        if let image = await ImageCache.shared.image(for: url) {
+        // Point the URL at the server this device can currently reach. A
+        // download's sidecar freezes whichever address the server answered on
+        // when the file was fetched, and that address does not work from
+        // everywhere — a cover saved at home pointed at the tailnet host and
+        // vanished the moment the phone left the tailnet (S-329). Done here
+        // rather than at each of the eleven call sites, so nothing can be
+        // missed and new callers inherit it.
+        let resolved = ArtworkURL.rebased(url, onto: session.serverURL)
+
+        if let image = await ImageCache.shared.image(for: resolved) {
             uiImage = image
         }
     }
@@ -59,7 +70,19 @@ actor ImageCache {
     /// The decoded image for a URL, from cache when present. Nil on failure.
     func image(for url: URL) async -> UIImage? {
         do {
-            let (data, _) = try await session.data(from: url)
+            let (data, response) = try await session.data(from: url)
+
+            // A 404 still carries a body, and URLCache will happily keep it —
+            // so a cover that failed once stayed "cached" as an error page and
+            // never recovered, even after the real image became reachable
+            // (S-329). Refuse the response and evict anything stored for it.
+            if let http = response as? HTTPURLResponse,
+               !(200...299).contains(http.statusCode) {
+                session.configuration.urlCache?.removeCachedResponse(for: URLRequest(url: url))
+
+                return nil
+            }
+
             return UIImage(data: data)
         } catch {
             return nil

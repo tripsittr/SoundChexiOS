@@ -3,6 +3,22 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.13.1 — 2026-09-23
+
+### Fixed
+- **Downloaded covers no longer vanish away from home** (S-329). The server
+  builds artwork URLs from the address a request arrived on, and a download's
+  sidecar froze whichever one was current when the file was fetched. A cover
+  saved at home therefore pointed at the tailnet host, which does not resolve
+  anywhere else, and the artwork simply disappeared. Stored URLs are now
+  rebased onto the server the device can currently reach. Only this server's
+  own artwork paths are touched — a cover hosted by a metadata provider is left
+  alone.
+- **A cover that failed once no longer stays broken** (S-329). The image loader
+  ignored the HTTP status, so a 404's body was cached as though it were the
+  image and the cover never recovered even once it became reachable. A
+  non-2xx response is now refused and anything cached for it evicted.
+
 ## 0.13.0 “Anchor” — 2026-09-23
 
 Named for the scrubber finally staying put.

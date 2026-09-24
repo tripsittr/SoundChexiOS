@@ -18,6 +18,8 @@ struct AddToPlaylistSheet: View {
     @State private var newName = ""
     @State private var creating = false
     @State private var message: String?
+    /// The playlist a duplicate add is waiting on an answer for (S-373).
+    @State private var alreadyIn: Playlist?
 
     var body: some View {
         NavigationStack {
@@ -71,6 +73,21 @@ struct AddToPlaylistSheet: View {
             }
         }
         .task { await load() }
+        .confirmationDialog(
+            "Already in \(alreadyIn?.name ?? "this playlist")",
+            isPresented: Binding(get: { alreadyIn != nil }, set: { if !$0 { alreadyIn = nil } }),
+            titleVisibility: .visible,
+        ) {
+            Button("Move to the end") {
+                if let playlist = alreadyIn {
+                    alreadyIn = nil
+                    add(to: playlist, moveToEnd: true)
+                }
+            }
+            Button("Cancel", role: .cancel) { alreadyIn = nil }
+        } message: {
+            Text("This song is already in the playlist. A playlist can't list the same song twice, but it can be moved to the end.")
+        }
     }
 
     private func load() async {
@@ -82,16 +99,21 @@ struct AddToPlaylistSheet: View {
         loading = false
     }
 
-    private func add(to playlist: Playlist) {
+    private func add(to playlist: Playlist, moveToEnd: Bool = false) {
         Task {
             do {
-                try await session.api?.addToPlaylist(playlist.id, itemID: item.id)
+                try await session.api?.addToPlaylist(playlist.id, itemID: item.id, moveToEnd: moveToEnd)
                 // The card shows a track count and a mosaic of its first few
                 // covers; both just changed.
                 await store.reload()
                 playlists = store.playlists
-                flash("Added to \(playlist.name)")
+                flash(moveToEnd ? "Moved to the end of \(playlist.name)" : "Added to \(playlist.name)")
                 dismiss()
+            } catch APIClient.APIError.alreadyInPlaylist {
+                // A playlist cannot list the same song twice, so the only
+                // thing adding again can do is move it to the end — worth
+                // asking about rather than doing silently (S-373).
+                alreadyIn = playlist
             } catch { flash("Couldn't add") }
         }
     }

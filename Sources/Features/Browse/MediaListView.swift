@@ -42,6 +42,8 @@ struct SongRow: View {
     let item: MediaItem
     var queue: [MediaItem] = []
     var index: Int = 0
+    /// Set only where the row is *in* a playlist (S-376).
+    var onRemoveFromPlaylist: (() -> Void)?
 
     @State private var addingToPlaylist = false
     @State private var editing = false
@@ -88,6 +90,7 @@ struct SongRow: View {
             Menu {
                 TrackActions(item: item,
                              onAddToPlaylist: { addingToPlaylist = true },
+                             onRemoveFromPlaylist: onRemoveFromPlaylist,
                              onEdit: { editing = true })
             } label: {
                 Image(systemName: "ellipsis")
@@ -142,6 +145,9 @@ struct TrackActions: View {
     @Environment(Session.self) private var session
     let item: MediaItem
     var onAddToPlaylist: (() -> Void)?
+    /// Set only where the row is *in* a playlist, so the action appears there
+    /// and nowhere else (S-376).
+    var onRemoveFromPlaylist: (() -> Void)?
     var onEdit: (() -> Void)?
 
     var body: some View {
@@ -161,6 +167,14 @@ struct TrackActions: View {
                 onAddToPlaylist()
             } label: {
                 Label("Add to playlist", systemImage: "music.note.list")
+            }
+        }
+
+        if let onRemoveFromPlaylist {
+            Button(role: .destructive) {
+                onRemoveFromPlaylist()
+            } label: {
+                Label("Remove from playlist", systemImage: "minus.circle")
             }
         }
 

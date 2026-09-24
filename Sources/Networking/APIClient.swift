@@ -37,6 +37,8 @@ struct APIClient {
         case http(status: Int)
         case decoding(underlying: Error)
         case unauthorized
+        /// The playlist already holds this track (S-373).
+        case alreadyInPlaylist
 
         var errorDescription: String? {
             switch self {
@@ -45,6 +47,7 @@ struct APIClient {
             case .http(let status): "The server returned an error (\(status))."
             case .decoding(let e): "The server's response was not understood. (\(decodingHint(e)))"
             case .unauthorized: "Your email or password was not accepted."
+            case .alreadyInPlaylist: "That song is already in this playlist."
             }
         }
     }
@@ -272,10 +275,20 @@ struct APIClient {
     }
 
     /// Adds an item to a playlist.
-    func addToPlaylist(_ playlistID: Int, itemID: Int) async throws {
-        struct Body: Encodable { let itemId: Int }
-        _ = try await sendRaw("/api/v1/playlists/\(playlistID)/items", method: "POST",
-                              body: Body(itemId: itemID))
+    ///
+    /// A playlist cannot hold the same track twice, so a track already on it
+    /// throws `alreadyInPlaylist` rather than silently moving it to the end —
+    /// which is what the server used to do. Pass `moveToEnd` to ask for that
+    /// deliberately (S-373).
+    func addToPlaylist(_ playlistID: Int, itemID: Int, moveToEnd: Bool = false) async throws {
+        struct Body: Encodable { let itemId: Int; let moveToEnd: Bool }
+
+        do {
+            _ = try await sendRaw("/api/v1/playlists/\(playlistID)/items", method: "POST",
+                                  body: Body(itemId: itemID, moveToEnd: moveToEnd))
+        } catch APIError.http(status: 409) {
+            throw APIError.alreadyInPlaylist
+        }
     }
 
     /// Removes an item from a playlist.

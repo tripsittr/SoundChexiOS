@@ -141,7 +141,9 @@ final class DownloadStore: NSObject {
             return nil
         }
 
-        return url
+        // Hand back a name AVFoundation will open. The stored file keeps its
+        // format-agnostic `.media` name; this is a hard link beside it (S-360).
+        return Self.playableURL(for: itemID) ?? url
     }
 
     // MARK: - Actions
@@ -329,6 +331,91 @@ final class DownloadStore: NSObject {
 
     static func mediaURL(for itemID: Int) -> URL {
         directory.appendingPathComponent("\(itemID).media")
+    }
+
+    /// A name AVFoundation will actually open the stored file under (S-360).
+    ///
+    /// Downloads are saved as `<id>.media`, a deliberately format-agnostic
+    /// name. AVFoundation will not open it: with no extension it recognises
+    /// and no type hint, `AVURLAsset` answers "Cannot Open" for a file that is
+    /// a perfectly valid MP3 — verified byte-for-byte against the same data
+    /// renamed `.mp3`, which loads and reports its duration.
+    ///
+    /// That is why downloaded music never played offline. Online it looked
+    /// like it worked: local playback failed, and the recovery path quietly
+    /// fell back to streaming, so the only symptom was that downloads were
+    /// pointless. In airplane mode there is nothing to fall back to.
+    ///
+    /// Rather than rename 603 existing files, a hard link with a real
+    /// extension is placed beside the download and handed to the player. Same
+    /// bytes, no copy, and the `.media` file stays the one the rest of the
+    /// store reasons about.
+    static func playableURL(for itemID: Int) -> URL? {
+        let source = mediaURL(for: itemID)
+
+        guard FileManager.default.fileExists(atPath: source.path) else { return nil }
+
+        let linked = directory.appendingPathComponent("\(itemID).\(Self.fileExtension(for: source))")
+
+        if FileManager.default.fileExists(atPath: linked.path) {
+            return linked
+        }
+
+        do {
+            try FileManager.default.linkItem(at: source, to: linked)
+
+            return linked
+        } catch {
+            // A filesystem that refuses hard links, or a name already taken by
+            // something else. Copying a whole track to play it is worse than
+            // trying the original and letting the stream fallback handle it.
+            AppLog.warning(
+                "Could not link a playable name for #\(itemID): \(error.localizedDescription)",
+                category: "downloads"
+            )
+
+            return source
+        }
+    }
+
+    /// The extension to present a download under, read from the file itself.
+    ///
+    /// Sniffed rather than guessed from the item's type: the catalogue records
+    /// what a thing *is*, not what container it arrived in, and naming an M4A
+    /// `.mp3` puts us back where we started. Four magic numbers cover
+    /// everything this server transcodes to or stores.
+    private static func fileExtension(for url: URL) -> String {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return "mp3" }
+
+        defer { try? handle.close() }
+
+        guard let head = try? handle.read(upToCount: 12), head.count >= 12 else { return "mp3" }
+
+        let bytes = [UInt8](head)
+
+        // ISO base media (M4A/M4B/MP4): "ftyp" at offset 4.
+        if bytes[4...7] == [0x66, 0x74, 0x79, 0x70] {
+            return "m4a"
+        }
+
+        // "OggS" — Vorbis or Opus.
+        if bytes[0...3] == [0x4F, 0x67, 0x67, 0x53] {
+            return "ogg"
+        }
+
+        // "fLaC".
+        if bytes[0...3] == [0x66, 0x4C, 0x61, 0x43] {
+            return "flac"
+        }
+
+        // "RIFF" … "WAVE".
+        if bytes[0...3] == [0x52, 0x49, 0x46, 0x46], bytes[8...11] == [0x57, 0x41, 0x56, 0x45] {
+            return "wav"
+        }
+
+        // An ID3 tag ("ID3") or a bare MPEG frame sync — both are MP3, and it
+        // is the overwhelmingly common case here.
+        return "mp3"
     }
 
     static func sidecarURL(for itemID: Int) -> URL {

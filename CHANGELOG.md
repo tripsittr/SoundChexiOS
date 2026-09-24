@@ -3,6 +3,24 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.15.1 — 2026-09-24
+
+### Fixed
+- **Downloaded music plays offline** (S-360). Downloads are stored as
+  `<id>.media`, and AVFoundation will not open that: given no extension it
+  recognises, it answers "Cannot Open" for a file that is a perfectly good MP3
+  — verified against the same bytes renamed `.mp3`, which load and report their
+  duration. Local playback therefore always failed, and the recovery path fell
+  back to streaming, so the only symptom online was that downloads achieved
+  nothing. In airplane mode there was nothing to fall back to. The player is
+  now handed a hard link named from the file's own container, sniffed from its
+  first bytes rather than guessed from the item's type.
+
+### Added
+- **Search results carry the same actions as everywhere else** (S-361): play
+  next, add to queue, add to playlist, download or remove — behind a kebab at
+  the end of each row.
+
 ## 0.15.0 “Porter” — 2026-09-24
 
 ### Added

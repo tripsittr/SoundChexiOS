@@ -22,6 +22,7 @@ struct SearchResultsList: View {
     @State private var results: [MediaItem] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var addingToPlaylist: MediaItem?
 
     var body: some View {
         List(results) { item in
@@ -37,11 +38,29 @@ struct SearchResultsList: View {
                         }
                     }
                     Spacer()
+
+                    // The same actions a track carries everywhere else —
+                    // play next, queue, playlist, download — rather than a
+                    // result you can only play (S-361).
+                    Menu {
+                        TrackActions(item: item) { addingToPlaylist = item }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .foregroundStyle(SoundChexTheme.ink500)
+                            .frame(width: 32, height: 32)
+                            .contentShape(.rect)
+                    }
+                    // Plain, so tapping the kebab does not also fire the row's
+                    // own play button — they share a row (S-344).
+                    .buttonStyle(.plain)
                 }
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .listRowBackground(SoundChexTheme.base900)
+        }
+        .sheet(item: $addingToPlaylist) { item in
+            AddToPlaylistSheet(item: item)
         }
         .listStyle(.plain)
         .overlay {

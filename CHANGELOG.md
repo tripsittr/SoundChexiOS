@@ -3,6 +3,14 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.14.0 “Folio” — 2026-09-23
+
+### Added
+- **Kindle-style paginated reading** (S-304). A book is laid out into pages
+  that fit the screen and turned by tapping an edge or swiping, instead of one
+  long scroll. Page and chapter position carry across a turn, so reading
+  progress still means what it did.
+
 ## 0.13.1 — 2026-09-23
 
 ### Fixed

@@ -14,7 +14,13 @@ struct NowPlayingPage: View {
 
     @State private var scrubbing = false
     @State private var scrubValue: Double = 0
-    @State private var addingToPlaylist = false
+    /// The song the Add to Playlist sheet was opened for.
+    ///
+    /// Held rather than read from `playback.current`: the track changes while
+    /// the sheet is open — that is the whole point of a player — and the sheet
+    /// was silently re-targeting the new song, so you added whatever happened
+    /// to be playing when you tapped, not the song you opened it for (S-374).
+    @State private var addingToPlaylist: MediaItem?
     @State private var showingQueue = false
     @State private var showingLyrics = false
 
@@ -89,15 +95,18 @@ struct NowPlayingPage: View {
                     .textCase(.uppercase)
                     .foregroundStyle(SoundChexTheme.ink500)
                 if let context = playbackContext(item) {
-                    Text(context)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(SoundChexTheme.ink200)
-                        .lineLimit(1)
+                    MarqueeText(
+                        text: context,
+                        font: .system(size: 12, weight: .semibold),
+                        color: SoundChexTheme.ink200,
+                        lineHeight: 16,
+                        alignment: .center,
+                    )
                 }
             }
             Spacer()
             Menu {
-                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
+                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = item })
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.headline)
@@ -106,8 +115,8 @@ struct NowPlayingPage: View {
             }
         }
         .padding(.top, 12)
-        .sheet(isPresented: $addingToPlaylist) {
-            AddToPlaylistSheet(item: item)
+        .sheet(item: $addingToPlaylist) { pinned in
+            AddToPlaylistSheet(item: pinned)
                 .presentationDetents([.medium, .large])
                 .soundchexTheme(theme)
         }
@@ -123,15 +132,22 @@ struct NowPlayingPage: View {
         HStack(alignment: .center) {
             // Left-aligned, Spotify-style — not centred.
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(SoundChexTheme.ink100)
-                    .lineLimit(1)
+                // Scrolled rather than truncated: a long title cut to
+                // "The Road to Hell Is Highway 59 (feat…" hides the part that
+                // says which track it is (S-377).
+                MarqueeText(
+                    text: item.title,
+                    font: .system(size: 22, weight: .bold),
+                    color: SoundChexTheme.ink100,
+                    lineHeight: 27,
+                )
                 if let subtitle = item.subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 16))
-                        .foregroundStyle(SoundChexTheme.ink300)
-                        .lineLimit(1)
+                    MarqueeText(
+                        text: subtitle,
+                        font: .system(size: 16),
+                        color: SoundChexTheme.ink300,
+                        lineHeight: 20,
+                    )
                 }
             }
             Spacer()

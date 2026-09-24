@@ -34,7 +34,8 @@ struct PlaylistDetailView: View {
                 .listRowSeparator(.hidden)
 
             ForEach(tracks) { track in
-                SongRow(item: track, queue: tracks, index: tracks.firstIndex(of: track) ?? 0)
+                SongRow(item: track, queue: tracks, index: tracks.firstIndex(of: track) ?? 0,
+                        onRemoveFromPlaylist: { remove(track) })
                     .listRowBackground(SoundChexTheme.base900)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { remove(track) } label: {

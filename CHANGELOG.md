@@ -3,6 +3,34 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.17.0 “Encore” — 2026-09-24
+
+### Added
+- **Add to Playlist warns when the song is already there** (S-373). A playlist
+  cannot list the same song twice — the pivot's key is the pair — so adding one
+  it already holds used to rewrite its position and move it to the end,
+  silently. It now asks, and "Move to the end" is offered as the honest
+  description of what adding again actually does.
+- **Remove from playlist, in the song row kebab** (S-376). Removing a song
+  needed a swipe, which is not discoverable. The action appears only on a row
+  that is actually in a playlist.
+- **Long titles scroll instead of truncating** (S-377). On the now-playing
+  page the song title, its subtitle and the "playing from" line marquee when
+  they are wider than the space they have — a title cut to "The Road to Hell
+  Is Highway 59 (feat…" hides the part that says which track it is.
+
+  Only when it has to: text that fits is left alone, with no animation
+  running, because this page is on screen for the length of a record.
+
+### Fixed
+- **Add to Playlist adds the song you opened it for** (S-374). The sheet read
+  the *live* now-playing track, so if the song changed while the sheet was
+  open, it quietly re-targeted and added whatever was playing when you tapped.
+  The song is captured when the sheet opens and held.
+
+  Lyrics deliberately keep following the track: the sheet stays open and swaps
+  to the new song, which is what you want while a record plays.
+
 ## 0.16.2 “Tether” — 2026-09-24
 
 ### Fixed

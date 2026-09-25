@@ -499,6 +499,45 @@ struct APIClient {
                               body: Body(position: position, duration: duration))
     }
 
+    /// Why someone sent an item back for review (S-400). Mirrors the server's
+    /// `ReviewReason` enum — the raw values are the wire format.
+    enum ReviewReason: String, CaseIterable, Identifiable, Sendable {
+        case metadata, file, cover, duplicate, other
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .metadata: "Wrong metadata"
+            case .file: "File problem"
+            case .cover: "Wrong cover"
+            case .duplicate: "Duplicate"
+            case .other: "Something else"
+            }
+        }
+
+        /// The line under the label, in the words someone would use about
+        /// their own library rather than the words the schema uses.
+        var hint: String {
+            switch self {
+            case .metadata: "Wrong title, artist, album, year or genre"
+            case .file: "Wrong file, bad quality, or it will not play"
+            case .cover: "Missing artwork, or artwork from something else"
+            case .duplicate: "This is already in the library"
+            case .other: "Anything the other reasons do not cover"
+            }
+        }
+    }
+
+    /// Sends an item back for review. The server hides it from the library
+    /// until an admin clears it (S-396), which is why the app confirms first.
+    func sendForReview(itemID: Int, reason: ReviewReason, note: String?) async throws {
+        struct Body: Encodable { let reason: String; let note: String? }
+
+        _ = try await sendRaw("/api/v1/items/\(itemID)/review", method: "POST",
+                              body: Body(reason: reason.rawValue, note: note))
+    }
+
     // MARK: - URLs (for streaming and artwork, used directly by AVPlayer / AsyncImage)
 
     /// The streaming URL for one item. Authentication is the bearer token in the

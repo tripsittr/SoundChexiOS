@@ -10,6 +10,10 @@ import SwiftUI
 /// lives here at the root so every screen can reach it through the environment.
 @main
 struct SoundChexApp: App {
+    // Exists only to answer "which orientations right now" — SwiftUI has no
+    // API for it, and UIApplicationDelegate is still where iOS asks (S-408).
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     @State private var session = Session()
     @State private var playback = PlaybackController()
     @State private var downloads = DownloadStore.shared

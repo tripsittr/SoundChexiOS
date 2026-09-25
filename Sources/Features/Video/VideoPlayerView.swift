@@ -23,6 +23,10 @@ struct VideoPlayerView: View {
         VideoPlayerContainer(item: item, api: session.api, subtitles: subtitles)
             .ignoresSafeArea()
             .background(.black)
+            // Video is the one screen where landscape is the point, and a
+            // full-screen AVPlayer already handles rotation itself. The rest
+            // of the app stays portrait until its layouts are ready (S-408).
+            .allowsOrientations(.allButUpsideDown)
             // The current caption, drawn over the video (S-160). AVPlayer can't
             // easily carry an external, auth-headed WebVTT track, so the line is
             // parsed and shown here, synced to the player's time.

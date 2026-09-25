@@ -3,6 +3,26 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.23.4 “Segue” — 2026-09-25
+
+### Fixed
+- **The app could not be uploaded at all.** App Store Connect rejects an iPad
+  build whose `Info.plist` names only portrait: all four orientations must be
+  declared to support iPad multitasking. This had been a build warning for a
+  while; at upload it is a hard rejection.
+
+  All four are now declared — but declaring an orientation is not the same as
+  being ready for it, and these layouts have no landscape handling yet. So the
+  plist says what the app is *allowed* to do and `OrientationLock` says what it
+  *currently* does: portrait everywhere, except the video player, where
+  landscape is the point and a full-screen AVPlayer already handles rotation
+  itself.
+
+  As each screen learns landscape it opts in and the lock shrinks. Rotating
+  the whole app into unprepared layouts would have shown testers something
+  visibly broken, which is a worse answer to a validator complaint than a
+  temporary lock.
+
 ## 0.23.3 “Segue” — 2026-09-25
 
 ### Fixed

@@ -23,8 +23,8 @@ settings:
     # Plans/Versioning.md). The name for each minor lives in
     # Sources/DesignSystem/AppRelease.swift — one written only in the
     # CHANGELOG is not shipped, because Settings reads that map.
-    MARKETING_VERSION: "0.23.3"
-    CURRENT_PROJECT_VERSION: "46"
+    MARKETING_VERSION: "0.23.4"
+    CURRENT_PROJECT_VERSION: "47"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete
@@ -67,7 +67,24 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIUserInterfaceStyle: Dark
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # All four declared because Apple REQUIRES it: an iPad build that
+        # names only portrait is rejected at upload, not merely warned about
+        # (S-408). Declaring them is not the same as being ready for them —
+        # the layouts have no landscape handling yet — so AppDelegate narrows
+        # this at runtime per screen. The plist says what the app is allowed
+        # to do; the delegate says what it currently does.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # iPad gets the same four. Split into its own key so the two can
+        # diverge once iPad layouts exist.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         # Background audio (keeps playing when the screen locks) and AirPlay.
         UIBackgroundModes: [audio]
         # Self-hosted server over Tailscale — often plain http on a private

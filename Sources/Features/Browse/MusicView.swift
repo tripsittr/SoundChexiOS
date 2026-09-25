@@ -150,46 +150,52 @@ struct MusicView: View {
     }
 
     private var recentRows: [RecentRow] {
-        recents.entries.compactMap { entry in
+        // `store.albums`, `store.artists` and `items(of:)` are all computed —
+        // each one regroups the whole catalogue on access. Looking them up
+        // inside the loop would regroup thousands of tracks once per entry,
+        // every time this view re-rendered; hoisting to a dictionary does it
+        // once and turns each lookup into a hash.
+        let albums = Dictionary(store.albums.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let artists = Dictionary(store.artists.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let playlistsByID = Dictionary(playlists.playlists.map { (String($0.id), $0) },
+                                       uniquingKeysWith: { first, _ in first })
+        let songs = Dictionary(store.items(of: .music).map { (String($0.id), $0) },
+                               uniquingKeysWith: { first, _ in first })
+
+        return recents.entries.compactMap { entry in
             switch entry.kind {
-            case .artist:
-                store.artists.first { $0.id == entry.id }.map(RecentRow.artist)
-            case .album:
-                store.albums.first { $0.id == entry.id }.map(RecentRow.album)
-            case .playlist:
-                playlists.playlists.first { String($0.id) == entry.id }.map(RecentRow.playlist)
-            case .song:
-                store.items(of: .music).first { String($0.id) == entry.id }.map(RecentRow.song)
+            case .artist: artists[entry.id].map(RecentRow.artist)
+            case .album: albums[entry.id].map(RecentRow.album)
+            case .playlist: playlistsByID[entry.id].map(RecentRow.playlist)
+            case .song: songs[entry.id].map(RecentRow.song)
             }
         }
     }
 
     /// The old browse landing, kept for the no-history case.
     @ViewBuilder private var browseShelves: some View {
-        Group {
-                if !store.albums.isEmpty {
-                    shelfHeader("Albums")
-                    LazyVGrid(columns: grid, spacing: 20) {
-                        ForEach(store.albums.prefix(6)) { album in
-                            NavigationLink { AlbumDetailView(album: album) } label: { albumCell(album) }
-                                .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 16)
+        if !store.albums.isEmpty {
+            shelfHeader("Albums")
+            LazyVGrid(columns: grid, spacing: 20) {
+                ForEach(store.albums.prefix(6)) { album in
+                    NavigationLink { AlbumDetailView(album: album) } label: { albumCell(album) }
+                        .buttonStyle(.plain)
                 }
+            }
+            .padding(.horizontal, 16)
+        }
 
-                if !store.artists.isEmpty {
-                    shelfHeader("Artists")
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(store.artists.prefix(10)) { artist in
-                                NavigationLink { ArtistDetailView(artist: artist) } label: { artistCircle(artist) }
-                                    .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 16)
+        if !store.artists.isEmpty {
+            shelfHeader("Artists")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(store.artists.prefix(10)) { artist in
+                        NavigationLink { ArtistDetailView(artist: artist) } label: { artistCircle(artist) }
+                            .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, 16)
+            }
         }
     }
 

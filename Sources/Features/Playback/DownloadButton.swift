@@ -14,13 +14,21 @@ struct DownloadButton: View {
     var size: CGFloat = 22
 
     @State private var confirmingRemove = false
+    @State private var choosingRetention = false
 
     var body: some View {
         Button {
             switch downloads.state(for: item.id) {
             case .stored: confirmingRemove = true
             case .downloading: break
-            default: downloads.download(item)
+            // Video asks how long to keep it; music and books just download
+            // (S-404). Asking about a 5MB song would be a tax on every tap.
+            default:
+                if item.type.isVideo {
+                    choosingRetention = true
+                } else {
+                    downloads.download(item)
+                }
             }
         } label: {
             icon
@@ -31,6 +39,12 @@ struct DownloadButton: View {
         .confirmationDialog("Remove download?", isPresented: $confirmingRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { downloads.remove(item.id) }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $choosingRetention) {
+            RetentionPicker(title: item.title) { retention in
+                downloads.download(item, keeping: retention)
+            }
+            .presentationDetents([.medium])
         }
     }
 

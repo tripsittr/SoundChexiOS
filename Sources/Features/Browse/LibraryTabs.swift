@@ -45,6 +45,11 @@ struct LibraryTabs: View {
             playback.attach(api: session.api)
             downloads.attach(api: session.api)
 
+            // Timed downloads that ran out while the app was closed (S-404).
+            // Before the library loads, so Downloads never shows a file that
+            // is about to be swept a second later.
+            downloads.sweepExpiredDownloads()
+
             // The cached catalogue first, and without waiting on anything that
             // touches the network. `refreshIdentity()` is one request with a
             // 20-second timeout, and awaiting it here meant that offline — or
@@ -90,6 +95,12 @@ struct LibraryTabs: View {
             // background session finishes what it had already started on its
             // own; this is for what never got a slot (S-364).
             downloads.resumeInterrupted()
+
+            // Timed downloads whose window ran out while the app was away
+            // (S-404). Done on the way in rather than on a background timer:
+            // iOS would not honour one reliably, and a file deleted while
+            // nobody is looking is a file nobody was told about.
+            downloads.sweepExpiredDownloads()
         }
     }
 }

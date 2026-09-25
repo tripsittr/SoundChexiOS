@@ -3,6 +3,52 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.23.0 “Segue” — 2026-09-25
+
+### Added
+- **Video downloads ask how long to keep the file** (S-404). Downloading a
+  film or an episode offers 24 hours, 3 days, a week, or keep it. A film is
+  2–10GB against a song's 5MB, so an unattended video download is the one
+  that quietly fills a phone.
+
+  Music and books are unaffected and still download permanently — asking the
+  same question about a 5MB song would be a tax on every tap for no benefit.
+
+  **Watching resets the clock.** The window means "unused for this long", not
+  "this long since you tapped download", so a series you are part-way through
+  does not vanish between two episodes. A 24-hour download stays a 24-hour
+  download when extended; it does not quietly become a weekly one.
+
+  **When the time is up the file goes but the row stays**, marked expired,
+  with a tap to download it again on the same terms. A film that vanished
+  without trace would be indistinguishable from one you never downloaded.
+
+  Downloads shows the time left on each timed item — "3d", "4h", "22m".
+
+  The sweep runs on launch and when the app comes forward, not on a background
+  timer: iOS would not honour one reliably, and a file deleted while nobody is
+  looking is a file nobody was told about.
+
+- **Episodes can be downloaded, from a long press** (S-388). The show page had
+  no download control at all, so downloading a series meant playing each
+  episode and hoping. Long-press an episode for Download or Remove; stored
+  episodes show a green marker on the row.
+
+  There is deliberately **no season or series download-all**. An episode is
+  gigabytes, and a "download this season" button turns filling a phone into a
+  one-tap mistake — the control exists for anyone who wants it, without
+  inviting a 40GB tap. Films, which have no episode rows to hang a menu off,
+  get a download button beside Play.
+
+### Known gaps
+- The expiry sweep runs when the app opens, so a file can outlive its window
+  by however long the app stays closed. It is deleted the moment you come
+  back, which is also the first moment you could have been told.
+- Nothing warns you before an expiry. The row simply reads "expired" next time
+  you look.
+- Retention is per download, not a setting — there is no "always keep video
+  for 3 days" default yet.
+
 ## 0.22.0 “Coda” — 2026-09-25
 
 ### Added

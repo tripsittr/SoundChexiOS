@@ -155,9 +155,19 @@ final class DownloadStore: NSObject {
     /// from where it stopped rather than starting over. Otherwise it starts fresh.
     /// Queues one item. A single tap goes through the same window as a batch,
     /// so one download does not jump ahead of a running "download all".
-    func download(_ item: MediaItem) {
+    func download(_ item: MediaItem, keeping retention: DownloadRetention = .forever) {
+        if retention.deadline != nil {
+            pendingRetention[item.id] = retention
+        }
+
         enqueue([item])
     }
+
+    /// Deadlines for downloads that have been asked for but whose sidecar is
+    /// not written yet. Held here rather than passed through `enqueue` because
+    /// a batch and a single tap share that path, and only the single tap can
+    /// carry a choice the person actually made (S-404).
+    @ObservationIgnored private var pendingRetention: [Int: DownloadRetention] = [:]
 
     /// Actually starts a transfer. Only `pumpQueue()` calls this, so the
     /// concurrency window is respected.
@@ -330,6 +340,74 @@ final class DownloadStore: NSObject {
         refreshStorageSnapshot()
     }
 
+    // MARK: - Retention (S-404)
+
+    /// Deletes the files of any timed download whose window has run out.
+    ///
+    /// The entry is kept and marked expired rather than removed outright: a
+    /// film that vanishes without trace is indistinguishable from one you
+    /// never downloaded, and the person who chose "3 days" still wants to
+    /// know where it went and to get it back in one tap.
+    ///
+    /// Called on launch and when the app comes forward, which is when the
+    /// person can actually see the result. There is no background timer —
+    /// iOS would not honour one reliably, and a sweep that runs while nobody
+    /// is looking buys nothing.
+    func sweepExpiredDownloads() {
+        let now = Date()
+
+        for item in stored where item.expiredAt == nil {
+            guard let expiresAt = item.expiresAt, expiresAt <= now else { continue }
+
+            expire(item.id)
+        }
+
+        refreshStorageSnapshot()
+    }
+
+    /// Drops the file, keeps the row.
+    private func expire(_ itemID: Int) {
+        try? FileManager.default.removeItem(at: Self.mediaURL(for: itemID))
+        Self.clearResumeData(for: itemID)
+
+        states[itemID] = .idle
+        storedBytesByItemID[itemID] = nil
+
+        guard let index = stored.firstIndex(where: { $0.id == itemID }) else { return }
+
+        stored[index].expiredAt = Date()
+
+        // The sidecar is the record, so it has to carry the expiry too — the
+        // in-memory list is rebuilt from these on the next launch and would
+        // otherwise forget that this ever expired.
+        if let data = try? JSONEncoder().encode(stored[index]) {
+            try? data.write(to: Self.sidecarURL(for: itemID))
+        }
+    }
+
+    /// Pushes a timed download's deadline back, because it is being watched.
+    ///
+    /// The window means "unused for this long", not "this long since you
+    /// tapped download" — a series you are part-way through should not
+    /// disappear between two episodes (owner's call, S-404).
+    func extendRetention(for itemID: Int) {
+        guard let index = stored.firstIndex(where: { $0.id == itemID }),
+              stored[index].expiresAt != nil,
+              stored[index].expiredAt == nil
+        else { return }
+
+        // The item's OWN window, recorded when it was downloaded. Extending by
+        // a fixed default would quietly promote a 24-hour download to a weekly
+        // one the first time it was watched.
+        guard let window = stored[index].retentionSeconds else { return }
+
+        stored[index].expiresAt = Date().addingTimeInterval(window)
+
+        if let data = try? JSONEncoder().encode(stored[index]) {
+            try? data.write(to: Self.sidecarURL(for: itemID))
+        }
+    }
+
     // MARK: - Disk layout
 
     /// ~/Library/Application Support/downloads — excluded from iCloud backup
@@ -463,8 +541,15 @@ final class DownloadStore: NSObject {
         let downloaded = DownloadedItem(
             id: item.id, type: item.type, title: item.title,
             subtitle: item.subtitle, artwork: item.artwork,
-            durationMs: item.meta?.durationMs
+            durationMs: item.meta?.durationMs,
+            // A re-download of something that expired clears the old stamp:
+            // it is here again, so the row should stop saying it is gone.
+            expiresAt: pendingRetention[item.id]?.deadline,
+            retentionSeconds: pendingRetention[item.id]?.duration,
+            expiredAt: nil
         )
+
+        pendingRetention.removeValue(forKey: item.id)
         if let data = try? JSONEncoder().encode(downloaded) {
             try? data.write(to: Self.sidecarURL(for: item.id))
         }
@@ -535,6 +620,96 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
     let subtitle: String?
     let artwork: URL?
     let durationMs: Int?
+
+    /// When this download should be cleaned up, or nil to keep it (S-404).
+    ///
+    /// Optional, and decoded leniently, because every sidecar written before
+    /// this existed has no such field — those are permanent downloads and
+    /// must stay that way rather than being read as "expires immediately".
+    var expiresAt: Date?
+
+    /// The window that was chosen, in seconds, so extending on playback
+    /// repeats the *same* window. Without it a 24-hour download would become
+    /// a weekly one the first time it was watched.
+    var retentionSeconds: TimeInterval?
+
+    /// Set when the file has been removed but the entry is kept, so Downloads
+    /// can show what went and offer it back in one tap. The owner's call: a
+    /// file vanishing with no trace is worse than a row saying it expired.
+    var expiredAt: Date?
+
+    var isExpired: Bool { expiredAt != nil }
+
+    /// How long is left, for the label on the row.
+    var timeRemaining: TimeInterval? {
+        guard let expiresAt, expiredAt == nil else { return nil }
+
+        return max(0, expiresAt.timeIntervalSinceNow)
+    }
+
+    init(id: Int, type: MediaType, title: String, subtitle: String?,
+         artwork: URL?, durationMs: Int?, expiresAt: Date? = nil,
+         retentionSeconds: TimeInterval? = nil, expiredAt: Date? = nil) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.subtitle = subtitle
+        self.artwork = artwork
+        self.durationMs = durationMs
+        self.expiresAt = expiresAt
+        self.retentionSeconds = retentionSeconds
+        self.expiredAt = expiredAt
+    }
+}
+
+/// How long to keep a downloaded video (S-404).
+///
+/// Offered for video only. A film is 2–10GB against a song's 5MB, so an
+/// unattended video download is the one that quietly fills a phone; asking
+/// the same question about a 5MB song would be a tax on every tap for no
+/// benefit.
+enum DownloadRetention: String, CaseIterable, Identifiable, Sendable {
+    case day, threeDays, week, forever
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .day: "24 hours"
+        case .threeDays: "3 days"
+        case .week: "A week"
+        case .forever: "Keep it"
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .day: "Deleted tomorrow unless you watch it"
+        case .threeDays: "Deleted in 3 days unless you watch it"
+        case .week: "Deleted in a week unless you watch it"
+        case .forever: "Stays until you remove it"
+        }
+    }
+
+    /// The deadline from now, or nil for a permanent download.
+    var deadline: Date? {
+        switch self {
+        case .day: Date().addingTimeInterval(24 * 3600)
+        case .threeDays: Date().addingTimeInterval(3 * 24 * 3600)
+        case .week: Date().addingTimeInterval(7 * 24 * 3600)
+        case .forever: nil
+        }
+    }
+
+    /// The window as a duration, for extending on playback.
+    var duration: TimeInterval? {
+        switch self {
+        case .day: 24 * 3600
+        case .threeDays: 3 * 24 * 3600
+        case .week: 7 * 24 * 3600
+        case .forever: nil
+        }
+    }
 }
 
 // MARK: - Background download delegate

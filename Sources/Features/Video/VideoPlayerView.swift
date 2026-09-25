@@ -123,6 +123,11 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     /// token-authed stream with the bearer header.
     private func makeItem(api: APIClient) -> AVPlayerItem {
         if let local = DownloadStore.shared.localURL(for: item.id) {
+            // Watching resets the clock on a timed download (S-404): the
+            // window means "unused for this long", so a series you are
+            // part-way through does not vanish between two episodes.
+            DownloadStore.shared.extendRetention(for: item.id)
+
             return AVPlayerItem(asset: AVURLAsset(url: local))
         }
         var options: [String: Any] = [:]

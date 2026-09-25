@@ -9,6 +9,11 @@ struct ShowDetailView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(PlaybackController.self) private var playback
     @Environment(ThemeStore.self) private var theme
+    @Environment(DownloadStore.self) private var downloads
+
+    /// The episode whose retention is being chosen (S-404). Held here because
+    /// the context menu that starts the flow cannot present a sheet itself.
+    @State private var downloadTarget: MediaItem?
     let item: MediaItem
 
     /// The item to play in the video player, when one is tapped.
@@ -35,8 +40,37 @@ struct ShowDetailView: View {
                 } else if episodes.isEmpty {
                     // A film, or a show with no episodes catalogued.
                     if item.playable {
-                        playButton(for: item, label: "Play")
-                            .padding(.horizontal, 16)
+                        HStack(spacing: 12) {
+                            playButton(for: item, label: "Play")
+
+                            // A film has no episode rows to hang a kebab off,
+                            // so its download sits here. It still asks how
+                            // long to keep it (S-404) — a film is the single
+                            // largest thing this app will ever store.
+                            if downloads.isStored(item.id) {
+                                Button {
+                                    downloads.remove(item.id)
+                                } label: {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .frame(width: 44, height: 44)
+                                        .foregroundStyle(SoundChexTheme.storedGreen)
+                                        .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
+                                }
+                            } else {
+                                Button {
+                                    downloadTarget = item
+                                } label: {
+                                    Image(systemName: "arrow.down")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .frame(width: 44, height: 44)
+                                        .foregroundStyle(SoundChexTheme.ink200)
+                                        .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 16)
                     }
                 } else {
                     episodeList
@@ -52,6 +86,13 @@ struct ShowDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
             VideoPlayerView(item: toPlay).soundchexTheme(theme)
+        }
+        .sheet(item: $downloadTarget) { episode in
+            RetentionPicker(title: episode.meta?.episodeTitle ?? episode.title) { retention in
+                downloads.download(episode, keeping: retention)
+            }
+            .presentationDetents([.medium])
+            .soundchexTheme(theme)
         }
         .fullScreenCover(item: $reading) { toRead in
             NavigationStack { ReaderView(item: toRead) }.soundchexTheme(theme)
@@ -115,12 +156,30 @@ struct ShowDetailView: View {
                                     .foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
                             }
                             Spacer()
+
+                            // Stored episodes say so on the row; downloading
+                            // is in the kebab rather than a button of its own
+                            // (S-388). The owner's call, and the right one:
+                            // an episode is gigabytes, and a download control
+                            // on every row of a 60-episode series is an
+                            // invitation to fill a phone by accident. There
+                            // is deliberately no season or series
+                            // download-all for the same reason.
+                            if downloads.isStored(episode.id) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.footnote)
+                                    .foregroundStyle(SoundChexTheme.storedGreen)
+                            }
+
                             Image(systemName: "play.circle").foregroundStyle(SoundChexTheme.ink400)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 11)
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        EpisodeActions(episode: episode) { downloadTarget = $0 }
+                    }
                     Divider().overlay(SoundChexTheme.base700).padding(.leading, 56)
                 }
             }
@@ -142,6 +201,41 @@ struct ShowDetailView: View {
         let groups = Dictionary(grouping: episodes) { $0.meta?.seasonNumber ?? 0 }
         return groups.keys.sorted().map { season in
             (season, groups[season]!.sorted { ($0.meta?.episodeNumber ?? 0) < ($1.meta?.episodeNumber ?? 0) })
+        }
+    }
+}
+
+/// The per-episode actions, in a long-press menu rather than a row of buttons
+/// (S-388).
+///
+/// An episode is gigabytes. Putting a download control on every row of a
+/// 60-episode series — or a "download this season" button above it — makes
+/// filling a phone a one-tap mistake, so downloading an episode is a
+/// deliberate act you have to go looking for. Video also asks how long to
+/// keep it (S-404), which is what makes that choice low-stakes.
+private struct EpisodeActions: View {
+    @Environment(DownloadStore.self) private var downloads
+
+    let episode: MediaItem
+
+    /// Asks the parent to present the picker. A context menu is dismissed
+    /// before a sheet attached to it would appear, so the sheet has to belong
+    /// to the view the menu hangs off.
+    let onDownload: (MediaItem) -> Void
+
+    var body: some View {
+        if downloads.isStored(episode.id) {
+            Button(role: .destructive) {
+                downloads.remove(episode.id)
+            } label: {
+                Label("Remove download", systemImage: "trash")
+            }
+        } else {
+            Button {
+                onDownload(episode)
+            } label: {
+                Label("Download episode", systemImage: "arrow.down.circle")
+            }
         }
     }
 }

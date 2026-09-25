@@ -176,6 +176,11 @@ final class LibraryStore {
         // here rather than at the sign-out call sites so a future one cannot
         // forget: whoever drops the library drops the history with it.
         RecentContextsStore.clearStorage()
+
+        // Pending expiry warnings belong to the account that made them
+        // (S-405). The next person's phone should not announce the last
+        // person's downloads.
+        Task { @MainActor in ExpiryNotifications.cancelAll() }
     }
 
     // MARK: - Filtered views

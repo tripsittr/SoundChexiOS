@@ -16,6 +16,12 @@ struct LibraryTabs: View {
     @Environment(Connectivity.self) private var connectivity
     @Environment(ThemeStore.self) private var theme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(NotificationRouter.self) private var notifications
+
+    /// Opened when an expiry warning is tapped (S-405). Presented here rather
+    /// than from AppHeader, which renders once per tab — five of them would
+    /// race to open the same sheet.
+    @State private var showingDownloads = false
     @State private var store = LibraryStore()
 
     var body: some View {
@@ -40,6 +46,18 @@ struct LibraryTabs: View {
         }
         .environment(store)
         .tint(theme.accent)
+        .onChange(of: notifications.destination) { _, destination in
+            guard destination == .downloads else { return }
+
+            showingDownloads = true
+            notifications.clear()
+        }
+        .sheet(isPresented: $showingDownloads) {
+            NavigationStack {
+                DownloadsView()
+            }
+            .soundchexTheme(theme)
+        }
         .task {
             store.attach(api: session.api)
             playback.attach(api: session.api)

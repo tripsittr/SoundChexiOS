@@ -26,6 +26,15 @@ struct RetentionPicker: View {
                 Section {
                     ForEach(DownloadRetention.allCases) { option in
                         Button {
+                            // Permission asked here, the first time someone
+                            // actually chooses a timed download — not at
+                            // launch (S-405). A prompt before the app has
+                            // shown what it is for is the one people deny,
+                            // and a denial cannot be re-prompted.
+                            if option != .forever {
+                                Task { _ = await ExpiryNotifications.requestPermission() }
+                            }
+
                             onPick(option)
                             dismiss()
                         } label: {

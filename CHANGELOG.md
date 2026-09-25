@@ -3,6 +3,42 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.23.1 “Segue” — 2026-09-25
+
+### Added
+- **A warning before a download expires** (S-405). A timed video download now
+  says so before it goes: a day's notice on a week or three days, four hours
+  on a 24-hour download. Tapping opens Downloads, where everything expiring is
+  in one list.
+
+  **Local notifications, not a background task.** iOS delivers a scheduled
+  local notification at the time you asked for whether or not the app is
+  running, and needs no entitlement to do it. What iOS does *not* promise is
+  background execution, so the file is still deleted by the sweep when the app
+  next opens — and the notification says the download *will be* removed rather
+  than that it was, because on that device it is still there.
+
+  The warning is cancelled when the download is watched, removed or has
+  already gone, and rescheduled when watching pushes the deadline back. An
+  alert about something that is no longer going anywhere is how people learn
+  to ignore alerts.
+
+  Permission is asked the first time someone picks a timed download, not at
+  launch. A prompt before the app has shown what it is for is the one people
+  deny, and a denial cannot be asked again.
+
+  Warnings are cleared on sign-out, along with the rest of the account's
+  history.
+
+### Known gaps
+- A short window can still pass without a warning: nothing is scheduled when
+  under a minute would remain, since a warning arriving as you look at the
+  screen you started from is noise.
+- Notifications are iOS-only so far. Android and desktop come with those
+  platforms.
+- There is no in-app list of what is about to expire, beyond the countdown on
+  each row in Downloads.
+
 ## 0.23.0 “Segue” — 2026-09-25
 
 ### Added

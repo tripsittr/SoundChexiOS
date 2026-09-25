@@ -257,6 +257,36 @@ final class PlaybackController {
         }
     }
 
+    /// Queues several tracks to play next, keeping their order (S-385).
+    ///
+    /// Inserted as a block rather than one at a time: calling `playNext` in a
+    /// loop puts each new track ahead of the last, so an album would queue
+    /// backwards.
+    func playNext(_ items: [MediaItem]) {
+        guard !items.isEmpty else { return }
+
+        if current == nil {
+            play(items)
+
+            return
+        }
+
+        queue.insert(contentsOf: items, at: min(index + 1, queue.count))
+    }
+
+    /// Appends several tracks to the end of the queue, keeping their order.
+    func addToQueue(_ items: [MediaItem]) {
+        guard !items.isEmpty else { return }
+
+        if current == nil {
+            play(items)
+
+            return
+        }
+
+        queue.append(contentsOf: items)
+    }
+
     /// What is coming up after the current track, for the queue view.
     var upNext: [MediaItem] {
         guard index + 1 <= queue.count else { return [] }

@@ -27,6 +27,7 @@ enum AppRelease {
         "0.16": "Tether",
         "0.17": "Bridge",
         "0.18": "Refrain",
+        "0.19": "Cadence",
         "1.0": "Encore",
     ]
 

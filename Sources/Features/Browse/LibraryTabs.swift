@@ -82,7 +82,9 @@ struct LibraryTabs: View {
                 return
             }
 
-            Task { await store.load() }
+            // Only when it has actually gone stale: returning to the app
+            // repeatedly in a minute should not re-sync each time (S-386).
+            Task { await store.refreshIfStale() }
 
             // Anything still owed from before the app was backgrounded. The
             // background session finishes what it had already started on its

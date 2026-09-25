@@ -3,6 +3,20 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.18.02 “Refrain” — 2026-09-25
+
+### Fixed
+- **Loose tracks gather as "Singles" instead of 83 "Unknown album" tiles**
+  (S-386). A track with no album fell back to grouping on its *title*, so each
+  one became its own album — 83 of them on a real library, every one labelled
+  "Unknown album". They are now gathered per artist, which turns 83 tiles into
+  33 and says what they actually are.
+- **The library refreshes during a long session.** It synced once per launch,
+  so a correction made on the server sat unseen until the app was killed and
+  reopened. A library screen appearing, or the app returning from the
+  background, now re-syncs when the catalogue has gone stale — and does
+  nothing when it has not, so moving between tabs still costs nothing.
+
 ## 0.18.01 “Refrain” — 2026-09-24
 
 ### Added

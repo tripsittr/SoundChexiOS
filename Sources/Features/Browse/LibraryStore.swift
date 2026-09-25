@@ -20,6 +20,21 @@ final class LibraryStore {
     private var api: APIClient?
     private var hasLoaded = false
 
+    /// When the catalogue was last synced with the server, this run.
+    ///
+    /// `loadIfNeeded()` guards on `hasLoaded`, so it syncs once per launch —
+    /// which is right for a screen the user opens and leaves, and wrong for an
+    /// app left open all evening. A correction made on the server (a fixed
+    /// album, a merged duplicate) then sat unseen until the app was killed and
+    /// reopened (S-386).
+    private var lastSyncedAt: Date?
+
+    /// How stale the catalogue may get before a screen appearing refreshes it.
+    ///
+    /// A delta with nothing to report is a few hundred bytes, so this is cheap
+    /// — but not free, and the library does not change minute to minute.
+    private static let refreshInterval: TimeInterval = 5 * 60
+
     /// The server's `synced_at` from the last successful fetch, sent back as the
     /// delta baseline. Persisted so a relaunch can sync incrementally rather than
     /// re-downloading the whole catalogue. UserDefaults, not the cache file, so a
@@ -45,9 +60,32 @@ final class LibraryStore {
     /// On first appearance, show the disk cache at once (so the app is usable
     /// offline and a launch is instant), then refresh from the network.
     func loadIfNeeded() async {
-        guard !hasLoaded, !isLoading else { return }
+        guard !isLoading else { return }
+
+        // Already loaded this run: sync again only if it has gone stale, so
+        // moving between tabs costs nothing but an evening's use still picks
+        // up what changed on the server (S-386).
+        if hasLoaded {
+            await refreshIfStale()
+
+            return
+        }
 
         loadFromDisk()
+        await load()
+    }
+
+    /// Syncs if the catalogue has not been refreshed recently.
+    ///
+    /// Called when a library screen appears and when the app returns from the
+    /// background — the two moments a stale list is about to be looked at.
+    func refreshIfStale() async {
+        guard hasLoaded, !isLoading else { return }
+
+        if let last = lastSyncedAt, Date().timeIntervalSince(last) < Self.refreshInterval {
+            return
+        }
+
         await load()
     }
 
@@ -68,6 +106,7 @@ final class LibraryStore {
                 try await fullFetch(api: api)
             }
             hasLoaded = true
+            lastSyncedAt = Date()
         } catch {
             // Offline with a cache is not an error — the cached library stands.
             if items.isEmpty {
@@ -163,6 +202,10 @@ final class LibraryStore {
 
     // MARK: - Music grouping (albums, artists)
 
+    /// The album key standing in for "no album", so an artist's loose tracks
+    /// gather into one entry rather than one tile each (S-386).
+    private static let singlesKey = "\u{0000}singles"
+
     /// One album: its tracks, in disc/track order.
     struct Album: Identifiable, Hashable {
         let id: String            // artist|albumKey, so variants merge but two different albums of a name don't
@@ -182,7 +225,17 @@ final class LibraryStore {
     var albums: [Album] {
         let music = items(of: .music)
         let groups = Dictionary(grouping: music) { item in
-            "\(item.meta?.groupingArtist ?? "")|\(item.meta?.groupingAlbum ?? item.title)"
+            let artist = item.meta?.groupingArtist ?? ""
+
+            // A track with no album is a single, not an album of one. Falling
+            // back to the *title* gave each one its own tile labelled
+            // "Unknown album" — 83 of them on a real library — so they are
+            // gathered per artist instead (S-386).
+            guard let album = item.meta?.groupingAlbum, !album.isEmpty else {
+                return "\(artist)|\(Self.singlesKey)"
+            }
+
+            return "\(artist)|\(album)"
         }
         return groups.compactMap { key, tracks -> Album? in
             guard let first = tracks.first else { return nil }
@@ -195,7 +248,11 @@ final class LibraryStore {
             let title = tracks
                 .compactMap { $0.meta?.album }
                 .filter { !$0.isEmpty }
-                .min { $0.count < $1.count } ?? "Unknown album"
+                .min { $0.count < $1.count }
+                // No album anywhere in the group: these are the artist's
+                // loose tracks, and "Singles" says that where "Unknown album"
+                // only said something had gone wrong.
+                ?? "Singles"
 
             return Album(
                 id: key,

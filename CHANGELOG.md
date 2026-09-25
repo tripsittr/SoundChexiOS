@@ -3,6 +3,29 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## Unreleased
+
+### Changed
+- **README rewritten against the code.** It described a three-feature app:
+  `Sources/Features` was listed as `Auth`, `Browse`, `Playback` when there are
+  ten directories, and the API section named six endpoints while the app calls
+  twenty. Downloads, playlists, lyrics, AirPlay, the reader, video, the admin
+  area and "Your Library" were all shipped and unmentioned.
+
+  It also pointed contributors at `Plans/Issues.md` for "the issue list", and
+  that file's entire content is a note saying the issues moved to the admin
+  tracker.
+
+  Added: what the app actually does, the iOS 17 deployment target (stated
+  nowhere before), the command-line device build, the `xcodegen generate`
+  trap, and the fact that there is no test target — so nobody goes hunting for
+  a suite that does not exist.
+
+- **A stale comment in `project.yml`** described 0.4.0 "Interlude" directly
+  above `MARKETING_VERSION: "0.21.0"` — seventeen minors out of date. It now
+  says where release names actually live, which is `AppRelease.swift`: a name
+  written only in the CHANGELOG is not shipped.
+
 ## 0.21.0 “Reprise” — 2026-09-25
 
 ### Added

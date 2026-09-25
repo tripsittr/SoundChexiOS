@@ -3,6 +3,27 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.19.0 “Cadence” — 2026-09-25
+
+### Added
+- **A kebab on the album and artist pages** (S-385): play next, add to queue,
+  and add all to playlist — acting on the whole record, or everything by the
+  artist, instead of a track at a time from the row kebabs.
+
+  The playlist sheet takes a set now rather than one track, and says how many
+  are going in ("Add 11 to playlist") so it cannot be mistaken for adding just
+  the one you tapped. Adding a set reports what happened — "Added 11 to Road
+  Trip — 3 already there" — rather than asking about each duplicate: the
+  "move it to the end?" question is worth asking for one track and not for
+  forty.
+
+  Queueing a set inserts it as a block, keeping album order. Inserting one at
+  a time would have queued the album backwards.
+
+  Deliberately no "Download all" in the menu: the album page already has a
+  download button that reports not-enough-space and nothing-to-do, and a menu
+  entry discarding that result would be the same action with worse feedback.
+
 ## 0.18.02 “Refrain” — 2026-09-25
 
 ### Fixed

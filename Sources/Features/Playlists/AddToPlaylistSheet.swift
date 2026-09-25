@@ -11,7 +11,20 @@ struct AddToPlaylistSheet: View {
     // waiting for a relaunch (S-372).
     @Environment(PlaylistStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    let item: MediaItem
+    /// The tracks to add.
+    ///
+    /// A set rather than one, so a whole album or an artist's whole catalogue
+    /// goes in with one action instead of a track at a time (S-385).
+    let items: [MediaItem]
+
+    /// One track — the row kebab's case, which is most of them.
+    init(item: MediaItem) {
+        self.items = [item]
+    }
+
+    init(items: [MediaItem]) {
+        self.items = items
+    }
 
     @State private var playlists: [Playlist] = []
     @State private var loading = true
@@ -57,7 +70,9 @@ struct AddToPlaylistSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(SoundChexTheme.base900)
-            .navigationTitle("Add to playlist")
+            // Says how many are going in, so "Add to playlist" from an album
+            // does not look like it will add only the track you tapped.
+            .navigationTitle(items.count == 1 ? "Add to playlist" : "Add \(items.count) to playlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
@@ -101,21 +116,63 @@ struct AddToPlaylistSheet: View {
 
     private func add(to playlist: Playlist, moveToEnd: Bool = false) {
         Task {
-            do {
-                try await session.api?.addToPlaylist(playlist.id, itemID: item.id, moveToEnd: moveToEnd)
-                // The card shows a track count and a mosaic of its first few
-                // covers; both just changed.
-                await store.reload()
-                playlists = store.playlists
-                flash(moveToEnd ? "Moved to the end of \(playlist.name)" : "Added to \(playlist.name)")
-                dismiss()
-            } catch APIClient.APIError.alreadyInPlaylist {
-                // A playlist cannot list the same song twice, so the only
-                // thing adding again can do is move it to the end — worth
-                // asking about rather than doing silently (S-373).
+            var added = 0
+            var alreadyThere = 0
+            var failed = 0
+
+            for track in items {
+                do {
+                    try await session.api?.addToPlaylist(playlist.id, itemID: track.id, moveToEnd: moveToEnd)
+                    added += 1
+                } catch APIClient.APIError.alreadyInPlaylist {
+                    alreadyThere += 1
+                } catch {
+                    failed += 1
+                }
+            }
+
+            // One track already there is a question worth asking — a playlist
+            // cannot list the same song twice, so the only thing adding again
+            // can do is move it to the end (S-373). For a whole album it is
+            // not: nobody wants "move to the end?" forty times, and the tracks
+            // are already where they should be.
+            if items.count == 1, alreadyThere == 1, !moveToEnd {
                 alreadyIn = playlist
-            } catch { flash("Couldn't add") }
+
+                return
+            }
+
+            // The card shows a track count and a mosaic of its first few
+            // covers; both just changed.
+            await store.reload()
+            playlists = store.playlists
+
+            flash(summary(added: added, alreadyThere: alreadyThere, failed: failed, playlist: playlist, moved: moveToEnd))
+
+            if failed < items.count {
+                dismiss()
+            }
         }
+    }
+
+    /// What to say after adding, in the terms the action was taken in.
+    private func summary(added: Int, alreadyThere: Int, failed: Int, playlist: Playlist, moved: Bool) -> String {
+        if added == 0 && alreadyThere > 0 {
+            return alreadyThere == 1 ? "Already in \(playlist.name)" : "All \(alreadyThere) already there"
+        }
+
+        if added == 0 {
+            return "Couldn't add"
+        }
+
+        if moved {
+            return "Moved to the end of \(playlist.name)"
+        }
+
+        let what = added == 1 ? "Added" : "Added \(added)"
+        let rest = alreadyThere > 0 ? " — \(alreadyThere) already there" : ""
+
+        return "\(what) to \(playlist.name)\(rest)"
     }
 
     private func create() {
@@ -125,7 +182,9 @@ struct AddToPlaylistSheet: View {
         Task {
             do {
                 if let created = try await session.api?.createPlaylist(name: name) {
-                    try await session.api?.addToPlaylist(created.id, itemID: item.id)
+                    for track in items {
+                        try await session.api?.addToPlaylist(created.id, itemID: track.id)
+                    }
                     // The grid caches its list and only loads it once, so a
                     // playlist made here stayed invisible until the app was
                     // relaunched — it looked as though nothing had been

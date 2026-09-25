@@ -13,7 +13,10 @@ import SwiftUI
 /// rather than inventing one (no server change; spec's out-of-scope rule).
 struct ArtistDetailView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(ThemeStore.self) private var theme
     let artist: LibraryStore.Artist
+
+    @State private var addingToPlaylist = false
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -39,6 +42,18 @@ struct ArtistDetailView: View {
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        // Everything by the artist, in album then track order — the same set
+        // the Play button uses (S-385).
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                CollectionActions(tracks: allTracks) { addingToPlaylist = true }
+            }
+        }
+        .sheet(isPresented: $addingToPlaylist) {
+            AddToPlaylistSheet(items: allTracks)
+                .presentationDetents([.medium, .large])
+                .soundchexTheme(theme)
+        }
     }
 
     // MARK: - Banner

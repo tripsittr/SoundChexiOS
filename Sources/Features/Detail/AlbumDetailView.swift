@@ -8,9 +8,11 @@ import SwiftUI
 struct AlbumDetailView: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
+    @Environment(ThemeStore.self) private var theme
     let album: LibraryStore.Album
 
     @State private var batchMessage: String?
+    @State private var addingToPlaylist = false
 
     var body: some View {
         ScrollView {
@@ -26,6 +28,18 @@ struct AlbumDetailView: View {
         // row would sit under the now-playing bar (S-343).
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
+        // Act on the whole record, rather than a track at a time from the row
+        // kebabs (S-385).
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                CollectionActions(tracks: album.tracks) { addingToPlaylist = true }
+            }
+        }
+        .sheet(isPresented: $addingToPlaylist) {
+            AddToPlaylistSheet(items: album.tracks)
+                .presentationDetents([.medium, .large])
+                .soundchexTheme(theme)
+        }
     }
 
     private var header: some View {

@@ -240,6 +240,15 @@ struct NowPlayingPage: View {
                     .foregroundStyle(SoundChexTheme.ink300)
             }
             Spacer()
+            // AirPlay. The audio already routes — the session is long-form
+            // playback — so this is the picker that was missing (S-165).
+            RoutePickerButton(
+                tint: UIColor(SoundChexTheme.ink300),
+                activeTint: UIColor(SoundChexTheme.accent),
+            )
+            .frame(width: 28, height: 28)
+            .accessibilityLabel("AirPlay")
+            Spacer()
             Button { showingQueue = true } label: {
                 Label("Queue", systemImage: "list.bullet")
                     .font(.system(size: 14, weight: .semibold))

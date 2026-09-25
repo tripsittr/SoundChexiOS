@@ -3,6 +3,27 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.18.0 “Refrain” — 2026-09-24
+
+### Added
+- **AirPlay** (S-165). An AirPlay button sits between Lyrics and Queue on the
+  now-playing page: send the music to a HomePod, an Apple TV, an AirPlay
+  speaker, or a pair of AirPods, without leaving the app.
+
+  The audio already *went* to AirPlay — the session is `.playback` with the
+  `.longFormAudio` policy, so iOS has always routed it like any music app and
+  Control Centre could move it. What was missing was a way to choose the
+  destination from inside the app.
+
+  Video was already covered: `AVPlayerViewController` brings its own route
+  button.
+
+### Not yet
+- **Chromecast** is not in this release. It needs Google's Cast SDK, a
+  closed-source binary framework under Google's own licence — a deliberate
+  decision against the project's AGPL position, so it waits for one.
+- **CarPlay** needs an entitlement from Apple that has not been requested yet.
+
 ## 0.17.03 “Bridge” — 2026-09-24
 
 ### Changed

@@ -3,7 +3,24 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
-## Unreleased
+## 0.22.0 “Coda” — 2026-09-25
+
+### Added
+- **Send for review** (S-400). A "Send for review" entry in the track kebab,
+  on every list that shows one — songs, album tracks, an artist's tracks, the
+  now-playing page and search.
+
+  It asks twice, on purpose. Reporting an item hides it from the library until
+  someone has looked at it, which is a large consequence for one tap in a menu
+  whose neighbours are "Play next" and "Add to queue". So tapping it raises a
+  confirmation that says exactly what will happen — hidden until reviewed,
+  nothing deleted, it comes back — and only a deliberate "Send for review"
+  opens the sheet that asks why.
+
+  Five reasons: wrong metadata, file problem, wrong cover, duplicate, something
+  else. Each carries a line saying what it covers, and there is an optional
+  note. The report lands on the review screen in the server's admin panel,
+  with the reason and the note attached.
 
 ### Changed
 - **README rewritten against the code.** It described a three-feature app:
@@ -25,6 +42,15 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   above `MARKETING_VERSION: "0.21.0"` — seventeen minors out of date. It now
   says where release names actually live, which is `AppRelease.swift`: a name
   written only in the CHANGELOG is not shipped.
+
+### Known gaps
+- Nothing tells you what came of a report. Once sent, the item simply stops
+  appearing until an admin clears it.
+- The row does not disappear until the next library sync, so a reported track
+  can still be tapped for a few seconds — it will refuse to play, because the
+  server has already hidden it.
+- Album and artist pages report per track; there is no "report this whole
+  album" yet.
 
 ## 0.21.0 “Reprise” — 2026-09-25
 

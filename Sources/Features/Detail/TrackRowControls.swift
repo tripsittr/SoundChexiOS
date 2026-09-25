@@ -18,13 +18,19 @@ struct TrackRowControls: View {
     let item: MediaItem
 
     @State private var addingToPlaylist = false
+    @State private var confirmingReview = false
+    @State private var reporting = false
 
     var body: some View {
         HStack(spacing: 4) {
             DownloadButton(item: item, size: 18)
 
             Menu {
-                TrackActions(item: item, onAddToPlaylist: { addingToPlaylist = true })
+                TrackActions(
+                    item: item,
+                    onAddToPlaylist: { addingToPlaylist = true },
+                    onSendForReview: { confirmingReview = true },
+                )
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15))
@@ -39,6 +45,25 @@ struct TrackRowControls: View {
         .sheet(isPresented: $addingToPlaylist) {
             AddToPlaylistSheet(item: item)
                 .presentationDetents([.medium, .large])
+                .soundchexTheme(theme)
+        }
+        // The consequence stated before the reason is asked for, so hiding a
+        // track is never the result of one stray tap in a menu (S-400).
+        .confirmationDialog(
+            "Send “\(item.title)” for review?",
+            isPresented: $confirmingReview,
+            titleVisibility: .visible,
+        ) {
+            Button("Send for review") { reporting = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It will be hidden from your library until someone has "
+                + "looked at it. Nothing is deleted — it comes back once the "
+                + "review is cleared.")
+        }
+        .sheet(isPresented: $reporting) {
+            SendForReviewSheet(item: item)
+                .presentationDetents([.large])
                 .soundchexTheme(theme)
         }
     }

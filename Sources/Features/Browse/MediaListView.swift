@@ -54,6 +54,8 @@ struct SongRow: View {
 
     @State private var addingToPlaylist = false
     @State private var editing = false
+    @State private var confirmingReview = false
+    @State private var reporting = false
 
     /// Whether this row is the track playing now — drives the equalizer overlay
     /// and the accent title.
@@ -103,7 +105,8 @@ struct SongRow: View {
                 TrackActions(item: item,
                              onAddToPlaylist: { addingToPlaylist = true },
                              onRemoveFromPlaylist: onRemoveFromPlaylist,
-                             onEdit: { editing = true })
+                             onEdit: { editing = true },
+                             onSendForReview: { confirmingReview = true })
             } label: {
                 Image(systemName: "ellipsis")
                     .foregroundStyle(SoundChexTheme.ink500)
@@ -143,6 +146,25 @@ struct SongRow: View {
             AdminItemEditView(itemID: item.id)
                 .soundchexTheme(theme)
         }
+        // Says what reporting does before asking why, so a track is never
+        // hidden by one stray tap in the menu (S-400).
+        .confirmationDialog(
+            "Send “\(item.title)” for review?",
+            isPresented: $confirmingReview,
+            titleVisibility: .visible,
+        ) {
+            Button("Send for review") { reporting = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It will be hidden from your library until someone has "
+                + "looked at it. Nothing is deleted — it comes back once the "
+                + "review is cleared.")
+        }
+        .sheet(isPresented: $reporting) {
+            SendForReviewSheet(item: item)
+                .presentationDetents([.large])
+                .soundchexTheme(theme)
+        }
     }
 }
 
@@ -161,6 +183,9 @@ struct TrackActions: View {
     /// and nowhere else (S-376).
     var onRemoveFromPlaylist: (() -> Void)?
     var onEdit: (() -> Void)?
+    /// Set where the row can be reported. The closure raises the confirmation;
+    /// this menu only asks for it (S-400).
+    var onSendForReview: (() -> Void)?
 
     var body: some View {
         Button {
@@ -201,6 +226,17 @@ struct TrackActions: View {
                 downloads.download(item)
             } label: {
                 Label("Download", systemImage: "arrow.down.circle")
+            }
+        }
+
+        // Reporting hides the item from the library until someone clears it
+        // (S-396), so this never fires straight from the menu: the caller
+        // raises a confirmation first that says exactly that (S-400).
+        if let onSendForReview {
+            Button {
+                onSendForReview()
+            } label: {
+                Label("Send for review", systemImage: "exclamationmark.triangle")
             }
         }
 

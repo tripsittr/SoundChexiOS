@@ -75,7 +75,7 @@ then move its row up into the table above and cross it off here.
 
 ### Recommended sequence (next up)
 
-After 0.4.0 "Interlude": Bridge → Refrain → Cadence → Coda → Segue → Vamp → Motif → Resonance → Reverie → Cascade → _(then dip into
+After 0.4.0 "Interlude": Bridge → Refrain → Cadence → Segue → Vamp → Motif → Resonance → Reverie → Cascade → _(then dip into
 the pool below)_ → **Encore (1.0.0)**.
 
 ### The pool, by category

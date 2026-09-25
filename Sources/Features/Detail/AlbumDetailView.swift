@@ -9,9 +9,10 @@ struct AlbumDetailView: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
+    @Environment(RecentContextsStore.self) private var recents
     let album: LibraryStore.Album
 
-    @State private var batchMessage: String?
+    @State private var batch = BatchDownloadStatus(noun: "album")
     @State private var addingToPlaylist = false
 
     var body: some View {
@@ -28,6 +29,7 @@ struct AlbumDetailView: View {
         // row would sit under the now-playing bar (S-343).
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
+        .batchDownloadTracking($batch, downloads: downloads)
         // Act on the whole record, rather than a track at a time from the row
         // kebabs (S-385).
         .toolbar {
@@ -75,21 +77,17 @@ struct AlbumDetailView: View {
             HStack(spacing: 20) {
                 circleButton(system: "shuffle") {
                     if !playback.isShuffled { playback.toggleShuffle() }
-                    playback.play(album.tracks)
+                    recents.record(.album, id: album.id)
+                    recents.record(.album, id: album.id)
+            playback.play(album.tracks)
                 }
-                circleButton(system: "arrow.down") {
-                    switch downloads.downloadAll(album.tracks) {
-                    case .started(let n): flash("Downloading \(n) songs…")
-                    case .insufficientSpace: flash("Not enough free space.")
-                    case .nothingToDo: flash("Already downloaded.")
-                    }
-                }
+                circleButton(system: "arrow.down") { downloadAll() }
                 Spacer()
             }
             .padding(.horizontal, 16)
 
-            if let batchMessage {
-                Text(batchMessage).font(.caption).foregroundStyle(SoundChexTheme.ink500)
+            if let message = batch.message(downloads) {
+                Text(message).font(.caption).foregroundStyle(SoundChexTheme.ink500)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
             }
         }
@@ -138,9 +136,10 @@ struct AlbumDetailView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func flash(_ text: String) {
-        batchMessage = text
-        Task { try? await Task.sleep(for: .seconds(3)); batchMessage = nil }
+    /// Queues the album and keeps the progress line up until it settles (S-394).
+    private func downloadAll() {
+        let pending = Set(album.tracks.filter { $0.playable && !downloads.isStored($0.id) }.map(\.id))
+        batch.start(downloads.downloadAll(album.tracks), pendingIDs: pending)
     }
 
     private var trackList: some View {
@@ -152,6 +151,7 @@ struct AlbumDetailView: View {
                 // kebab would start the album (S-390).
                 HStack(spacing: 0) {
                 Button {
+                    recents.record(.album, id: album.id)
                     playback.play(album.tracks, startAt: pair.offset)
                 } label: {
                     HStack(spacing: 12) {

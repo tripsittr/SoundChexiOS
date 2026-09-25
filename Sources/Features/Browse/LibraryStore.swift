@@ -172,6 +172,10 @@ final class LibraryStore {
     static func clearCache() {
         try? FileManager.default.removeItem(at: cacheURL)
         UserDefaults.standard.removeObject(forKey: syncedAtKey)
+        // Recent contexts are this account's listening too (S-392). Cleared
+        // here rather than at the sign-out call sites so a future one cannot
+        // forget: whoever drops the library drops the history with it.
+        RecentContextsStore.clearStorage()
     }
 
     // MARK: - Filtered views

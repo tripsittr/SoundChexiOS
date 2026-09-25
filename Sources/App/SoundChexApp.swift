@@ -17,6 +17,9 @@ struct SoundChexApp: App {
     // Shared, not view-local: a playlist can be created from the Add to
     // Playlist sheet on any screen, and the grid has to hear about it (S-372).
     @State private var playlists = PlaylistStore()
+    // What you last played, and what you played it *from* — the Your Library
+    // landing reads this (S-392).
+    @State private var recents = RecentContextsStore()
 
     init() {
         configureBarAppearance()
@@ -36,6 +39,7 @@ struct SoundChexApp: App {
                 .environment(downloads)
                 .environment(theme)
                 .environment(playlists)
+                .environment(recents)
                 .environment(Connectivity.shared)
                 // The user's chosen appearance and accent, applied app-wide and
                 // live: changing either in Settings updates every screen at once

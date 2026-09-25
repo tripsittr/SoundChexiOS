@@ -15,10 +15,11 @@ struct ArtistDetailView: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
+    @Environment(RecentContextsStore.self) private var recents
     let artist: LibraryStore.Artist
 
     @State private var addingToPlaylist = false
-    @State private var batchMessage: String?
+    @State private var batch = BatchDownloadStatus(noun: "artist")
 
     /// Which list the page is showing, and how each is ordered (S-391).
     private enum Tab: String, CaseIterable { case albums, songs }
@@ -55,6 +56,7 @@ struct ArtistDetailView: View {
         // row would sit under the now-playing bar (S-343).
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
+        .batchDownloadTracking($batch, downloads: downloads)
         .toolbarBackground(.hidden, for: .navigationBar)
         // Everything by the artist, in album then track order — the same set
         // the Play button uses (S-385).
@@ -149,6 +151,7 @@ struct ArtistDetailView: View {
 
                 HStack(spacing: 0) {
                     Button {
+                        recents.record(.artist, id: artist.id)
                         playback.play(sorted, startAt: pair.offset)
                     } label: {
                         HStack(spacing: 12) {
@@ -189,23 +192,21 @@ struct ArtistDetailView: View {
             HStack(spacing: 20) {
                 circleButton(system: "shuffle") {
                     if !playback.isShuffled { playback.toggleShuffle() }
-                    playback.play(allTracks)
+                    recents.record(.artist, id: artist.id)
+                    recents.record(.artist, id: artist.id)
+            playback.play(allTracks)
                 }
-                circleButton(system: "arrow.down") {
-                    switch downloads.downloadAll(allTracks) {
-                    case .started(let n): flash("Downloading \(n) songs…")
-                    case .insufficientSpace: flash("Not enough free space.")
-                    case .nothingToDo: flash("Already downloaded.")
-                    }
-                }
+                circleButton(system: "arrow.down") { downloadAll() }
                 Spacer()
             }
 
             // The result, said plainly. An artist's whole catalogue is a lot
             // to fetch, and "not enough free space" is the answer that most
-            // needs saying.
-            if let batchMessage {
-                Text(batchMessage)
+            // needs saying. It counts down while the batch runs (S-394) —
+            // fetching a discography takes minutes, and a line that cleared
+            // after three seconds left the page looking idle for all of them.
+            if let message = batch.message(downloads) {
+                Text(message)
                     .font(.caption)
                     .foregroundStyle(SoundChexTheme.ink500)
             }
@@ -223,9 +224,9 @@ struct ArtistDetailView: View {
         }
     }
 
-    private func flash(_ text: String) {
-        batchMessage = text
-        Task { try? await Task.sleep(for: .seconds(3)); batchMessage = nil }
+    private func downloadAll() {
+        let pending = Set(allTracks.filter { $0.playable && !downloads.isStored($0.id) }.map(\.id))
+        batch.start(downloads.downloadAll(allTracks), pendingIDs: pending)
     }
 
     private var playFAB: some View {

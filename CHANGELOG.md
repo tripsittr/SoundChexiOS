@@ -3,6 +3,30 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.23.3 “Segue” — 2026-09-25
+
+### Fixed
+- **Xcode Cloud builds could not start at all.** `SoundChex.xcodeproj` is
+  gitignored — `project.yml` is the source of truth and XcodeGen writes the
+  project from it — so a clean cloud checkout had nothing to build. The
+  failure looked like a broken configuration rather than a missing file.
+
+  `ci_scripts/ci_post_clone.sh` now installs XcodeGen and generates the
+  project after the clone. Apple fixes that path and filename, and the file
+  must be executable or it is skipped in silence, which looks exactly like it
+  not being there.
+
+- **The scheme was not shared**, which would have been the next failure and
+  would have looked identical. XcodeGen generates an implicit scheme that
+  `xcodebuild` can find, but Xcode Cloud's workflow editor lists only schemes
+  written to `xcshareddata` — with none there, a workflow has nothing to
+  select. The scheme is now declared explicitly in `project.yml`, with Release
+  for archive and profile.
+
+  Verified by cloning the repository afresh, running the script, and archiving
+  in Release: the archive carries the right version, the privacy manifest and
+  the encryption declaration.
+
 ## 0.23.2 “Segue” — 2026-09-25
 
 ### Added

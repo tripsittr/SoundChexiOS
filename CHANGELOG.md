@@ -3,6 +3,23 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.18.01 “Refrain” — 2026-09-24
+
+### Added
+- **Smart shuffle** (S-289), as a third state of the shuffle button: press it
+  to cycle off → shuffle → smart shuffle → off. Smart gets its own glyph
+  rather than a badge, since iOS ships one.
+
+  Ordinary shuffle is uniform, which on a library of thousands means mostly
+  tracks nobody has chosen. Smart draws two thirds from what this profile
+  actually plays — by play count and recency — and a third from everything
+  else, interleaved so it does not read as two playlists stuck together.
+
+  The queue is weighted on the server: the phone would need the whole library
+  and the whole play history to do it here. If the request fails it drops back
+  to ordinary shuffle rather than staying in a mode that quietly means
+  nothing.
+
 ## 0.18.0 “Refrain” — 2026-09-24
 
 ### Added

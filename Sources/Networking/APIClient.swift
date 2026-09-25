@@ -149,6 +149,22 @@ struct APIClient {
         )
     }
 
+    /// A shuffled queue of the music library, built server-side (S-289).
+    ///
+    /// `smart` weights the draw by what this profile actually plays. Built on
+    /// the server because weighting it here would mean the phone holding the
+    /// whole library and the whole play history.
+    func shuffleLibrary(smart: Bool, limit: Int = 200) async throws -> [MediaItem] {
+        struct Response: Decodable { let items: [MediaItem] }
+
+        let response: Response = try await send(
+            "/api/v1/library/shuffle?smart=\(smart ? 1 : 0)&limit=\(limit)",
+            method: "GET",
+        )
+
+        return response.items
+    }
+
     // MARK: - Search
 
     /// Library search — titles, people, dialogue and book text, server-side.

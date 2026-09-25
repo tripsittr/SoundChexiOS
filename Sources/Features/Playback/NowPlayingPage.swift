@@ -195,14 +195,26 @@ struct NowPlayingPage: View {
         .padding(.top, 24)
     }
 
+    /// What VoiceOver says the shuffle button will do next.
+    private var shuffleLabel: String {
+        switch playback.shuffleMode {
+        case .off: "Shuffle"
+        case .on: "Shuffle on. Press for smart shuffle"
+        case .smart: "Smart shuffle on"
+        }
+    }
+
     private var transport: some View {
         HStack(spacing: 32) {
-            // Shuffle
+            // Shuffle: off → on → smart, on one button (S-289). Smart gets
+            // its own glyph rather than a badge — iOS ships one, and a
+            // sparkle reads as "chosen for you" without a legend.
             Button { playback.toggleShuffle() } label: {
-                Image(systemName: "shuffle")
+                Image(systemName: playback.shuffleMode == .smart ? "shuffle.circle.fill" : "shuffle")
                     .font(.system(size: 18))
                     .foregroundStyle(playback.isShuffled ? SoundChexTheme.accent : SoundChexTheme.ink400)
             }
+            .accessibilityLabel(shuffleLabel)
 
             Button { playback.previous() } label: {
                 Image(systemName: "backward.fill").font(.title2)

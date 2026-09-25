@@ -3,6 +3,18 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.19.01 “Cadence” — 2026-09-25
+
+### Added
+- **Shuffle and download on the artist page** (S-387). Albums and playlists
+  both had a download-all button; the artist page had none, so downloading an
+  artist meant opening every album in turn. It is the same pair of controls the
+  album page uses, acting on everything by the artist, and it reports the same
+  answers — how many started, not enough free space, already downloaded.
+
+  An artist's whole catalogue is a lot to fetch, so saying "not enough free
+  space" plainly matters more here than anywhere else.
+
 ## 0.19.0 “Cadence” — 2026-09-25
 
 ### Added

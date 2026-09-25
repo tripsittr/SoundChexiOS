@@ -24,23 +24,52 @@ struct DownloadsView: View {
                 } else {
                     List(Array(items.enumerated()), id: \.element.id) { pair in
                         Button {
-                            playback.play(asMediaItems, startAt: pair.offset)
+                            // An expired row has no file behind it, so playing
+                            // would fail silently. Tapping re-downloads with
+                            // the same window instead (S-404).
+                            if pair.element.isExpired {
+                                redownload(pair.element)
+                            } else {
+                                playback.play(asMediaItems, startAt: pair.offset)
+                            }
                         } label: {
                             HStack(spacing: 12) {
                                 DownloadArtwork(item: pair.element, size: 44)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(pair.element.title)
                                         .foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
-                                    if let subtitle = pair.element.subtitle {
+                                    if pair.element.isExpired {
+                                        Text("Expired — tap to download again")
+                                            .font(.caption)
+                                            .foregroundStyle(SoundChexTheme.ink500)
+                                            .lineLimit(1)
+                                    } else if let subtitle = pair.element.subtitle {
                                         Text(subtitle).font(.caption)
                                             .foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
                                     }
                                 }
                                 Spacer()
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(SoundChexTheme.storedGreen)
+
+                                // Expired, counting down, or simply stored
+                                // (S-404). The expired row is deliberately
+                                // still here: a film that vanished without
+                                // trace is indistinguishable from one you
+                                // never downloaded.
+                                if pair.element.isExpired {
+                                    Image(systemName: "arrow.down.circle")
+                                        .foregroundStyle(SoundChexTheme.ink500)
+                                } else if let remaining = pair.element.timeRemaining {
+                                    Text(Self.remainingLabel(remaining))
+                                        .font(.caption2)
+                                        .foregroundStyle(SoundChexTheme.ink500)
+                                        .monospacedDigit()
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(SoundChexTheme.storedGreen)
+                                }
                             }
                             .contentShape(.rect)
+                            .opacity(pair.element.isExpired ? 0.55 : 1)
                         }
                         .buttonStyle(.plain)
                         .listRowBackground(SoundChexTheme.base900)
@@ -91,6 +120,31 @@ private struct DownloadArtwork: View {
         SoundChexTheme.base700.overlay(
             Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500)
         )
+    }
+}
+
+extension DownloadsView {
+    /// "3d", "4h", "22m" — short enough to sit at the end of a row without
+    /// pushing the title out, precise enough to act on.
+    static func remainingLabel(_ remaining: TimeInterval) -> String {
+        let hours = Int(remaining / 3600)
+
+        if hours >= 24 { return "\(hours / 24)d" }
+        if hours >= 1 { return "\(hours)h" }
+
+        return "\(max(1, Int(remaining / 60)))m"
+    }
+
+    /// Queues an expired item again, keeping the window it originally had.
+    private func redownload(_ item: DownloadedItem) {
+        let retention: DownloadRetention = switch item.retentionSeconds {
+        case .some(let seconds) where seconds <= 24 * 3600: .day
+        case .some(let seconds) where seconds <= 3 * 24 * 3600: .threeDays
+        case .some: .week
+        case nil: .forever
+        }
+
+        downloads.download(item.asMediaItem, keeping: retention)
     }
 }
 

@@ -170,6 +170,10 @@ enum MediaType: String, Codable, CaseIterable, Sendable {
     /// The catch-all for a value the server adds later that this build predates.
     case unknown
 
+    /// Whether this is video, which is the type big enough to be worth asking
+    /// how long to keep (S-404). A film is 2–10GB; a song is 5MB.
+    var isVideo: Bool { self == .movie || self == .show }
+
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = MediaType(rawValue: raw) ?? .unknown

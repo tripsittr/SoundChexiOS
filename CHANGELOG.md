@@ -3,6 +3,28 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.20.0 “Tempo” — 2026-09-25
+
+### Added
+- **Albums and Songs tabs on the artist page** (S-391), with sorting for each.
+  Songs: A–Z, Z–A, album, release date, recently played. Albums: A–Z, Z–A,
+  release date, recently played.
+
+  The sort control sits beside the tabs rather than inside each list, so
+  switching tabs does not move the control you just used. An album is as
+  recent as its most recently played track, and its year is the earliest its
+  tracks claim — so a reissued bonus track does not date the whole record to
+  this year.
+
+  The Songs tab replaces the old "Popular" list, which showed a fixed top five
+  with no way to see the rest.
+
+### Fixed
+- **Track rows on the album and artist pages show their download state**
+  (S-390), and carry the same kebab the Songs list has — play next, add to
+  queue, add to playlist. They had neither, so downloading an album gave no
+  per-track feedback at all and a working download looked like a failure.
+
 ## 0.19.01 “Cadence” — 2026-09-25
 
 ### Added

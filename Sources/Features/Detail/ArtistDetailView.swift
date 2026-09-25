@@ -20,6 +20,13 @@ struct ArtistDetailView: View {
     @State private var addingToPlaylist = false
     @State private var batchMessage: String?
 
+    /// Which list the page is showing, and how each is ordered (S-391).
+    private enum Tab: String, CaseIterable { case albums, songs }
+
+    @State private var tab: Tab = .albums
+    @State private var songSort: SongSort = .album
+    @State private var albumSort: AlbumSort = .releaseDate
+
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
     /// Every track by the artist, album order then track order — the queue the
@@ -33,8 +40,12 @@ struct ArtistDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 banner
                 secondaryActions
-                popular
-                albums
+                tabPicker
+
+                switch tab {
+                case .albums: albums
+                case .songs: songs
+                }
             }
             .padding(.bottom, 24)
         }
@@ -89,6 +100,84 @@ struct ArtistDetailView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
+        }
+    }
+
+    /// Albums or Songs, with the sort for whichever is showing.
+    ///
+    /// The sort menu sits beside the tabs rather than inside each list, so
+    /// switching tabs does not move the control the user just used.
+    private var tabPicker: some View {
+        HStack {
+            Picker("", selection: $tab) {
+                Text("Albums").tag(Tab.albums)
+                Text("Songs").tag(Tab.songs)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 220)
+
+            Spacer()
+
+            Menu {
+                switch tab {
+                case .albums:
+                    Picker("Sort", selection: $albumSort) {
+                        ForEach(AlbumSort.allCases) { Text($0.label).tag($0) }
+                    }
+                case .songs:
+                    Picker("Sort", selection: $songSort) {
+                        ForEach(SongSort.allCases) { Text($0.label).tag($0) }
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SoundChexTheme.ink300)
+                    .frame(width: 40, height: 40)
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    /// Every track by the artist, in the chosen order.
+    private var songs: some View {
+        LazyVStack(spacing: 0) {
+            let sorted = songSort.apply(allTracks)
+
+            ForEach(Array(sorted.enumerated()), id: \.element.id) { pair in
+                let isCurrent = playback.current?.id == pair.element.id
+
+                HStack(spacing: 0) {
+                    Button {
+                        playback.play(sorted, startAt: pair.offset)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Artwork(item: pair.element, size: 44)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(pair.element.title)
+                                    .foregroundStyle(isCurrent ? SoundChexTheme.accent : SoundChexTheme.ink100)
+                                    .lineLimit(1)
+
+                                if let album = pair.element.meta?.album, !album.isEmpty {
+                                    Text(album)
+                                        .font(.caption)
+                                        .foregroundStyle(SoundChexTheme.ink500)
+                                        .lineLimit(1)
+                                }
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.leading, 16).padding(.vertical, 6)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+
+                    TrackRowControls(item: pair.element)
+                        .padding(.trailing, 8)
+                }
+            }
         }
     }
 
@@ -152,59 +241,12 @@ struct ArtistDetailView: View {
         }
     }
 
-    // MARK: - Popular
-
-    @ViewBuilder private var popular: some View {
-        let top = Array(allTracks.prefix(5))
-        if !top.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Popular")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(SoundChexTheme.ink100)
-                    .padding(.horizontal, 16)
-
-                ForEach(Array(top.enumerated()), id: \.element.id) { pair in
-                    let isCurrent = playback.current?.id == pair.element.id
-                    Button {
-                        playback.play(allTracks, startAt: pair.offset)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Group {
-                                if isCurrent {
-                                    PlayingEqualizer(isAnimating: playback.isPlaying, size: 20)
-                                } else {
-                                    Text("\(pair.offset + 1)")
-                                        .font(.subheadline.monospacedDigit())
-                                        .foregroundStyle(SoundChexTheme.ink500)
-                                }
-                            }
-                            .frame(width: 24)
-                            Artwork(item: pair.element, size: 44)
-                            Text(pair.element.title)
-                                .foregroundStyle(isCurrent ? SoundChexTheme.accent : SoundChexTheme.ink100)
-                                .lineLimit(1)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 6)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
     // MARK: - Albums
 
     private var albums: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Albums")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(SoundChexTheme.ink100)
-                .padding(.horizontal, 16)
-
             LazyVGrid(columns: columns, spacing: 20) {
-                ForEach(artist.albums) { album in
+                ForEach(albumSort.apply(artist.albums)) { album in
                     NavigationLink {
                         AlbumDetailView(album: album)
                     } label: {

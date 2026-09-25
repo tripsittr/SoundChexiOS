@@ -17,6 +17,9 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     let subtitle: String?
     let parentID: Int?
     let playable: Bool
+    /// When the current profile last played this, for a "recently played"
+    /// sort. Nil for something never played (S-391).
+    let lastPlayedAt: Date?
     /// Absolute artwork URL the server resolved, or nil. Public — no token.
     let artwork: URL?
     let meta: Meta?
@@ -24,7 +27,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     // The decoder applies .convertFromSnakeCase first, so the keys these match
     // against are already camelCase: parent_id arrives as "parentId".
     enum CodingKeys: String, CodingKey {
-        case id, type, title, subtitle, playable, artwork, meta
+        case id, type, title, subtitle, playable, artwork, meta, lastPlayedAt
         case parentID = "parentId"
     }
 
@@ -36,6 +39,10 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         subtitle = try? c.decodeIfPresent(String.self, forKey: .subtitle)
         parentID = try? c.decodeIfPresent(Int.self, forKey: .parentID)
         playable = (try? c.decodeIfPresent(Bool.self, forKey: .playable)) ?? false
+        // A server that predates this sends nothing; sorting simply treats
+        // those as never played rather than failing the whole item.
+        lastPlayedAt = ((try? c.decodeIfPresent(String.self, forKey: .lastPlayedAt)) ?? nil)
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
         // A malformed or relative artwork string is treated as no artwork.
         artwork = (try? c.decodeIfPresent(String.self, forKey: .artwork)).flatMap { $0.flatMap(URL.init(string:)) }
         meta = try? c.decodeIfPresent(Meta.self, forKey: .meta)
@@ -45,7 +52,8 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     /// rather than a server response (a custom decoder suppresses the synthesised
     /// memberwise one).
     init(id: Int, type: MediaType, title: String, subtitle: String?,
-         parentID: Int?, playable: Bool, artwork: URL?, meta: Meta?) {
+         parentID: Int?, playable: Bool, artwork: URL?, meta: Meta?,
+         lastPlayedAt: Date? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -54,6 +62,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         self.playable = playable
         self.artwork = artwork
         self.meta = meta
+        self.lastPlayedAt = lastPlayedAt
     }
 
     /// For the on-disk library cache. Written and read by us, so a plain encode
@@ -69,6 +78,13 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         try c.encode(playable, forKey: .playable)
         try c.encodeIfPresent(artwork?.absoluteString, forKey: .artwork)
         try c.encodeIfPresent(meta, forKey: .meta)
+        // As an ISO string, matching what the server sends — so a cached item
+        // decodes the same way a fetched one does and the sort survives a
+        // relaunch.
+        try c.encodeIfPresent(
+            lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) },
+            forKey: .lastPlayedAt,
+        )
     }
 
     struct Meta: Codable, Hashable, Sendable {

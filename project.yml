@@ -22,8 +22,8 @@ settings:
     # Versioning: SemVer with a music-themed name per minor release (see
     # Plans/Versioning.md). 0.4.0 is "Interlude" — persistent search/account
     # header on every page + Spotify-style playlists.
-    MARKETING_VERSION: "0.19.0"
-    CURRENT_PROJECT_VERSION: "37"
+    MARKETING_VERSION: "0.19.01"
+    CURRENT_PROJECT_VERSION: "38"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete

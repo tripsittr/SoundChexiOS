@@ -13,10 +13,12 @@ import SwiftUI
 /// rather than inventing one (no server change; spec's out-of-scope rule).
 struct ArtistDetailView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
     let artist: LibraryStore.Artist
 
     @State private var addingToPlaylist = false
+    @State private var batchMessage: String?
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -30,6 +32,7 @@ struct ArtistDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 banner
+                secondaryActions
                 popular
                 albums
             }
@@ -87,6 +90,53 @@ struct ArtistDetailView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
+    }
+
+    /// Shuffle and download, under the banner — the same pair the album page
+    /// offers, so downloading an artist does not mean opening every album
+    /// (S-387).
+    @ViewBuilder private var secondaryActions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 20) {
+                circleButton(system: "shuffle") {
+                    if !playback.isShuffled { playback.toggleShuffle() }
+                    playback.play(allTracks)
+                }
+                circleButton(system: "arrow.down") {
+                    switch downloads.downloadAll(allTracks) {
+                    case .started(let n): flash("Downloading \(n) songs…")
+                    case .insufficientSpace: flash("Not enough free space.")
+                    case .nothingToDo: flash("Already downloaded.")
+                    }
+                }
+                Spacer()
+            }
+
+            // The result, said plainly. An artist's whole catalogue is a lot
+            // to fetch, and "not enough free space" is the answer that most
+            // needs saying.
+            if let batchMessage {
+                Text(batchMessage)
+                    .font(.caption)
+                    .foregroundStyle(SoundChexTheme.ink500)
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func circleButton(system: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 44, height: 44)
+                .foregroundStyle(SoundChexTheme.ink200)
+                .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
+        }
+    }
+
+    private func flash(_ text: String) {
+        batchMessage = text
+        Task { try? await Task.sleep(for: .seconds(3)); batchMessage = nil }
     }
 
     private var playFAB: some View {

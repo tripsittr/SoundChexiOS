@@ -23,11 +23,27 @@ settings:
     # Plans/Versioning.md). The name for each minor lives in
     # Sources/DesignSystem/AppRelease.swift — one written only in the
     # CHANGELOG is not shipped, because Settings reads that map.
-    MARKETING_VERSION: "0.23.2"
-    CURRENT_PROJECT_VERSION: "44"
+    MARKETING_VERSION: "0.23.3"
+    CURRENT_PROJECT_VERSION: "45"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete
+
+# An explicit, SHARED scheme. XcodeGen generates an implicit one that
+# `xcodebuild` can find, but Xcode Cloud's workflow editor lists only schemes
+# written to xcshareddata — with none there, the workflow has nothing to build
+# and fails in a way that looks like the project is broken (S-406).
+schemes:
+  SoundChex:
+    build:
+      targets:
+        SoundChex: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+    profile:
+      config: Release
 
 targets:
   SoundChex:

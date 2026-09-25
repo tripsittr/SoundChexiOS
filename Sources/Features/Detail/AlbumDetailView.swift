@@ -147,6 +147,10 @@ struct AlbumDetailView: View {
         LazyVStack(spacing: 0) {
             ForEach(Array(album.tracks.enumerated()), id: \.element.id) { pair in
                 let isCurrent = playback.current?.id == pair.element.id
+                // The row is a play button *plus* its controls, side by side —
+                // the controls cannot live inside the button or tapping the
+                // kebab would start the album (S-390).
+                HStack(spacing: 0) {
                 Button {
                     playback.play(album.tracks, startAt: pair.offset)
                 } label: {
@@ -168,10 +172,14 @@ struct AlbumDetailView: View {
                             .lineLimit(1)
                         Spacer()
                     }
-                    .padding(.horizontal, 16).padding(.vertical, 11)
+                    .padding(.leading, 16).padding(.vertical, 11)
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+
+                TrackRowControls(item: pair.element)
+                    .padding(.trailing, 8)
+                }
                 Divider().overlay(SoundChexTheme.base700).padding(.leading, 56)
             }
         }

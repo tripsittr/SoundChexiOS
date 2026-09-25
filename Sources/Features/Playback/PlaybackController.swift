@@ -25,7 +25,17 @@ final class PlaybackController {
     private(set) var duration: Double = 0
 
     /// Shuffle and repeat, surfaced for the now-playing controls.
-    private(set) var isShuffled = false
+    /// Off, ordinary shuffle, or shuffle weighted by what this profile plays.
+    ///
+    /// Three states on one button, cycled by pressing it, the way repeat
+    /// already works — so the third mode lives where one already did rather
+    /// than needing a new control on a crowded transport (S-289).
+    enum ShuffleMode { case off, on, smart }
+
+    private(set) var shuffleMode: ShuffleMode = .off
+
+    /// Whether shuffle is on at all, in either form.
+    var isShuffled: Bool { shuffleMode != .off }
     enum RepeatMode { case off, all, one }
     private(set) var repeatMode: RepeatMode = .off
 
@@ -133,15 +143,61 @@ final class PlaybackController {
         loadCurrent(api: api)
     }
 
-    /// Toggles shuffle. Shuffling keeps the current track playing and reorders
-    /// what's behind it; un-shuffling restores the original order from here on.
+    /// Cycles shuffle: off → on → smart → off.
+    ///
+    /// Shuffling keeps the current track playing and reorders what is behind
+    /// it; turning it off restores the original order from here on. Smart asks
+    /// the server for a queue weighted by this profile's play history —
+    /// weighting it here would mean the phone holding the whole library and
+    /// every play (S-289).
     func toggleShuffle() {
-        isShuffled.toggle()
-        if isShuffled {
+        shuffleMode = switch shuffleMode {
+        case .off: .on
+        case .on: .smart
+        case .smart: .off
+        }
+
+        switch shuffleMode {
+        case .on:
             applyShuffle(keepingCurrent: true)
-        } else if let current, let restored = originalQueue.firstIndex(of: current) {
-            queue = originalQueue
-            index = restored
+        case .smart:
+            // The queue is left as it is until the weighted one arrives: a
+            // button that empties the player mid-request is worse than one
+            // that takes a moment.
+            Task { await loadSmartQueue() }
+        case .off:
+            if let current, let restored = originalQueue.firstIndex(of: current) {
+                queue = originalQueue
+                index = restored
+            }
+        }
+    }
+
+    /// Replaces what is behind the current track with a server-weighted queue.
+    ///
+    /// A failure falls back to ordinary shuffle rather than staying in "smart"
+    /// while behaving uniformly — the listener pressed a button and something
+    /// should happen, and a mode that quietly means nothing is worse than an
+    /// honest one.
+    private func loadSmartQueue() async {
+        guard let api else { return }
+
+        do {
+            let items = try await api.shuffleLibrary(smart: true)
+
+            guard !items.isEmpty else { throw APIClient.APIError.http(status: 204) }
+
+            let playing = current
+            let rest = items.filter { $0.id != playing?.id }
+
+            queue = playing.map { [$0] + rest } ?? rest
+            originalQueue = queue
+            index = 0
+        } catch {
+            AppLog.warning("Smart shuffle failed, falling back: \(error.localizedDescription)", category: "playback")
+
+            shuffleMode = .on
+            applyShuffle(keepingCurrent: true)
         }
     }
 

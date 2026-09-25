@@ -20,6 +20,8 @@ struct SoundChexApp: App {
     // What you last played, and what you played it *from* — the Your Library
     // landing reads this (S-392).
     @State private var recents = RecentContextsStore()
+    // Carries a tapped notification to the screen it names (S-405).
+    @State private var notifications = NotificationRouter()
 
     init() {
         configureBarAppearance()
@@ -40,6 +42,8 @@ struct SoundChexApp: App {
                 .environment(theme)
                 .environment(playlists)
                 .environment(recents)
+                .environment(notifications)
+                .task { notifications.attach() }
                 .environment(Connectivity.shared)
                 // The user's chosen appearance and accent, applied app-wide and
                 // live: changing either in Settings updates every screen at once

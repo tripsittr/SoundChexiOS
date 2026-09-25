@@ -331,6 +331,9 @@ final class DownloadStore: NSObject {
 
     /// Removes a downloaded item from disk.
     func remove(_ itemID: Int) {
+        // Removed by hand: there is nothing left to warn about (S-405).
+        ExpiryNotifications.cancel(for: itemID)
+
         try? FileManager.default.removeItem(at: Self.mediaURL(for: itemID))
         try? FileManager.default.removeItem(at: Self.sidecarURL(for: itemID))
         Self.clearResumeData(for: itemID)
@@ -367,6 +370,9 @@ final class DownloadStore: NSObject {
 
     /// Drops the file, keeps the row.
     private func expire(_ itemID: Int) {
+        // Already gone — a warning that it is about to go would be nonsense.
+        ExpiryNotifications.cancel(for: itemID)
+
         try? FileManager.default.removeItem(at: Self.mediaURL(for: itemID))
         Self.clearResumeData(for: itemID)
 
@@ -401,7 +407,15 @@ final class DownloadStore: NSObject {
         // one the first time it was watched.
         guard let window = stored[index].retentionSeconds else { return }
 
-        stored[index].expiresAt = Date().addingTimeInterval(window)
+        let newDeadline = Date().addingTimeInterval(window)
+
+        stored[index].expiresAt = newDeadline
+
+        // Watching moved the deadline, so the old warning is wrong (S-405).
+        ExpiryNotifications.schedule(
+            itemID: itemID, title: stored[index].title,
+            expiresAt: newDeadline, window: window,
+        )
 
         if let data = try? JSONEncoder().encode(stored[index]) {
             try? data.write(to: Self.sidecarURL(for: itemID))
@@ -548,6 +562,17 @@ final class DownloadStore: NSObject {
             retentionSeconds: pendingRetention[item.id]?.duration,
             expiredAt: nil
         )
+
+        // The warning is scheduled here, where the deadline is first known
+        // (S-405). Local notification, not a background task: iOS delivers a
+        // scheduled one on time whether or not the app runs, and guarantees
+        // nothing about background execution.
+        if let deadline = downloaded.expiresAt, let window = downloaded.retentionSeconds {
+            ExpiryNotifications.schedule(
+                itemID: item.id, title: item.title,
+                expiresAt: deadline, window: window,
+            )
+        }
 
         pendingRetention.removeValue(forKey: item.id)
         if let data = try? JSONEncoder().encode(downloaded) {

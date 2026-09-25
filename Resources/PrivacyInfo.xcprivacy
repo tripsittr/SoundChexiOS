@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Privacy manifest. Required by Apple since May 2024 — an upload without one
+    is rejected, and one that under-declares is rejected on review.
+
+    SoundChex collects nothing. It talks to a server the user runs themselves;
+    there is no SoundChex-operated backend to collect anything into, no
+    analytics SDK and no advertising identifier. So NSPrivacyCollectedDataTypes
+    is deliberately empty rather than omitted: empty is a statement, missing is
+    an oversight.
+
+    The two API declarations below are the "required reason" APIs this app
+    actually calls. They are not tracking — Apple requires a stated reason for
+    them because they have been abused for fingerprinting elsewhere.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Nothing is collected. The library, the plays and the downloads live on
+         the user's own server and their own device. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- UserDefaults: the server address, the theme, the remembered
+             playback position and the recent-contexts list. All of it is this
+             app's own state on this device — CA92.1 is the category for
+             exactly that. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+
+        <!-- Free disk space: checked before a batch download so the app can
+             refuse rather than fill the device. E174.1 is "display to the
+             user", which is what the "not enough free space" message is. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>E174.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

@@ -3,6 +3,32 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.23.2 “Segue” — 2026-09-25
+
+### Added
+- **The pieces an App Store upload requires.** Nothing user-facing; the app was
+  not uploadable without them.
+
+  `PrivacyInfo.xcprivacy`, required by Apple since May 2024 — an upload
+  without one is rejected outright. It declares that the app collects nothing,
+  which is true: there is no SoundChex-operated backend to collect into. It
+  also declares the two "required reason" APIs actually called, UserDefaults
+  and free-disk-space, both for their own obvious purposes.
+
+  `ITSAppUsesNonExemptEncryption: false`. Without it every upload stops with a
+  Missing Compliance prompt before any tester can install the build. The app
+  uses only the system's HTTPS, which is exempt.
+
+  `Plans/TestFlight.md` documents the rest — the Apple-side setup that cannot
+  live in a repository, and draft App Review notes explaining why the app
+  allows plain-HTTP connections (users' own servers on private addresses
+  cannot hold public TLS certificates).
+
+### Known gaps
+- No demo account exists for App Review. Internal TestFlight testing does not
+  need one; external testing will fail without it, because a reviewer who
+  cannot sign in cannot see the app work.
+
 ## 0.23.1 “Segue” — 2026-09-25
 
 ### Added

@@ -23,8 +23,8 @@ settings:
     # Plans/Versioning.md). The name for each minor lives in
     # Sources/DesignSystem/AppRelease.swift — one written only in the
     # CHANGELOG is not shipped, because Settings reads that map.
-    MARKETING_VERSION: "0.23.1"
-    CURRENT_PROJECT_VERSION: "43"
+    MARKETING_VERSION: "0.23.2"
+    CURRENT_PROJECT_VERSION: "44"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete
@@ -60,6 +60,12 @@ targets:
           NSAllowsArbitraryLoads: true
         UILaunchScreen:
           UIColorName: SoundChexLaunch
+        # Declared so every TestFlight upload does not stop and ask. The app
+        # uses only HTTPS/TLS through the system, which is exempt under the
+        # US export rules — there is no custom or proprietary cryptography
+        # here. Without this key App Store Connect holds each build with a
+        # "Missing Compliance" prompt before testers can install it.
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.soundchex.ios

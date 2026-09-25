@@ -39,11 +39,18 @@ struct SongRow: View {
     @Environment(ThemeStore.self) private var theme
     @Environment(DownloadStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
+    @Environment(RecentContextsStore.self) private var recents
     let item: MediaItem
     var queue: [MediaItem] = []
     var index: Int = 0
     /// Set only where the row is *in* a playlist (S-376).
     var onRemoveFromPlaylist: (() -> Void)?
+    /// What playing this row means you played (S-392). The row is shared
+    /// between the Songs list and the playlist page, and the two record
+    /// different things: a song picked out of the library is a song, the same
+    /// row inside a playlist is that playlist. Defaults to the loose song,
+    /// which is what every other caller is.
+    var playContext: RecentContextsStore.Entry?
 
     @State private var addingToPlaylist = false
     @State private var editing = false
@@ -55,6 +62,11 @@ struct SongRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Button {
+                if let playContext {
+                    recents.record(playContext.kind, id: playContext.id)
+                } else {
+                    recents.record(.song, id: String(item.id))
+                }
                 playback.play(queue.isEmpty ? [item] : queue, startAt: index)
             } label: {
                 HStack(spacing: 12) {

@@ -3,6 +3,59 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.21.0 “Reprise” — 2026-09-25
+
+### Added
+- **Your Library on the Music page** (S-392). With no filter chip selected,
+  the page used to list Albums and then Artists — which is exactly what the
+  chips above already do, so the landing was a worse copy of the next tap. It
+  now shows what you last played, newest first.
+
+  The unit is the *context* you played from, not the track. Put on an artist
+  and the artist appears; tap a track inside an album and the album appears;
+  play a playlist and the playlist appears. A song appears on its own only
+  when a song is genuinely what you picked — out of the Songs list, or off
+  this page.
+
+  This is remembered on the device. The server cannot answer it: `media_plays`
+  has a `source` column, but it holds a surface name ("browse", "home") rather
+  than an identity, and the only playback ping the client sends is
+  `POST /items/{id}/progress`, which carries position and duration and nothing
+  about where the track came from.
+
+  Entries de-duplicate by identity, so playing one album four times in an
+  evening leaves one entry at the top rather than four. History is cleared on
+  sign-out and on a server change, alongside the cached library — one
+  account's listening should not greet the next one.
+
+  Until there is any history — a fresh install, or just after a sign-out —
+  the page falls back to the old browse shelves. An empty page on first launch
+  would be worse than a redundant one.
+
+### Fixed
+- **Batch download progress now persists and counts down** (S-394). The artist
+  and album pages announced "Downloading 40 songs…" and cleared the line
+  after three seconds. Fetching a discography takes minutes, so for the rest
+  of them the page looked idle and the only way to check was to leave and come
+  back. The line now stays up and counts — "Downloading 12 of 40" — then
+  reports what landed.
+
+- **A failed track no longer strands the playlist download at "1 remaining"**
+  (S-394). The playlist page had its own copy of this logic, and it counted
+  only tracks that reached `stored`. A batch containing a dead file therefore
+  never reached zero, so the completion message never fired. Failures now
+  count as settled, and the final line says what actually happened:
+  "Downloaded 39 of 40 — 1 failed" rather than claiming success.
+
+  All three pages now share one `BatchDownloadStatus`, so there is one place
+  for this to be right instead of three chances to get it wrong.
+
+### Known gaps
+- Recent contexts are per-device, not synced between devices. Playing an album
+  on the Mac will not put it on the phone's landing page.
+- A context whose album or playlist has since left the library is skipped
+  rather than shown as unavailable.
+
 ## 0.20.0 “Tempo” — 2026-09-25
 
 ### Added

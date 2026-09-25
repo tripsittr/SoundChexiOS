@@ -29,6 +29,7 @@ enum AppRelease {
         "0.18": "Refrain",
         "0.19": "Cadence",
         "0.20": "Tempo",
+        "0.21": "Reprise",
         "1.0": "Encore",
     ]
 

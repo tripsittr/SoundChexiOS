@@ -11,6 +11,8 @@ import SwiftUI
 /// slot (a segmented control, not the spec's pills).
 struct MusicView: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(RecentContextsStore.self) private var recents
+    @Environment(PlaylistStore.self) private var playlists
 
     /// The active filter chip. `nil` is "everything" — the Recents landing
     /// (spec §1); a chip narrows to that one kind.
@@ -44,7 +46,7 @@ struct MusicView: View {
         } else {
             switch section {
             case .none:
-                recents
+                yourLibrary
 
             case .songs:
                 let songs = store.items(of: .music)
@@ -96,13 +98,75 @@ struct MusicView: View {
         }
     }
 
-    /// The "everything" landing (no chip active) — the Recents surface from the
-    /// references. It summarises the library (albums, then artists); the chips
-    /// above do the exhaustive browse, and Playlists is a chip of its own since
-    /// those live in a separate store. Kept to what LibraryStore actually holds.
-    private var recents: some View {
+    /// The "everything" landing (no chip active): Your Library — what you last
+    /// played, newest first (S-392).
+    ///
+    /// It used to list Albums then Artists, which is exactly what the chips
+    /// above already do, so the landing was a worse copy of the next tap. What
+    /// it shows now is history, and history the app records by *context*: put
+    /// on an artist and the artist is here, tap a track inside an album and
+    /// the album is here. See `RecentContextsStore`.
+    ///
+    /// Until there is history — a fresh install, or just after a sign-out —
+    /// it falls back to the old browse shelves. An empty page on first launch
+    /// would be worse than a redundant one.
+    private var yourLibrary: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                if recentRows.isEmpty {
+                    browseShelves
+                } else {
+                    shelfHeader("Your Library")
+                    ForEach(recentRows) { row in
+                        recentRow(row)
+                    }
+                }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .background(SoundChexTheme.base900)
+    }
+
+    /// One remembered thing, resolved from its stored id to the live object.
+    /// Ids are resolved on read rather than cached because albums and artists
+    /// are recomputed from the catalogue on every access — and because a
+    /// context whose album has since left the library should simply vanish
+    /// from the page rather than 404 on tap.
+    private enum RecentRow: Identifiable {
+        case artist(LibraryStore.Artist)
+        case album(LibraryStore.Album)
+        case playlist(Playlist)
+        case song(MediaItem)
+
+        var id: String {
+            switch self {
+            case .artist(let a): "artist:\(a.id)"
+            case .album(let a): "album:\(a.id)"
+            case .playlist(let p): "playlist:\(p.id)"
+            case .song(let s): "song:\(s.id)"
+            }
+        }
+    }
+
+    private var recentRows: [RecentRow] {
+        recents.entries.compactMap { entry in
+            switch entry.kind {
+            case .artist:
+                store.artists.first { $0.id == entry.id }.map(RecentRow.artist)
+            case .album:
+                store.albums.first { $0.id == entry.id }.map(RecentRow.album)
+            case .playlist:
+                playlists.playlists.first { String($0.id) == entry.id }.map(RecentRow.playlist)
+            case .song:
+                store.items(of: .music).first { String($0.id) == entry.id }.map(RecentRow.song)
+            }
+        }
+    }
+
+    /// The old browse landing, kept for the no-history case.
+    @ViewBuilder private var browseShelves: some View {
+        Group {
                 if !store.albums.isEmpty {
                     shelfHeader("Albums")
                     LazyVGrid(columns: grid, spacing: 20) {
@@ -126,11 +190,64 @@ struct MusicView: View {
                         .padding(.horizontal, 16)
                     }
                 }
-            }
-            .padding(.top, 8)
-            .padding(.bottom, 24)
         }
-        .background(SoundChexTheme.base900)
+    }
+
+    /// One Your Library row: artwork, name, and what kind of thing it is.
+    ///
+    /// A flat list rather than a shelf per kind, because the ordering *is* the
+    /// information — the most recent thing belongs at the top whether it is an
+    /// artist or a song, and four near-empty shelves would bury it.
+    @ViewBuilder private func recentRow(_ row: RecentRow) -> some View {
+        switch row {
+        case .artist(let artist):
+            NavigationLink { ArtistDetailView(artist: artist) } label: {
+                rowLabel(artwork: artist.artwork, title: artist.name,
+                         subtitle: "Artist", circular: true,
+                         placeholder: "music.mic")
+            }
+            .buttonStyle(.plain)
+
+        case .album(let album):
+            NavigationLink { AlbumDetailView(album: album) } label: {
+                rowLabel(artwork: album.artwork, title: album.title,
+                         subtitle: "Album · \(album.artist)", circular: false,
+                         placeholder: "music.note")
+            }
+            .buttonStyle(.plain)
+
+        case .playlist(let playlist):
+            NavigationLink { PlaylistDetailView(playlist: playlist) } label: {
+                rowLabel(artwork: playlist.artworkURL, title: playlist.name,
+                         subtitle: "Playlist", circular: false,
+                         placeholder: "music.note.list")
+            }
+            .buttonStyle(.plain)
+
+        case .song(let item):
+            SongRow(item: item)
+                .padding(.horizontal, 16)
+        }
+    }
+
+    private func rowLabel(artwork: URL?, title: String, subtitle: String,
+                          circular: Bool, placeholder: String) -> some View {
+        HStack(spacing: 12) {
+            CachedImage(url: artwork) { $0.resizable().scaledToFill() } placeholder: {
+                SoundChexTheme.base700.overlay(
+                    Image(systemName: placeholder).foregroundStyle(SoundChexTheme.ink500))
+            }
+            .frame(width: 56, height: 56)
+            .clipShape(circular ? AnyShape(.circle)
+                                : AnyShape(.rect(cornerRadius: SoundChexTheme.radiusPoster)))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
     }
 
     /// A circular artist tile for the recents shelf — artist art is a circle

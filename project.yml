@@ -20,8 +20,9 @@ settings:
     DEVELOPMENT_TEAM: "7GSWB72PH6"
     CODE_SIGN_STYLE: Automatic
     # Versioning: SemVer with a music-themed name per minor release (see
-    # Plans/Versioning.md). 0.4.0 is "Interlude" — persistent search/account
-    # header on every page + Spotify-style playlists.
+    # Plans/Versioning.md). The name for each minor lives in
+    # Sources/DesignSystem/AppRelease.swift — one written only in the
+    # CHANGELOG is not shipped, because Settings reads that map.
     MARKETING_VERSION: "0.21.0"
     CURRENT_PROJECT_VERSION: "40"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small

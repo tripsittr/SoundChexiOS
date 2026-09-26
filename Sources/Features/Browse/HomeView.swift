@@ -16,7 +16,7 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if let hero = store.heroItem {
+                    if let hero = store.dynamicHero {
                         HeroBanner(item: hero) { play(hero) }
                     }
 
@@ -26,7 +26,7 @@ struct HomeView: View {
                         }
                     }
                     // Overlap the first rail onto the hero's fade.
-                    .padding(.top, store.heroItem == nil ? 16 : -24)
+                    .padding(.top, store.dynamicHero == nil ? 16 : -24)
                     .padding(.bottom, 24)
                 }
             }
@@ -39,6 +39,15 @@ struct HomeView: View {
                 ContentUnavailableView("Couldn't load", systemImage: "wifi.slash",
                                        description: Text(error))
             }
+        }
+        // Fetched rather than derived: resume position is not in the mirror
+        // (S-414). Refreshed on every appearance because "continue watching"
+        // is exactly the row that goes stale — you watched something, came
+        // back, and it should have moved.
+        .task { await store.loadContinue() }
+        .refreshable {
+            await store.load()
+            await store.loadContinue()
         }
     }
 

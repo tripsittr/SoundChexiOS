@@ -310,8 +310,56 @@ final class LibraryStore {
         let items: [MediaItem]
     }
 
+    /// Items the server says are part-finished, fetched separately (S-414).
+    ///
+    /// Not derivable on the device: resume position lives in `media_plays` and
+    /// the mirror does not carry it.
+    private(set) var continueWatching: [MediaItem] = []
+    private(set) var continueReading: [MediaItem] = []
+
+    /// Fetches the continue shelves. Failure is silent and leaves the shelves
+    /// as they were — a home page that shows one row fewer is better than one
+    /// that shows an error where a row should be.
+    func loadContinue() async {
+        guard let api else { return }
+
+        guard let result = try? await api.continueItems() else { return }
+
+        continueWatching = result.watching
+        continueReading = result.reading
+    }
+
+    /// The home rails.
+    ///
+    /// Ordered by what the person is most likely to want: what they were in
+    /// the middle of, then what they have been playing, then the catalogue.
+    /// Before this the page was "Recently added" plus one row per type — the
+    /// same rows on day one and day five hundred, reflecting nothing the
+    /// person had ever done (S-414).
     var homeRows: [Row] {
         var rows: [Row] = []
+
+        // Top, because an unfinished film is the least speculative thing the
+        // page can offer: you already chose it.
+        if !continueWatching.isEmpty {
+            rows.append(Row(title: "Continue watching", items: continueWatching))
+        }
+
+        if !continueReading.isEmpty {
+            rows.append(Row(title: "Keep reading", items: continueReading))
+        }
+
+        // Then what has actually been played, most recent first. The mirror
+        // carries a play date per item (S-385) and nothing on this page used
+        // it until now.
+        let played = items
+            .filter { $0.parentID == nil && $0.lastPlayedAt != nil }
+            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+            .prefix(20)
+
+        if played.count >= 2 {
+            rows.append(Row(title: "Recently played", items: Array(played)))
+        }
 
         let recent = items.filter { $0.parentID == nil }.prefix(20)
         if !recent.isEmpty { rows.append(Row(title: "Recently added", items: Array(recent))) }
@@ -323,6 +371,25 @@ final class LibraryStore {
         }
 
         return rows
+    }
+
+    /// The hero: something you have played, else the newest thing with
+    /// artwork (S-414).
+    ///
+    /// The old hero was always the newest item with artwork, which is why it
+    /// never changed — a library that has stopped growing had a permanent
+    /// hero. Preferring something played makes the top of the page yours.
+    var dynamicHero: MediaItem? {
+        let playedWithArtwork = items
+            .filter { $0.parentID == nil && $0.artwork != nil && $0.lastPlayedAt != nil }
+            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+
+        // Not the single most recent: that is probably still playing, and a
+        // hero advertising the thing in the now-playing bar is wasted space.
+        // Second-most-recent is something you like and are not hearing.
+        if playedWithArtwork.count >= 2 { return playedWithArtwork[1] }
+
+        return playedWithArtwork.first ?? heroItem
     }
 
     func search(_ term: String) -> [MediaItem] {

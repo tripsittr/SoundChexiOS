@@ -154,6 +154,25 @@ struct APIClient {
     /// `smart` weights the draw by what this profile actually plays. Built on
     /// the server because weighting it here would mean the phone holding the
     /// whole library and the whole play history.
+    /// What you started and did not finish (S-414).
+    ///
+    /// Server-side because resume position lives in `media_plays` and the
+    /// library mirror does not carry it — the device cannot work this out
+    /// from what it holds.
+    func continueItems(limit: Int = 20) async throws -> (watching: [MediaItem], reading: [MediaItem]) {
+        struct Response: Decodable {
+            let watching: [MediaItem]
+            let reading: [MediaItem]
+        }
+
+        let response: Response = try await send(
+            "/api/v1/library/continue?limit=\(limit)",
+            method: "GET",
+        )
+
+        return (response.watching, response.reading)
+    }
+
     func shuffleLibrary(smart: Bool, limit: Int = 200) async throws -> [MediaItem] {
         struct Response: Decodable { let items: [MediaItem] }
 

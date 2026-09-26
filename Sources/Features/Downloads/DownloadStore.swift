@@ -396,23 +396,72 @@ final class DownloadStore: NSObject {
     ///
     /// Runs on launch and is cheap after the first time: an entry with a
     /// recorded path is already done.
+    /// Fills in artist and album on sidecars written before S-417, from the
+    /// catalogue the app already holds.
+    ///
+    /// Without this the repair has nothing to work with: the files it needs
+    /// to move are exactly the ones whose sidecars never recorded where they
+    /// belong. Called with the library before migrating.
+    func backfillMetadata(from catalogue: [MediaItem]) {
+        guard !catalogue.isEmpty else { return }
+
+        let byID = Dictionary(catalogue.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var updated = 0
+
+        for (index, entry) in stored.enumerated() where entry.artist == nil && entry.author == nil {
+            guard let item = byID[entry.id], let meta = item.meta else { continue }
+
+            stored[index].artist = meta.groupingArtist
+            stored[index].album = meta.album
+            stored[index].trackNumber = meta.trackNumber
+            stored[index].author = meta.author
+            stored[index].releaseYear = meta.releaseYear
+            stored[index].seasonNumber = meta.seasonNumber
+            stored[index].episodeNumber = meta.episodeNumber
+
+            if let data = try? JSONEncoder().encode(stored[index]) {
+                try? data.write(to: Self.sidecarURL(for: entry.id))
+            }
+
+            updated += 1
+        }
+
+        if updated > 0 {
+            AppLog.info("Backfilled metadata for \(updated) download(s)", category: "downloads")
+        }
+    }
+
     func migrateToMediaLibrary() {
-        let pending = stored.filter { $0.relativePath == nil }
+        // Two groups. Anything with no recorded path is a pre-S-416 download
+        // still in the old cache. Anything filed under "Unknown" was moved by
+        // 0.28.0 before the sidecar carried artist and album, so it went to
+        // the wrong place through no fault of its own (S-417) — refile it now
+        // that the catalogue can say where it belongs.
+        let pending = stored.filter { entry in
+            entry.relativePath == nil || Self.isMisfiled(entry.relativePath)
+        }
 
         guard !pending.isEmpty else { return }
 
         var moved = 0
 
         for entry in pending {
-            let legacy = Self.mediaURL(for: entry.id)
+            // Wherever it is now: the old cache, or the wrong shelf.
+            let source = entry.relativePath
+                .map { MediaLibraryPath.root.appendingPathComponent($0) }
+                ?? Self.mediaURL(for: entry.id)
 
-            guard FileManager.default.fileExists(atPath: legacy.path) else { continue }
+            guard FileManager.default.fileExists(atPath: source.path) else { continue }
 
-            let ext = Self.fileExtension(for: legacy)
+            let ext = Self.fileExtension(for: source)
 
             guard let relative = MediaLibraryPath.relativePath(
                 for: entry.asMediaItem, extension: ext,
             ) ?? Optional("Other/\(entry.id).\(ext)") else { continue }
+
+            // Already right — a misfiled entry the catalogue still cannot
+            // place. Leave it rather than moving it onto itself.
+            guard relative != entry.relativePath else { continue }
 
             let destination = MediaLibraryPath.prepare(relative)
 
@@ -421,7 +470,10 @@ final class DownloadStore: NSObject {
                 // migration; the legacy file is the one the app has been
                 // playing, so it wins.
                 try? FileManager.default.removeItem(at: destination)
-                try FileManager.default.moveItem(at: legacy, to: destination)
+                try FileManager.default.moveItem(at: source, to: destination)
+
+                // The shelf it came from may now be empty.
+                pruneEmptyFolders(above: source)
 
                 // The hard link made for AVFoundation (S-360) points at a file
                 // that has moved, so it is now junk.
@@ -461,6 +513,21 @@ final class DownloadStore: NSObject {
             try? FileManager.default.removeItem(at: folder)
             folder = folder.deletingLastPathComponent()
         }
+    }
+
+    /// Whether a recorded path is one of 0.28.0's "Unknown" placements.
+    ///
+    /// Those files were filed before the sidecar carried artist and album, so
+    /// the layout had nothing to work with. They are worth moving again; a
+    /// track genuinely lacking metadata will simply land back in the same
+    /// place, which the caller skips.
+    private static func isMisfiled(_ relativePath: String?) -> Bool {
+        guard let relativePath else { return false }
+
+        return relativePath.contains("/Unknown Artist/")
+            || relativePath.contains("/Unknown Album")
+            || relativePath.contains("/Unknown Author/")
+            || relativePath.hasPrefix("Other/")
     }
 
     /// The old hard-linked name beside a legacy download.
@@ -681,11 +748,22 @@ final class DownloadStore: NSObject {
             id: item.id, type: item.type, title: item.title,
             subtitle: item.subtitle, artwork: item.artwork,
             durationMs: item.meta?.durationMs,
+            // Captured now, while the catalogue entry is in hand. The file is
+            // filed by these, and offline there is nowhere else to get them
+            // (S-417).
             // A re-download of something that expired clears the old stamp:
             // it is here again, so the row should stop saying it is gone.
             expiresAt: pendingRetention[item.id]?.deadline,
             retentionSeconds: pendingRetention[item.id]?.duration,
-            expiredAt: nil
+            expiredAt: nil,
+            relativePath: stored.first(where: { $0.id == item.id })?.relativePath,
+            artist: item.meta?.groupingArtist,
+            album: item.meta?.album,
+            trackNumber: item.meta?.trackNumber,
+            author: item.meta?.author,
+            releaseYear: item.meta?.releaseYear,
+            seasonNumber: item.meta?.seasonNumber,
+            episodeNumber: item.meta?.episodeNumber
         )
 
         // The warning is scheduled here, where the deadline is first known
@@ -783,6 +861,20 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
     /// a weekly one the first time it was watched.
     var retentionSeconds: TimeInterval?
 
+    /// The metadata the library layout is built from (S-417).
+    ///
+    /// Stored rather than looked up: a download has to be filed correctly
+    /// while offline, when the catalogue may not be loaded, and a sidecar
+    /// that knows only a title files everything under "Unknown Artist" —
+    /// which is exactly what shipped in 0.28.0.
+    var artist: String?
+    var album: String?
+    var trackNumber: Int?
+    var author: String?
+    var releaseYear: Int?
+    var seasonNumber: Int?
+    var episodeNumber: Int?
+
     /// Where the media file actually is, relative to the Files-visible media
     /// root (S-416).
     ///
@@ -810,7 +902,10 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
     init(id: Int, type: MediaType, title: String, subtitle: String?,
          artwork: URL?, durationMs: Int?, expiresAt: Date? = nil,
          retentionSeconds: TimeInterval? = nil, expiredAt: Date? = nil,
-         relativePath: String? = nil) {
+         relativePath: String? = nil,
+         artist: String? = nil, album: String? = nil, trackNumber: Int? = nil,
+         author: String? = nil, releaseYear: Int? = nil,
+         seasonNumber: Int? = nil, episodeNumber: Int? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -821,6 +916,13 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
         self.retentionSeconds = retentionSeconds
         self.expiredAt = expiredAt
         self.relativePath = relativePath
+        self.artist = artist
+        self.album = album
+        self.trackNumber = trackNumber
+        self.author = author
+        self.releaseYear = releaseYear
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
     }
 }
 

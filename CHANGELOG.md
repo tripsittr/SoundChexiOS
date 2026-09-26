@@ -3,6 +3,29 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.28.1 “Cascade” — 2026-09-26
+
+### Fixed
+- **Every download was filed under "Unknown Artist / Unknown Album"**
+  (S-417). 0.28.0 moved downloads into the Files-visible library using the
+  sidecar beside each file — and that sidecar recorded a title, a subtitle
+  and a duration, but never an artist or an album. So the layout had nothing
+  to work with and put the whole library on one shelf.
+
+  Sidecars now carry the artist, album, track number, author, year, season and
+  episode. Captured when the download starts, while the catalogue entry is in
+  hand, because a download also has to be filed correctly offline — when
+  there is nowhere else to look them up.
+
+  **Files already misfiled are moved again**, once, on the next launch. Their
+  sidecars are backfilled from the catalogue first, since the files needing
+  repair are exactly the ones whose sidecars never knew where they belonged.
+  A track that genuinely has no artist stays where it is rather than being
+  shuffled between identical paths, and a repaired file is not picked up
+  again.
+
+  Empty "Unknown Artist" folders left behind by the repair are removed.
+
 ## 0.28.0 “Cascade” — 2026-09-26
 
 ### Added

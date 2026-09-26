@@ -63,10 +63,6 @@ struct LibraryTabs: View {
             playback.attach(api: session.api)
             downloads.attach(api: session.api)
 
-            // Downloads made before the move live under their id in a hidden
-            // cache; relocate them into the Files-visible library (S-416).
-            // First, so the sweep below judges files where they now are.
-            downloads.migrateToMediaLibrary()
 
             // Timed downloads that ran out while the app was closed (S-404).
             // Before the library loads, so Downloads never shows a file that
@@ -85,6 +81,12 @@ struct LibraryTabs: View {
             // paused where it stopped (S-342). Needs the catalogue, since the
             // queue is remembered as ids.
             playback.restoreRememberedState(from: store.items)
+
+            // After the catalogue, because filing a download correctly needs
+            // its artist and album — and the sidecars written before S-417 do
+            // not have them (S-416, S-417).
+            downloads.backfillMetadata(from: store.items)
+            downloads.migrateToMediaLibrary()
 
             // Admin-ness only decides whether an extra tab appears, so it can
             // settle whenever the network allows, or never.

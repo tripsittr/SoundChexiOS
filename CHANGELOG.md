@@ -3,6 +3,37 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.27.0 “Reverie” — 2026-09-25
+
+### Added
+- **Films and shows say what they are** (S-412). The detail page had artwork, a
+  play button and a list of episodes. Everything that helps someone decide what
+  to watch was in the database, unsent; now it is both sent and shown.
+
+  - **Cast and crew**, as rails of faces with the character each played. A cast
+    is scanned for someone you recognise, not read top to bottom. Billing order
+    is the server's, so the lead comes first.
+  - **The facts**: year, runtime, rating, director or creator, studio or
+    network, seasons and episodes, IMDb and Rotten Tomatoes scores, language
+    and country.
+  - **The tagline**, set in italics above the rest — it is the film talking
+    about itself rather than a fact about it.
+
+  Credits are fetched when the page opens rather than carried in the library
+  sync. Every device mirrors the whole catalogue, and 8,323 items carry
+  credits; downloading every actor of every film so one screen can show a
+  handful is not a trade worth making.
+
+  Every row is conditional. An item that was never enriched shows a short page
+  rather than a column of blank labels.
+
+### Known gaps
+- **Still no description.** There is no overview or synopsis column anywhere in
+  the database — `tagline` is a marketing line, not a plot. TMDB returns one
+  and the pipeline discards it, so this needs a migration and an enrichment
+  change before any client can show it.
+- Tapping a cast member does nothing yet. There is no person page.
+
 ## 0.26.0 “Resonance” — 2026-09-25
 
 ### Added

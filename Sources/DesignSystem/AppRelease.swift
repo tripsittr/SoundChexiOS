@@ -35,6 +35,7 @@ enum AppRelease {
         "0.24": "Vamp",
         "0.25": "Motif",
         "0.26": "Resonance",
+        "0.27": "Reverie",
         "1.0": "Encore",
     ]
 

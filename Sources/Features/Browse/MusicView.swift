@@ -121,6 +121,14 @@ struct MusicView: View {
                         recentRow(row)
                     }
                 }
+
+                // Suggestions under the history (S-413). Built from what the
+                // device already knows, so they appear as soon as there is
+                // anything to go on rather than waiting for a recommender.
+                ForEach(shelves) { shelf in
+                    shelfHeader(shelf.title)
+                    albumRail(shelf.albums)
+                }
             }
             .padding(.top, 8)
             .padding(.bottom, 24)
@@ -146,6 +154,29 @@ struct MusicView: View {
             case .playlist(let p): "playlist:\(p.id)"
             case .song(let s): "song:\(s.id)"
             }
+        }
+    }
+
+    /// Suggestion shelves, recomputed when the library or history changes.
+    private var shelves: [LibraryShelves.Shelf] {
+        LibraryShelves.build(store: store, recents: recents)
+    }
+
+    /// A horizontal row of album tiles — the shape the shelves use, and the
+    /// same cell the browse grid draws so a suggestion looks like the library
+    /// rather than a different feature bolted on.
+    private func albumRail(_ albums: [LibraryStore.Album]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(albums) { album in
+                    NavigationLink { AlbumDetailView(album: album) } label: {
+                        albumCell(album)
+                            .frame(width: 150)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
         }
     }
 

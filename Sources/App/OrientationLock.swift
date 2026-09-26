@@ -25,6 +25,8 @@ enum OrientationLock {
     /// only thing iOS asks.
     static var supported: UIInterfaceOrientationMask = .portrait {
         didSet {
+            AppDelegate.current = supported
+
             guard supported != oldValue else { return }
 
             // Ask the window to re-evaluate. Without this the change takes
@@ -67,10 +69,18 @@ extension View {
 /// SwiftUI has no API for "which orientations does this app support right
 /// now" — `UIApplicationDelegate` is still the only place iOS asks.
 class AppDelegate: NSObject, UIApplicationDelegate {
+    /// The orientations iOS should honour right now.
+    ///
+    /// Mirrored into a plain `nonisolated` box rather than read from
+    /// `OrientationLock` directly. iOS does not promise to ask this on the
+    /// main actor, and `MainActor.assumeIsolated` *traps* when that
+    /// assumption is wrong — a crash at launch rather than a wrong answer.
+    nonisolated(unsafe) static var current: UIInterfaceOrientationMask = .portrait
+
     func application(
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?,
     ) -> UIInterfaceOrientationMask {
-        MainActor.assumeIsolated { OrientationLock.supported }
+        Self.current
     }
 }

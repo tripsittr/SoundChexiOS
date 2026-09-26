@@ -10,6 +10,8 @@ import SwiftUI
 struct NowPlayingPage: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(ThemeStore.self) private var theme
+    // To resolve the playing track's artist and album to real pages (S-412).
+    @Environment(LibraryStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
     @State private var scrubbing = false
@@ -23,6 +25,40 @@ struct NowPlayingPage: View {
     @State private var addingToPlaylist: MediaItem?
     @State private var showingQueue = false
     @State private var showingLyrics = false
+    /// Where a tap on the artist or album line is going (S-412).
+    @State private var destination: Destination?
+
+    /// The artist or album behind the current track, when the library holds
+    /// one. A single, or a track mid-scan, resolves to nothing — and then the
+    /// line is plain text rather than a link to an empty page.
+    private enum Destination: Hashable, Identifiable {
+        case artist(LibraryStore.Artist)
+        case album(LibraryStore.Album)
+
+        var id: String {
+            switch self {
+            case .artist(let a): "artist:\(a.id)"
+            case .album(let a): "album:\(a.id)"
+            }
+        }
+    }
+
+    private func artist(for item: MediaItem) -> LibraryStore.Artist? {
+        guard let name = item.meta?.groupingArtist, !name.isEmpty else { return nil }
+
+        return store.artists.first { $0.id == name }
+    }
+
+    private func album(for item: MediaItem) -> LibraryStore.Album? {
+        guard let artist = item.meta?.groupingArtist,
+              let key = item.meta?.groupingAlbum, !key.isEmpty
+        else { return nil }
+
+        // Albums are keyed "artist|albumKey" — the same grouping the browse
+        // pages use, so tapping through lands on exactly the page the library
+        // shows rather than a near-match.
+        return store.albums.first { $0.id == "\(artist)|\(key)" }
+    }
 
     var body: some View {
         ZStack {
@@ -120,6 +156,20 @@ struct NowPlayingPage: View {
                 .presentationDetents([.medium, .large])
                 .soundchexTheme(theme)
         }
+        // Pushed inside its own stack rather than by dismissing the player
+        // first (S-412). Tapping the artist should not stop the music or
+        // throw away the player you were looking at — you go and come back.
+        .sheet(item: $destination) { where_ in
+            NavigationStack {
+                switch where_ {
+                case .artist(let artist):
+                    ArtistDetailView(artist: artist)
+                case .album(let album):
+                    AlbumDetailView(album: album)
+                }
+            }
+            .soundchexTheme(theme)
+        }
     }
 
     /// The album (or author) the current track belongs to, for the context line.
@@ -142,12 +192,47 @@ struct NowPlayingPage: View {
                     lineHeight: 27,
                 )
                 if let subtitle = item.subtitle {
-                    MarqueeText(
-                        text: subtitle,
-                        font: .system(size: 16),
-                        color: SoundChexTheme.ink300,
-                        lineHeight: 20,
-                    )
+                    // Tappable when the library actually holds that artist
+                    // (S-412). A single or a mid-scan track resolves to
+                    // nothing, and then this stays plain text rather than
+                    // offering a link to an empty page.
+                    if let artist = artist(for: item) {
+                        Button {
+                            destination = .artist(artist)
+                        } label: {
+                            MarqueeText(
+                                text: subtitle,
+                                font: .system(size: 16),
+                                color: SoundChexTheme.accent,
+                                lineHeight: 20,
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        MarqueeText(
+                            text: subtitle,
+                            font: .system(size: 16),
+                            color: SoundChexTheme.ink300,
+                            lineHeight: 20,
+                        )
+                    }
+                }
+
+                // The album, under the artist. Not shown before: the context
+                // line above the artwork already names it, but that is a
+                // label rather than somewhere to go.
+                if let album = album(for: item) {
+                    Button {
+                        destination = .album(album)
+                    } label: {
+                        MarqueeText(
+                            text: album.title,
+                            font: .system(size: 14),
+                            color: SoundChexTheme.ink400,
+                            lineHeight: 18,
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             Spacer()

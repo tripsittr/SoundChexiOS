@@ -63,6 +63,11 @@ struct LibraryTabs: View {
             playback.attach(api: session.api)
             downloads.attach(api: session.api)
 
+            // Downloads made before the move live under their id in a hidden
+            // cache; relocate them into the Files-visible library (S-416).
+            // First, so the sweep below judges files where they now are.
+            downloads.migrateToMediaLibrary()
+
             // Timed downloads that ran out while the app was closed (S-404).
             // Before the library loads, so Downloads never shows a file that
             // is about to be swept a second later.
@@ -118,6 +123,11 @@ struct LibraryTabs: View {
             // (S-404). Done on the way in rather than on a background timer:
             // iOS would not honour one reliably, and a file deleted while
             // nobody is looking is a file nobody was told about.
+            // Downloads made before the move live under their id in a hidden
+            // cache; relocate them into the Files-visible library (S-416).
+            // Before the sweep, so an expiring file is judged where it is.
+            downloads.migrateToMediaLibrary()
+
             downloads.sweepExpiredDownloads()
 
             // The server may have become reachable — or stopped being — while

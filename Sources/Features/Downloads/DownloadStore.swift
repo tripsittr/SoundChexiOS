@@ -116,8 +116,28 @@ final class DownloadStore: NSObject {
 
     /// The on-disk media file for an item, when it is stored — for local playback.
     func localURL(for itemID: Int) -> URL? {
-        let url = Self.mediaURL(for: itemID)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        // The recorded path first (S-416): the file lives in the
+        // Files-visible library now, named for what it is rather than its id.
+        if let relative = stored.first(where: { $0.id == itemID })?.relativePath {
+            let url = MediaLibraryPath.root.appendingPathComponent(relative)
+
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+
+            // Recorded but gone. The file is in Documents now, so the person
+            // can rename or delete it from Files — that is the cost of making
+            // it theirs. Treat it as not downloaded rather than failing at the
+            // moment of playing.
+            return nil
+        }
+
+        // A download from before the move, still under its id in the old
+        // cache. `migrateToMediaLibrary()` relocates these on launch; this
+        // keeps them playing until it does.
+        let legacy = Self.mediaURL(for: itemID)
+
+        return FileManager.default.fileExists(atPath: legacy.path) ? legacy : nil
     }
 
     /// The on-disk file only when it is worth handing to the player.
@@ -141,8 +161,12 @@ final class DownloadStore: NSObject {
             return nil
         }
 
-        // Hand back a name AVFoundation will open. The stored file keeps its
-        // format-agnostic `.media` name; this is a hard link beside it (S-360).
+        // A file in the media library already ends in .mp3 or .m4a, so
+        // AVFoundation opens it directly — the hard link that used to give a
+        // `.media` file a real extension (S-360) is only needed for downloads
+        // that have not been moved yet (S-416).
+        if url.pathExtension != "media" { return url }
+
         return Self.playableURL(for: itemID) ?? url
     }
 
@@ -334,6 +358,13 @@ final class DownloadStore: NSObject {
         // Removed by hand: there is nothing left to warn about (S-405).
         ExpiryNotifications.cancel(for: itemID)
 
+        // Wherever it actually is — the media library for anything downloaded
+        // since S-416, the old cache for anything before it.
+        if let url = localURL(for: itemID) {
+            try? FileManager.default.removeItem(at: url)
+            pruneEmptyFolders(above: url)
+        }
+
         try? FileManager.default.removeItem(at: Self.mediaURL(for: itemID))
         try? FileManager.default.removeItem(at: Self.sidecarURL(for: itemID))
         Self.clearResumeData(for: itemID)
@@ -341,6 +372,100 @@ final class DownloadStore: NSObject {
         stored.removeAll { $0.id == itemID }
         storedBytesByItemID[itemID] = nil
         refreshStorageSnapshot()
+    }
+
+    // MARK: - Files-visible library (S-416)
+
+    /// Notes where an item's file ended up, in memory and on disk.
+    private func recordPath(_ relative: String, for itemID: Int) {
+        guard let index = stored.firstIndex(where: { $0.id == itemID }) else { return }
+
+        stored[index].relativePath = relative
+
+        if let data = try? JSONEncoder().encode(stored[index]) {
+            try? data.write(to: Self.sidecarURL(for: itemID))
+        }
+    }
+
+    /// Moves downloads made before S-416 into the Files-visible library.
+    ///
+    /// Moved, not copied: someone with a full phone should not need twice the
+    /// space to gain a folder they can browse, and two copies of a library
+    /// diverging is its own bug. A file that cannot be moved is left where it
+    /// is and stays playable through the legacy path in `localURL`.
+    ///
+    /// Runs on launch and is cheap after the first time: an entry with a
+    /// recorded path is already done.
+    func migrateToMediaLibrary() {
+        let pending = stored.filter { $0.relativePath == nil }
+
+        guard !pending.isEmpty else { return }
+
+        var moved = 0
+
+        for entry in pending {
+            let legacy = Self.mediaURL(for: entry.id)
+
+            guard FileManager.default.fileExists(atPath: legacy.path) else { continue }
+
+            let ext = Self.fileExtension(for: legacy)
+
+            guard let relative = MediaLibraryPath.relativePath(
+                for: entry.asMediaItem, extension: ext,
+            ) ?? Optional("Other/\(entry.id).\(ext)") else { continue }
+
+            let destination = MediaLibraryPath.prepare(relative)
+
+            do {
+                // Anything already at the destination is a previous partial
+                // migration; the legacy file is the one the app has been
+                // playing, so it wins.
+                try? FileManager.default.removeItem(at: destination)
+                try FileManager.default.moveItem(at: legacy, to: destination)
+
+                // The hard link made for AVFoundation (S-360) points at a file
+                // that has moved, so it is now junk.
+                try? FileManager.default.removeItem(at: Self.playableLinkURL(for: entry.id, ext: ext))
+
+                recordPath(relative, for: entry.id)
+                moved += 1
+            } catch {
+                AppLog.warning(
+                    "Could not move download #\(entry.id) into the media library: \(error.localizedDescription)",
+                    category: "downloads",
+                )
+            }
+        }
+
+        if moved > 0 {
+            AppLog.info("Moved \(moved) download(s) into the Files-visible library", category: "downloads")
+            refreshStorageSnapshot()
+        }
+    }
+
+    /// Removes the folders a deleted file leaves behind.
+    ///
+    /// Without this, deleting the last track of an album leaves an empty
+    /// Artist/Album pair in the Files app — and a library of empty folders is
+    /// worse than one that is simply missing things. Stops at the media root,
+    /// and only ever removes a directory that is already empty.
+    private func pruneEmptyFolders(above file: URL) {
+        var folder = file.deletingLastPathComponent()
+        let root = MediaLibraryPath.root.standardizedFileURL
+
+        while folder.standardizedFileURL != root, folder.path.hasPrefix(root.path) {
+            let contents = try? FileManager.default.contentsOfDirectory(atPath: folder.path)
+
+            guard contents?.isEmpty == true else { return }
+
+            try? FileManager.default.removeItem(at: folder)
+            folder = folder.deletingLastPathComponent()
+        }
+    }
+
+    /// The old hard-linked name beside a legacy download.
+    private static func playableLinkURL(for itemID: Int, ext: String) -> URL {
+        directory.appendingPathComponent("\(itemID).\(ext)")
     }
 
     // MARK: - Retention (S-404)
@@ -658,6 +783,16 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
     /// a weekly one the first time it was watched.
     var retentionSeconds: TimeInterval?
 
+    /// Where the media file actually is, relative to the Files-visible media
+    /// root (S-416).
+    ///
+    /// Recorded rather than derived: the path is built from metadata that can
+    /// change under the app — an album gets re-tagged, a title is corrected —
+    /// and a download whose path is recomputed differently tomorrow is a
+    /// download the app has lost. Nil means a pre-S-416 file still living in
+    /// the old cache under its id.
+    var relativePath: String?
+
     /// Set when the file has been removed but the entry is kept, so Downloads
     /// can show what went and offer it back in one tap. The owner's call: a
     /// file vanishing with no trace is worse than a row saying it expired.
@@ -674,7 +809,8 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
 
     init(id: Int, type: MediaType, title: String, subtitle: String?,
          artwork: URL?, durationMs: Int?, expiresAt: Date? = nil,
-         retentionSeconds: TimeInterval? = nil, expiredAt: Date? = nil) {
+         retentionSeconds: TimeInterval? = nil, expiredAt: Date? = nil,
+         relativePath: String? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -684,6 +820,7 @@ struct DownloadedItem: Identifiable, Codable, Hashable, Sendable {
         self.expiresAt = expiresAt
         self.retentionSeconds = retentionSeconds
         self.expiredAt = expiredAt
+        self.relativePath = relativePath
     }
 }
 
@@ -793,11 +930,28 @@ extension DownloadStore: URLSessionDownloadDelegate {
                 return
             }
 
-            let dest = Self.mediaURL(for: itemID)
+            // Into the Files-visible library, under a name that says what it
+            // is (S-416). The extension is sniffed from the bytes, because
+            // the catalogue's path is not always right about the container.
+            let ext = Self.fileExtension(for: temp)
+            let relative = stored.first(where: { $0.id == itemID })
+                .flatMap { entry in
+                    inFlightItems[itemID].flatMap {
+                        MediaLibraryPath.relativePath(for: $0, extension: ext)
+                    } ?? MediaLibraryPath.relativePath(
+                        for: entry.asMediaItem, extension: ext,
+                    )
+                }
+                // No usable metadata: still download it, under the id, rather
+                // than refusing. A file in the wrong place beats no file.
+                ?? "Other/\(itemID).\(ext)"
+
+            let dest = MediaLibraryPath.prepare(relative)
             try? FileManager.default.removeItem(at: dest)
             do {
                 try FileManager.default.moveItem(at: temp, to: dest)
                 states[itemID] = .stored
+                recordPath(relative, for: itemID)
                 if let size = (try? dest.resourceValues(forKeys: [.fileSizeKey]).fileSize) {
                     storedBytesByItemID[itemID] = Int64(size)
                 } else {

@@ -861,6 +861,27 @@ final class PlaybackController {
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         info[MPMediaItemPropertyMediaType] = MPMediaType.music.rawValue
 
+        // The album, and the two keys that travel with it (S-413).
+        //
+        // Car head units read `albumTitle` specifically. It was never set, so
+        // a car over Bluetooth showed a blank album — which reads as missing
+        // metadata rather than as an app that did not send it. Album artist
+        // and track number are read by some units too, and the app already
+        // has both.
+        //
+        // Set to nil rather than "" when absent: an empty string is a value,
+        // and a head unit will faithfully display an empty album line where
+        // nil lets it collapse the row.
+        info[MPMediaItemPropertyAlbumTitle] = item.meta?.album
+        info[MPMediaItemPropertyAlbumArtist] = item.meta?.groupingArtist
+        info[MPMediaItemPropertyAlbumTrackNumber] = item.meta?.trackNumber
+
+        if let year = item.meta?.releaseYear {
+            info[MPMediaItemPropertyReleaseDate] = DateComponents(
+                calendar: .current, year: year,
+            ).date
+        }
+
         // Carry the artwork already loaded for this item across a text-only
         // refresh (a play/pause, a position tick), so it does not blink out
         // between the sync update and the async reload below.

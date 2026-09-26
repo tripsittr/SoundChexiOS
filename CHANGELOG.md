@@ -3,6 +3,37 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.24.0 “Vamp” — 2026-09-25
+
+### Added
+- **The artist and album on the now-playing page are tappable** (S-412). They
+  were plain text, which made "what else is on this?" a trip back through
+  three screens. Both now open the real page, pushed inside the player rather
+  than dismissing it — tapping an artist should not stop the music or throw
+  away the screen you were on.
+
+  A track whose artist or album is not in the library — a single, or one
+  mid-scan — stays plain text rather than offering a link to an empty page.
+  Resolution uses the same grouping keys the browse pages use, so you land on
+  exactly the page the library shows rather than a near-match.
+
+  The album line is new here; the context line above the artwork named it, but
+  a label is not somewhere to go.
+
+### Fixed
+- **A car over Bluetooth showed no album name** (S-413). The now-playing info
+  carried title, artist, duration and artwork, but never
+  `MPMediaItemPropertyAlbumTitle` — which is the key head units actually read.
+  With it unset they show nothing, which reads as missing metadata rather than
+  as an app that did not send it.
+
+  Album artist, track number and release date go with it: the app already had
+  all three and some head units display them. Absent values are sent as nil
+  rather than an empty string, so a unit can collapse the row instead of
+  faithfully displaying a blank line.
+
+  This affects the lock screen and CarPlay too, not only Bluetooth.
+
 ## 0.23.4 “Segue” — 2026-09-25
 
 ### Fixed

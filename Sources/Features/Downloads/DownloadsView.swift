@@ -155,7 +155,20 @@ extension DownloadedItem {
         MediaItem(
             id: id, type: type, title: title, subtitle: subtitle,
             parentID: nil, playable: true, artwork: artwork,
-            meta: durationMs.map { MediaItem.Meta(durationMs: $0) }
+            // Everything the library layout needs, not just the duration
+            // (S-417). Building Meta from duration alone is what filed a
+            // whole library under "Unknown Artist" in 0.28.0.
+            meta: MediaItem.Meta(
+                artist: artist,
+                primaryArtist: artist,
+                album: album,
+                author: author,
+                trackNumber: trackNumber,
+                seasonNumber: seasonNumber,
+                episodeNumber: episodeNumber,
+                releaseYear: releaseYear,
+                durationMs: durationMs,
+            )
         )
     }
 }

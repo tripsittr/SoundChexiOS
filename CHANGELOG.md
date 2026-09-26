@@ -3,6 +3,48 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.28.0 “Cascade” — 2026-09-26
+
+### Added
+- **Downloads are visible in the Files app** (S-416), under
+  `SoundChex/Media`, laid out exactly as the desktop library:
+
+      Music/Artist/Album/## Track.mp3
+      Movies/Title (Year)/Title (Year).mp4
+      TV/Show/Season 01/Show - S01E02.mkv
+      Books/Author/Title.epub
+
+  Before this they sat in a hidden cache as `42.media` — named by database
+  id, invisible, and impossible to do anything else with. They are the
+  person's own media and should be reachable like any other folder.
+
+  **Existing downloads are moved, not copied.** Nobody should need twice the
+  space to gain a folder they can browse, and two copies of a library drifting
+  apart is its own bug. Anything that cannot be moved is left where it is and
+  keeps playing.
+
+  The folder stays excluded from iCloud backup, as the old cache was: pushing
+  a few hundred albums into someone's iCloud allowance is not what downloading
+  them meant.
+
+- **Books can be downloaded.** They had no download control anywhere in the
+  app — not on a row, not in the reader — so a book could not be read without
+  the server. There is now one beside Read. It does not ask how long to keep
+  it: a book is a few megabytes, and that prompt exists for films.
+
+### Changed
+- Deleting a download now removes the empty Artist and Album folders it
+  leaves behind. A library of empty folders in Files is worse than one that is
+  simply missing things.
+
+### Known gaps
+- A file in Documents belongs to the person, so it can be renamed or deleted
+  from Files. Playback treats a file that has gone as not-downloaded and
+  offers it again, rather than failing at the moment of playing — but the app
+  cannot tell a deliberate deletion from an accident.
+- Nothing writes artwork or metadata sidecars beside the media yet, so another
+  player reading the folder sees whatever the file's own tags say.
+
 ## 0.27.1 “Reverie” — 2026-09-26
 
 ### Fixed

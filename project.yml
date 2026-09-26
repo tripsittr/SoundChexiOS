@@ -23,8 +23,8 @@ settings:
     # Plans/Versioning.md). The name for each minor lives in
     # Sources/DesignSystem/AppRelease.swift — one written only in the
     # CHANGELOG is not shipped, because Settings reads that map.
-    MARKETING_VERSION: "0.27.1"
-    CURRENT_PROJECT_VERSION: "52"
+    MARKETING_VERSION: "0.28.0"
+    CURRENT_PROJECT_VERSION: "53"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete
@@ -111,6 +111,13 @@ targets:
         # here. Without this key App Store Connect holds each build with a
         # "Missing Compliance" prompt before testers can install it.
         ITSAppUsesNonExemptEncryption: false
+        # Makes Documents/SoundChex/Media browsable in the Files app (S-416).
+        # Both keys are needed: the first lists the app in Files, the second
+        # lets files be opened and edited in place rather than copied out.
+        # Downloads are the person's own media and should be reachable like
+        # any other folder.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.soundchex.ios

@@ -28,14 +28,25 @@ struct ShowDetailView: View {
             VStack(spacing: 16) {
                 header
                 if item.type == .book {
-                    // A book opens the reader rather than the video player.
-                    Button {
-                        reading = item
-                    } label: {
-                        Label("Read", systemImage: "book")
-                            .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
-                            .background(SoundChexTheme.accent, in: .capsule).foregroundStyle(.white)
+                    // A book opens the reader rather than the video player,
+                    // and can be downloaded to read with no server — which it
+                    // could not be before, having had no download control
+                    // anywhere in the app (S-416).
+                    HStack(spacing: 12) {
+                        Button {
+                            reading = item
+                        } label: {
+                            Label("Read", systemImage: "book")
+                                .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
+                                .background(SoundChexTheme.accent, in: .capsule).foregroundStyle(.white)
+                        }
+
+                        // No retention prompt: a book is a few megabytes, and
+                        // asking how long to keep one would be the tax on
+                        // every tap that S-404 deliberately avoided for music.
+                        DownloadButton(item: item, size: 20)
                     }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 16)
                 } else if episodes.isEmpty {
                     // A film, or a show with no episodes catalogued.

@@ -3,6 +3,41 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.26.0 “Resonance” — 2026-09-25
+
+### Added
+- **The home page reacts to what you play** (S-414). It used to show
+  "Recently added" and one row per media type — the same rows on day one and
+  day five hundred, reflecting nothing you had ever done.
+
+  - **Continue watching** and **Keep reading** at the top, because something
+    you started is the least speculative thing the page can offer: you already
+    chose it. Fetched from the server, which is the only place resume position
+    lives — the library mirror does not carry it, so the device could not work
+    this out from what it holds.
+  - **Recently played**, from the play dates already in the mirror and unused
+    by this page until now.
+  - **A hero that changes.** It was always the newest item with artwork, which
+    is why it never moved: a library that has stopped growing had a permanent
+    hero. It now prefers something you have played — and deliberately not the
+    *most* recent, which is probably still playing and already visible in the
+    now-playing bar.
+
+  A library with no history still gets a hero and a page: the old rows remain
+  underneath, and each new row appears only when it has something to show. A
+  single played item does not earn a row of its own.
+
+  The continue shelves refresh on every visit to the page, because they are
+  exactly the rows that go stale — you watched something, came back, and it
+  should have moved.
+
+### Known gaps
+- Rows are recency, not taste. Nothing ranks by how much you liked something,
+  because nothing measures that yet (S-289).
+- If the continue request fails the shelves are left as they were and nothing
+  is said. A home page with one row fewer is better than one with an error
+  where a row should be.
+
 ## 0.25.0 “Motif” — 2026-09-25
 
 ### Added

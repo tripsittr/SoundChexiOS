@@ -126,11 +126,12 @@ final class PlaybackController {
     /// with the rest queued behind it.
     func play(_ items: [MediaItem], startAt start: Int = 0) {
         guard !items.isEmpty else { return }
-        guard let api else {
-            AppLog.error("Playback ignored because API client is unavailable", category: "playback")
-            DeviceReporter.shared.sendDiagnostics(reason: "playback request ignored: api client unavailable")
-            return
-        }
+
+        // No guard on `api` here. A downloaded track needs no server at all,
+        // and refusing to play one because the session has no client is
+        // exactly the bug this was: bytes on the device, and "Playback
+        // ignored" in the log (S-415). `loadCurrent` takes the local path
+        // first and only needs a client to stream.
 
         originalQueue = items
         queue = items
@@ -408,7 +409,7 @@ final class PlaybackController {
     /// `startingAt` exists only for restoring a track that was interrupted
     /// mid-play (S-342); every ordinary load starts at zero, because moving
     /// between songs always restarts them.
-    private func loadCurrent(api: APIClient, startingAt startPosition: Double = 0, autoplay: Bool = true) {
+    private func loadCurrent(api: APIClient?, startingAt startPosition: Double = 0, autoplay: Bool = true) {
         guard queue.indices.contains(index) else { return }
 
         let item = queue[index]
@@ -444,6 +445,20 @@ final class PlaybackController {
             sourceDescription = "local"
             currentPlaybackTarget = "local:\(local.lastPathComponent)"
         } else {
+            // Streaming is the only branch that needs a server. Reaching here
+            // with no client means the track is not downloaded *and* there is
+            // nowhere to fetch it from — worth saying plainly rather than
+            // failing further down.
+            guard let api else {
+                AppLog.error(
+                    "Cannot play #\(item.id): not downloaded and no server connection",
+                    category: "playback",
+                )
+                isPlaying = false
+                updateNowPlayingInfo()
+                return
+            }
+
             guard let url = api.streamURL(itemID: item.id) else {
                 AppLog.error("Playback failed: stream URL missing for #\(item.id)", category: "playback")
                 DeviceReporter.shared.sendDiagnostics(reason: "playback failed for item #\(item.id): stream URL missing")
@@ -491,8 +506,12 @@ final class PlaybackController {
             // resuming would drop the listener back mid-song.
             let resume: Double = startPosition > 0
                 ? startPosition
+                // A book resumes where it was left, which only the server
+                // knows. With no client — playing a download with no server
+                // reachable — it starts at the beginning rather than refusing
+                // to play at all (S-415).
                 : (item.type == .book
-                    ? Double((try? await api.progress(itemID: item.id))?.position ?? 0)
+                    ? Double((try? await api?.progress(itemID: item.id))??.position ?? 0)
                     : 0)
 
             // The await above gives another skip time to start its own load. If

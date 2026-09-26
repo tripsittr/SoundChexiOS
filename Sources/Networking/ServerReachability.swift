@@ -45,7 +45,12 @@ enum ServerReachability {
     }
 
     /// Whether a server answers its health route at this address.
-    private static func isUp(_ base: URL) async -> Bool {
+    ///
+    /// Public because `Connectivity` asks the same question continuously
+    /// (S-415): "is there a network interface" and "does my server answer"
+    /// are different questions, and only the second one decides whether an
+    /// undownloaded track can play.
+    static func isUp(_ base: URL) async -> Bool {
         let url = base.appendingPathComponent("up")
 
         var request = URLRequest(url: url)

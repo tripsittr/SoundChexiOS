@@ -3,6 +3,39 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.25.0 “Motif” — 2026-09-25
+
+### Added
+- **Suggestions under Your Library** (S-413). The page said what you had just
+  played; it now also says what to play next.
+
+  Three shelves, built from what the device already holds — the mirrored
+  catalogue's play dates and the recent-contexts store — rather than waiting
+  for a recommender to exist:
+
+  - **More from ARTIST**, for whoever you played last. The least speculative
+    suggestion available: you chose them minutes ago. Excludes the album you
+    are actually listening to, so it is *more* rather than the same thing.
+  - **You haven't heard this in a while** — albums you played once and have
+    not returned to, oldest first. Deliberately *not* "never played": that is
+    the rest of the library, and suggesting it is just browsing.
+  - **On repeat** — recently played albums, reaching further back than the
+    handful of contexts above it.
+
+  Every shelf is honest about its own emptiness. A library with no history
+  produces fewer shelves rather than empty ones, and a shelf with a single
+  item is dropped rather than given a header over nothing. An album counts as
+  recently played if *any* of its tracks is.
+
+  When the real recommender lands (S-289) these become the fallback, or the
+  shape the server fills.
+
+### Known gaps
+- The shelves are recency, not taste. Nothing ranks by how much you liked
+  something, because nothing measures that yet.
+- Music only. Movies, shows and books have no equivalent — continue watching
+  needs a server endpoint that does not exist (S-414).
+
 ## 0.24.0 “Vamp” — 2026-09-25
 
 ### Added

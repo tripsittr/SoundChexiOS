@@ -3,6 +3,37 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.27.1 “Reverie” — 2026-09-26
+
+### Fixed
+- **A downloaded track would not play when the server was unreachable**
+  (S-415). `play()` refused outright if the session had no API client, logged
+  "Playback ignored", and stopped — even though the bytes were already on the
+  device and no server was needed. Only the *streaming* branch ever needed a
+  client, and now only it requires one. A book still resumes where it was left
+  when the server can be asked, and starts from the beginning when it cannot,
+  rather than refusing to play.
+
+- **"Offline" meant the wrong thing** (S-415). It asked whether a network
+  interface existed, which for this app is nearly the wrong question: you run
+  the server yourself, usually at home or on a tailnet, so a phone on mobile
+  data or someone else's wifi has a fine internet connection and no route to
+  the library whatsoever.
+
+  The old code admitted this in its own comment — "a phone on hotel wifi with
+  no route to a home tailnet reads as online here" — and treated it as an edge
+  case. It is the normal case away from home: nothing greyed out, every
+  undownloaded row accepted a tap, and every one of those taps failed.
+
+  Offline now means the server did not answer. The interface is only the
+  trigger to go and ask: no interface is a definite no, and an interface that
+  appears or changes prompts a fresh probe, as does the app coming forward and
+  a request that fails — that last one being the most truthful signal
+  available, since it is the real thing failing rather than a test.
+
+  Before a server is configured the app stays optimistic, so signing in does
+  not happen behind a greyed-out library.
+
 ## 0.27.0 “Reverie” — 2026-09-25
 
 ### Added

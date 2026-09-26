@@ -17,7 +17,17 @@ import UIKit
 @Observable
 final class Session {
     /// The base URL of the SoundChex server, e.g. https://el-laptop.tail7e590c.ts.net
-    private(set) var serverURL: URL?
+    /// The server in use. Assigned from seven places — restore, the address
+    /// race, sign-in, sign-out — so the connectivity probe is pointed from a
+    /// `didSet` rather than at each one, where it would eventually be missed
+    /// (S-415).
+    private(set) var serverURL: URL? {
+        didSet {
+            guard serverURL != oldValue else { return }
+
+            Connectivity.shared.track(serverURL: serverURL)
+        }
+    }
 
     /// The bearer token for the API, once signed in.
     private(set) var token: String?

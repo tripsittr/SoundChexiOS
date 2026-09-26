@@ -119,6 +119,11 @@ struct LibraryTabs: View {
             // iOS would not honour one reliably, and a file deleted while
             // nobody is looking is a file nobody was told about.
             downloads.sweepExpiredDownloads()
+
+            // The server may have become reachable — or stopped being — while
+            // the app was away, which is most of the time on a phone that
+            // leaves the house (S-415).
+            connectivity.refresh()
         }
     }
 }

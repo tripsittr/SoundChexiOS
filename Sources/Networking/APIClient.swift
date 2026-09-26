@@ -154,6 +154,41 @@ struct APIClient {
     /// `smart` weights the draw by what this profile actually plays. Built on
     /// the server because weighting it here would mean the phone holding the
     /// whole library and the whole play history.
+    /// One person in a film or show's credits (S-412).
+    struct Credit: Decodable, Identifiable, Hashable, Sendable {
+        let id: Int
+        let name: String
+        let role: String?
+        let character: String?
+        let headshot: URL?
+
+        /// "Actor as Character", or just the name. The character is the part
+        /// people actually recognise, so it belongs next to the name rather
+        /// than in a column of its own.
+        var billing: String {
+            guard let character, !character.isEmpty else { return name }
+
+            return "\(name) as \(character)"
+        }
+    }
+
+    /// Cast, crew and tags for one item.
+    ///
+    /// A separate call rather than part of the library sync: every device
+    /// mirrors the whole catalogue, and credits for thousands of items would
+    /// be a lot to carry so one screen can show a handful (S-412).
+    func details(itemID: Int) async throws -> (cast: [Credit], crew: [Credit], tags: [String]) {
+        struct Response: Decodable {
+            let cast: [Credit]
+            let crew: [Credit]
+            let tags: [String]
+        }
+
+        let response: Response = try await send("/api/v1/items/\(itemID)/details", method: "GET")
+
+        return (response.cast, response.crew, response.tags)
+    }
+
     /// What you started and did not finish (S-414).
     ///
     /// Server-side because resume position lives in `media_plays` and the

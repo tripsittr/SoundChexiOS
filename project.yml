@@ -23,8 +23,8 @@ settings:
     # Plans/Versioning.md). The name for each minor lives in
     # Sources/DesignSystem/AppRelease.swift — one written only in the
     # CHANGELOG is not shipped, because Settings reads that map.
-    MARKETING_VERSION: "0.26.0"
-    CURRENT_PROJECT_VERSION: "50"
+    MARKETING_VERSION: "0.27.0"
+    CURRENT_PROJECT_VERSION: "51"
     # Strict concurrency is on by default at Swift 6; keep it, the app is small
     # enough to get right from the start.
     SWIFT_STRICT_CONCURRENCY: complete

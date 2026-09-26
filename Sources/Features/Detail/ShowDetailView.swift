@@ -75,6 +75,12 @@ struct ShowDetailView: View {
                 } else {
                     episodeList
                 }
+
+                // Facts and credits: what the item is and who made it
+                // (S-412). Below the episodes for a show, because someone
+                // opening a series wants the next episode first.
+                MediaFactsSection(item: item)
+                    .padding(.top, 8)
             }
             .padding(.bottom, 24)
         }

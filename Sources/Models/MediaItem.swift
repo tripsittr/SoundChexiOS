@@ -108,6 +108,26 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         let releaseYear: Int?
         let durationMs: Int?
 
+        // The wider film and show detail the server now sends (S-412). All
+        // optional: a library item that was never enriched has none of it,
+        // and a detail page shows what it has rather than blank rows.
+        let tagline: String?
+        let studio: String?
+        let language: String?
+        let country: String?
+        let imdbRating: Double?
+        let rtScore: Int?
+        let mpaaRating: String?
+        let runtimeMinutes: Int?
+        let creator: String?
+        let network: String?
+        let firstAirYear: Int?
+        let lastAirYear: Int?
+        let seasonCount: Int?
+        let episodeCount: Int?
+        let status: String?
+        let contentRating: String?
+
         /// The artist to group and browse by: the primary when known, else the
         /// full credit. Everything that lists artists should use this, not
         /// `artist`, or featured tracks split into their own artists.
@@ -129,6 +149,12 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
             case artist, primaryArtist, album, albumKey, author, director
             case episodeTitle, trackNumber, discNumber
             case seasonNumber, episodeNumber, releaseYear, durationMs
+            // Film and show detail (S-412). Snake_case on the wire; the
+            // decoder converts, so these match the server's keys.
+            case tagline, studio, language, country, imdbRating, rtScore
+            case mpaaRating, runtimeMinutes
+            case creator, network, firstAirYear, lastAirYear
+            case seasonCount, episodeCount, status, contentRating
         }
 
         /// Direct initialiser for building from stored data (offline entries).
@@ -137,13 +163,27 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
              director: String? = nil, episodeTitle: String? = nil,
              trackNumber: Int? = nil, discNumber: Int? = nil,
              seasonNumber: Int? = nil, episodeNumber: Int? = nil,
-             releaseYear: Int? = nil, durationMs: Int? = nil) {
+             releaseYear: Int? = nil, durationMs: Int? = nil,
+             tagline: String? = nil, studio: String? = nil, language: String? = nil,
+             country: String? = nil, imdbRating: Double? = nil, rtScore: Int? = nil,
+             mpaaRating: String? = nil, runtimeMinutes: Int? = nil,
+             creator: String? = nil, network: String? = nil,
+             firstAirYear: Int? = nil, lastAirYear: Int? = nil,
+             seasonCount: Int? = nil, episodeCount: Int? = nil,
+             status: String? = nil, contentRating: String? = nil) {
             self.artist = artist; self.primaryArtist = primaryArtist; self.album = album; self.albumKey = albumKey
             self.author = author
             self.director = director; self.episodeTitle = episodeTitle
             self.trackNumber = trackNumber; self.discNumber = discNumber
             self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
             self.releaseYear = releaseYear; self.durationMs = durationMs
+            self.tagline = tagline; self.studio = studio; self.language = language
+            self.country = country; self.imdbRating = imdbRating; self.rtScore = rtScore
+            self.mpaaRating = mpaaRating; self.runtimeMinutes = runtimeMinutes
+            self.creator = creator; self.network = network
+            self.firstAirYear = firstAirYear; self.lastAirYear = lastAirYear
+            self.seasonCount = seasonCount; self.episodeCount = episodeCount
+            self.status = status; self.contentRating = contentRating
         }
 
         init(from decoder: Decoder) throws {
@@ -161,6 +201,22 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
             episodeNumber = try? c.decodeIfPresent(Int.self, forKey: .episodeNumber)
             releaseYear = try? c.decodeIfPresent(Int.self, forKey: .releaseYear)
             durationMs = try? c.decodeIfPresent(Int.self, forKey: .durationMs)
+            tagline = try? c.decodeIfPresent(String.self, forKey: .tagline)
+            studio = try? c.decodeIfPresent(String.self, forKey: .studio)
+            language = try? c.decodeIfPresent(String.self, forKey: .language)
+            country = try? c.decodeIfPresent(String.self, forKey: .country)
+            imdbRating = try? c.decodeIfPresent(Double.self, forKey: .imdbRating)
+            rtScore = try? c.decodeIfPresent(Int.self, forKey: .rtScore)
+            mpaaRating = try? c.decodeIfPresent(String.self, forKey: .mpaaRating)
+            runtimeMinutes = try? c.decodeIfPresent(Int.self, forKey: .runtimeMinutes)
+            creator = try? c.decodeIfPresent(String.self, forKey: .creator)
+            network = try? c.decodeIfPresent(String.self, forKey: .network)
+            firstAirYear = try? c.decodeIfPresent(Int.self, forKey: .firstAirYear)
+            lastAirYear = try? c.decodeIfPresent(Int.self, forKey: .lastAirYear)
+            seasonCount = try? c.decodeIfPresent(Int.self, forKey: .seasonCount)
+            episodeCount = try? c.decodeIfPresent(Int.self, forKey: .episodeCount)
+            status = try? c.decodeIfPresent(String.self, forKey: .status)
+            contentRating = try? c.decodeIfPresent(String.self, forKey: .contentRating)
         }
     }
 }

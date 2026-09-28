@@ -55,6 +55,7 @@ struct AdminProfilesView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { creating = true } label: { Image(systemName: "plus") }
+                    .accessibilityLabel("New profile")
             }
         }
         .sheet(item: $editing) { profile in

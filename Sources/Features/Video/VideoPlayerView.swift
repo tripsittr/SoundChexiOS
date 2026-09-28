@@ -81,6 +81,11 @@ struct VideoPlayerView: View {
                 .font(.title3)
                 .foregroundStyle(.white)
                 .padding(10)
+                // On and off differ only by a filled glyph, so the state is
+                // spoken. This is the control for a feature declared as
+                // supported; it cannot be an unlabelled button.
+                .accessibilityLabel("Subtitles")
+                .accessibilityValue(subtitles.selected?.label ?? "Off")
                 .background(.black.opacity(0.5), in: .circle)
         }
     }

@@ -80,6 +80,7 @@ struct ArtistDetailView: View {
                 SoundChexTheme.base700.overlay(
                     Image(systemName: "music.mic").font(.largeTitle).foregroundStyle(SoundChexTheme.ink500))
             }
+            .accessibilityHidden(true)
             .frame(height: 320)
             .frame(maxWidth: .infinity)
             .clipped()
@@ -137,6 +138,7 @@ struct ArtistDetailView: View {
                     .foregroundStyle(SoundChexTheme.ink300)
                     .frame(width: 40, height: 40)
             }
+            .accessibilityLabel("Sort")
         }
         .padding(.horizontal, 16)
     }
@@ -190,13 +192,13 @@ struct ArtistDetailView: View {
     @ViewBuilder private var secondaryActions: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 20) {
-                circleButton(system: "shuffle") {
+                circleButton(system: "shuffle", label: "Shuffle") {
                     if !playback.isShuffled { playback.toggleShuffle() }
                     recents.record(.artist, id: artist.id)
                     recents.record(.artist, id: artist.id)
             playback.play(allTracks)
                 }
-                circleButton(system: "arrow.down") { downloadAll() }
+                circleButton(system: "arrow.down", label: "Download all") { downloadAll() }
                 Spacer()
             }
 
@@ -214,7 +216,11 @@ struct ArtistDetailView: View {
         .padding(.horizontal, 16)
     }
 
-    private func circleButton(system: String, action: @escaping () -> Void) -> some View {
+    private func circleButton(
+        system: String,
+        label: String,
+        action: @escaping () -> Void,
+    ) -> some View {
         Button(action: action) {
             Image(systemName: system)
                 .font(.system(size: 16, weight: .semibold))
@@ -222,6 +228,7 @@ struct ArtistDetailView: View {
                 .foregroundStyle(SoundChexTheme.ink200)
                 .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
         }
+        .accessibilityLabel(label)
     }
 
     private func downloadAll() {
@@ -240,6 +247,7 @@ struct ArtistDetailView: View {
                 .background(SoundChexTheme.accent, in: .circle)
                 .shadow(color: SoundChexTheme.accent.opacity(0.4), radius: 12, y: 4)
         }
+        .accessibilityLabel("Play all")
     }
 
     // MARK: - Albums
@@ -256,6 +264,7 @@ struct ArtistDetailView: View {
                                 SoundChexTheme.base700.overlay(
                                     Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500))
                             }
+                            .accessibilityHidden(true)
                             .aspectRatio(1, contentMode: .fill)
                             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusPoster))
                             Text(album.title).font(.subheadline)

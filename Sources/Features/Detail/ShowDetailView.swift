@@ -67,6 +67,7 @@ struct ShowDetailView: View {
                                         .frame(width: 44, height: 44)
                                         .foregroundStyle(SoundChexTheme.storedGreen)
                                         .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
+                                        .accessibilityLabel("Downloaded. Remove download")
                                 }
                             } else {
                                 Button {
@@ -77,6 +78,7 @@ struct ShowDetailView: View {
                                         .frame(width: 44, height: 44)
                                         .foregroundStyle(SoundChexTheme.ink200)
                                         .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
+                                        .accessibilityLabel("Download")
                                 }
                             }
                         }
@@ -189,11 +191,18 @@ struct ShowDetailView: View {
                             }
 
                             Image(systemName: "play.circle").foregroundStyle(SoundChexTheme.ink400)
+                                .accessibilityHidden(true)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 11)
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    // The number, the title and — if it is on the device — a
+                    // green tick, as one sentence. The tick is the only mark
+                    // of a downloaded episode, so it has to be said.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(episodeLabel(episode))
+                    .accessibilityAddTraits(.isButton)
                     .contextMenu {
                         EpisodeActions(episode: episode) { downloadTarget = $0 }
                     }
@@ -201,6 +210,23 @@ struct ShowDetailView: View {
                 }
             }
         }
+    }
+
+    /// An episode row, spoken.
+    private func episodeLabel(_ episode: MediaItem) -> String {
+        var parts: [String] = []
+
+        if let number = episode.meta?.episodeNumber {
+            parts.append("Episode \(number)")
+        }
+
+        parts.append(episode.meta?.episodeTitle ?? episode.title)
+
+        if downloads.isStored(episode.id) {
+            parts.append("Downloaded")
+        }
+
+        return parts.joined(separator: ", ")
     }
 
     private func playButton(for item: MediaItem, label: String) -> some View {

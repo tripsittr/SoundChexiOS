@@ -85,6 +85,7 @@ struct ThemeSettingsView: View {
                     .fill(theme.surface(for: scheme))
                     .frame(width: 56, height: 56)
                     .overlay(Image(systemName: "music.note").foregroundStyle(theme.legibleAccent(on: scheme)))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Now Playing").font(.headline)
                     Text("Your accent, live").font(.subheadline).foregroundStyle(.secondary)
@@ -93,7 +94,12 @@ struct ThemeSettingsView: View {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 34))
                     .foregroundStyle(theme.legibleAccent(on: scheme))
+                    .accessibilityHidden(true)
             }
+            // A preview of the chosen accent, not a control. Announced
+            // piecemeal it sounds like a player someone can operate.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Preview of your accent colour")
             Capsule()
                 .fill(theme.accent)
                 .frame(height: 4)

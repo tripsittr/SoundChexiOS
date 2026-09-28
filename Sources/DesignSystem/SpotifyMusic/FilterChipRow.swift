@@ -31,6 +31,7 @@ struct FilterChipRow<Option: Hashable>: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(SoundChexTheme.ink100)
                             .frame(width: 34, height: 34)
+                            .accessibilityLabel("Clear filter")
                             .background(SoundChexTheme.base700, in: .circle)
                     }
                     .buttonStyle(.plain)

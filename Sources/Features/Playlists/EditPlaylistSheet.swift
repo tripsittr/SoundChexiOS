@@ -95,6 +95,7 @@ struct EditPlaylistSheet: View {
             Image(systemName: "camera.fill")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.white)
+                .accessibilityHidden(true)
                 .padding(7)
                 .background(SoundChexTheme.accent, in: .circle)
                 .padding(6)

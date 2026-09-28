@@ -68,6 +68,7 @@ struct ImportPlaylistView: View {
             Image(systemName: "music.note.list")
                 .font(.system(size: 48))
                 .foregroundStyle(SoundChexTheme.ink500)
+                .accessibilityHidden(true)
             Text("Bring a playlist with you")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(SoundChexTheme.ink100)
@@ -205,6 +206,7 @@ private struct UnmatchedRow: View {
                         Image(systemName: "plus.circle").foregroundStyle(SoundChexTheme.accent)
                     }
                 }
+                .accessibilityLabel("Match with \(item.title)")
                 .buttonStyle(.plain)
             }
         }

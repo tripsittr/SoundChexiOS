@@ -48,6 +48,7 @@ struct CollectionActions: View {
                 .foregroundStyle(SoundChexTheme.ink200)
                 .frame(width: 40, height: 40)
         }
+        .accessibilityLabel("More actions")
         .disabled(tracks.isEmpty)
     }
 }

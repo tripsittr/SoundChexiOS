@@ -3,6 +3,20 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.06 “Clarity” — 2026-09-28
+
+### Added
+- **Films and shows show their synopsis** (S-412). The detail page had the
+  tagline, the facts and the credits, but not the paragraph that actually
+  tells you what the thing is.
+
+  It sits above the facts table, because the synopsis is what someone reads to
+  decide what to watch and the runtime is what they check afterwards.
+
+  The server prefers the owner's own words over TMDB's, so this is not always
+  a scraped blurb — a description written in the admin is what the phone
+  shows.
+
 ## 0.29.05 “Clarity” — 2026-09-28
 
 ### Fixed

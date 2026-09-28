@@ -8,6 +8,7 @@ import SwiftUI
 struct NowPlayingBar: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(ThemeStore.self) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var showingPlayer = false
 
     var body: some View {
@@ -70,7 +71,15 @@ struct NowPlayingBar: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .background(.ultraThinMaterial)
+            // A blur behind text is the one place translucency costs
+            // legibility, so Reduce Transparency gets a solid fill (#437).
+            .background {
+                if reduceTransparency {
+                    SoundChexTheme.base800
+                } else {
+                    Rectangle().fill(.ultraThinMaterial)
+                }
+            }
             .overlay(alignment: .top) {
                 Rectangle().fill(SoundChexTheme.base700).frame(height: 0.5)
             }

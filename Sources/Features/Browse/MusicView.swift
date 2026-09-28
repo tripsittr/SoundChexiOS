@@ -86,7 +86,7 @@ struct MusicView: View {
                             .accessibilityHidden(true)
                             .frame(width: 44, height: 44).clipShape(.circle)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(artist.name).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                                Text(artist.name).foregroundStyle(SoundChexTheme.ink100).scalableTitle()
                                 Text("\(artist.albums.count) album\(artist.albums.count == 1 ? "" : "s")").font(.caption)
                                     .foregroundStyle(SoundChexTheme.ink500)
                             }
@@ -310,7 +310,7 @@ struct MusicView: View {
 
     private func shelfHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 22, weight: .bold))
+            .font(ScaledFont.system(size: 22, relativeTo: .title2, weight: .bold))
             .foregroundStyle(SoundChexTheme.ink100)
             .padding(.horizontal, 16)
     }
@@ -324,7 +324,7 @@ struct MusicView: View {
             .accessibilityHidden(true)
             .aspectRatio(1, contentMode: .fill)
             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusPoster))
-            Text(album.title).font(.subheadline).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+            Text(album.title).font(.subheadline).foregroundStyle(SoundChexTheme.ink100).scalableTitle()
             Text(album.artist).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
         }
     }

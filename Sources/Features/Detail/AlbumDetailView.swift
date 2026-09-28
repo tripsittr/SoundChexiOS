@@ -62,11 +62,11 @@ struct AlbumDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(album.title)
-                        .font(.system(size: 24, weight: .bold))
+                        .font(ScaledFont.system(size: 24, relativeTo: .title2, weight: .bold))
                         .foregroundStyle(SoundChexTheme.ink100)
                         .lineLimit(2)
                     Text(metaLine)
-                        .font(.system(size: 13))
+                        .font(ScaledFont.system(size: 13, relativeTo: .footnote))
                         .foregroundStyle(SoundChexTheme.ink400)
                 }
                 Spacer(minLength: 12)

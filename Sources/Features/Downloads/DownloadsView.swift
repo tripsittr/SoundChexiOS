@@ -37,7 +37,7 @@ struct DownloadsView: View {
                                 DownloadArtwork(item: pair.element, size: 44)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(pair.element.title)
-                                        .foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                                        .foregroundStyle(SoundChexTheme.ink100).scalableTitle()
                                     if pair.element.isExpired {
                                         Text("Expired — tap to download again")
                                             .font(.caption)

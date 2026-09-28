@@ -157,7 +157,7 @@ struct ShowDetailView: View {
             ForEach(groupedBySeason, id: \.season) { group in
                 if group.season > 0 {
                     Text("Season \(group.season)")
-                        .font(.system(size: 13, weight: .semibold)).tracking(1).textCase(.uppercase)
+                        .font(ScaledFont.system(size: 13, relativeTo: .footnote, weight: .semibold)).tracking(1).textCase(.uppercase)
                         .foregroundStyle(SoundChexTheme.ink500)
                         .padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 6)
                 }
@@ -172,7 +172,7 @@ struct ShowDetailView: View {
                             }
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(episode.meta?.episodeTitle ?? episode.title)
-                                    .foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                                    .foregroundStyle(SoundChexTheme.ink100).scalableTitle()
                             }
                             Spacer()
 

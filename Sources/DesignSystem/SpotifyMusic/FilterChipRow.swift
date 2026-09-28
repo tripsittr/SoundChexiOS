@@ -62,7 +62,7 @@ struct FilterChipRow<Option: Hashable>: View {
             }
         } label: {
             Text(label(option))
-                .font(.system(size: 14, weight: .semibold))
+                .font(ScaledFont.system(size: 14, relativeTo: .footnote, weight: .semibold))
                 .foregroundStyle(active ? .white : SoundChexTheme.ink100)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)

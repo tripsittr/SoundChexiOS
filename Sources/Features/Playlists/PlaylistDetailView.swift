@@ -149,7 +149,7 @@ struct PlaylistDetailView: View {
 
                         if batch.isRunning {
                             Text("\(batch.remaining(downloads))")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(ScaledFont.system(size: 10, relativeTo: .caption2, weight: .bold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)

@@ -3,6 +3,40 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.01 “Clarity” — 2026-09-28
+
+### Added
+- **Text scales with the reader's chosen size** (#434). The app was written
+  with literal point sizes — `.font(.system(size: 15))` — in 25 files. A
+  literal size ignores Dynamic Type completely, so the app looked identical at
+  the largest accessibility setting and the smallest. That is the single most
+  common reason someone cannot read an app at all.
+
+  35 text sites now scale. Icon glyphs, the reader's own size control and
+  sizes derived from geometry stay fixed, because a symbol is a drawing and
+  scaling it does not help anyone read.
+
+  The obvious fix does not exist: there is no `Font.system(size:relativeTo:)`.
+  Only `Font.custom` takes a `relativeTo:`, and that needs a named face rather
+  than the system font. `ScaledFont` scales the size through `UIFontMetrics` —
+  what the text styles use underneath — and hands it to the ordinary system
+  font, so it tracks Dynamic Type exactly while keeping the design's sizes.
+
+- **Layouts that would break at the accessibility sizes now change shape.**
+  - Film and show facts stack label above value instead of holding a 120pt
+    label column. At AX5 that column left almost nothing for the value.
+  - Titles in scrolling lists wrap to three lines instead of truncating to
+    one. At AX5 a row holds roughly eight characters, so every row in a list
+    read "Symphony No…" and the list stopped distinguishing its contents.
+    Fixed-size tiles still truncate, since they cannot grow.
+  - The scrolling marquee title reserved a fixed line height, which would
+    have clipped the now-playing title as soon as the font grew.
+
+### Known gaps
+- **Not yet checked on a device** at the accessibility sizes. The
+  Accessibility Inspector's Dynamic Type slider at AX5 is the real test and
+  has not been run; expect more layout work after it.
+
 ## 0.29.0 “Clarity” — 2026-09-28
 
 ### Added

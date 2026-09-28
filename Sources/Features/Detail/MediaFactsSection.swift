@@ -14,6 +14,7 @@ import SwiftUI
 /// this, and a page of blank labels is worse than a short page.
 struct MediaFactsSection: View {
     @Environment(Session.self) private var session
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let item: MediaItem
 
@@ -27,7 +28,7 @@ struct MediaFactsSection: View {
                 // Italic and set apart: a tagline is the film talking about
                 // itself, not a fact about it.
                 Text(tagline)
-                    .font(.system(size: 15))
+                    .font(ScaledFont.system(size: 15, relativeTo: .subheadline))
                     .italic()
                     .foregroundStyle(SoundChexTheme.ink300)
                     .padding(.horizontal, 16)
@@ -97,17 +98,33 @@ struct MediaFactsSection: View {
     private var factGrid: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(facts.enumerated()), id: \.offset) { pair in
-                HStack(alignment: .firstTextBaseline) {
-                    Text(pair.element.0)
-                        .font(.caption)
-                        .foregroundStyle(SoundChexTheme.ink500)
-                        .frame(width: 120, alignment: .leading)
+                // Label beside value normally; stacked at the accessibility
+                // sizes. A 120pt label column leaves almost nothing for the
+                // value once the text is three times its usual size, and a
+                // director's name squeezed into a thumb's width of column is
+                // not information any more.
+                let label = Text(pair.element.0)
+                    .font(.caption)
+                    .foregroundStyle(SoundChexTheme.ink500)
 
-                    Text(pair.element.1)
-                        .font(.subheadline)
-                        .foregroundStyle(SoundChexTheme.ink100)
+                let value = Text(pair.element.1)
+                    .font(.subheadline)
+                    .foregroundStyle(SoundChexTheme.ink100)
 
-                    Spacer()
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 2) {
+                            label
+                            value
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        HStack(alignment: .firstTextBaseline) {
+                            label.frame(width: 120, alignment: .leading)
+                            value
+                            Spacer()
+                        }
+                    }
                 }
                 .padding(.vertical, 7)
                 .accessibilityElement(children: .combine)
@@ -127,7 +144,7 @@ struct MediaFactsSection: View {
     private func creditRail(_ title: String, _ people: [APIClient.Credit]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 18, weight: .semibold))
+                .font(ScaledFont.system(size: 18, relativeTo: .body, weight: .semibold))
                 .foregroundStyle(SoundChexTheme.ink100)
                 .padding(.horizontal, 16)
 

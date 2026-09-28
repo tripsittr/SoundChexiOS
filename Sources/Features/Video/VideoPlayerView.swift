@@ -33,7 +33,7 @@ struct VideoPlayerView: View {
             .overlay(alignment: .bottom) {
                 if let line = subtitles.currentLine {
                     Text(line)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(ScaledFont.system(size: 18, relativeTo: .body, weight: .semibold))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white)
                         .shadow(color: .black, radius: 3)

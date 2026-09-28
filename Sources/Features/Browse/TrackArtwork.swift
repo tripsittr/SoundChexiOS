@@ -43,6 +43,18 @@ extension View {
             .scalableTitle()
     }
 
+    /// A dot under a toggle that is on (#436).
+    ///
+    /// Shuffle and repeat signalled "on" by turning the accent colour and
+    /// nothing else — no change of shape, no label, no badge. Someone who
+    /// cannot separate the accent from the inactive grey had no way to tell
+    /// whether shuffle was running. The dot is the convention both Apple
+    /// Music and Spotify use, and it survives Differentiate Without Colour
+    /// because it is a shape appearing, not a colour changing.
+    func activeDot(_ isActive: Bool) -> some View {
+        modifier(ActiveDot(isActive: isActive))
+    }
+
     /// One line normally; up to `limit` at the accessibility text sizes (#434).
     ///
     /// A title truncated to one line is fine at the default size, where a row
@@ -65,5 +77,26 @@ private struct ScalableTitle: ViewModifier {
 
     func body(content: Content) -> some View {
         content.lineLimit(dynamicTypeSize.isAccessibilitySize ? limit : 1)
+    }
+}
+
+/// Backs `activeDot(_:)`.
+///
+/// The dot is drawn whenever the toggle is on, and drawn *larger* when the
+/// person has asked to differentiate without colour — at that point it is the
+/// only thing distinguishing on from off, so it should not be subtle.
+private struct ActiveDot: ViewModifier {
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
+
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .bottom) {
+            Circle()
+                .fill(SoundChexTheme.accent)
+                .frame(width: differentiate ? 5 : 4, height: differentiate ? 5 : 4)
+                .offset(y: 8)
+                .opacity(isActive ? 1 : 0)
+        }
     }
 }

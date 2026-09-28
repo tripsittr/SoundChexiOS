@@ -3,6 +3,25 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.04 “Clarity” — 2026-09-28
+
+### Added
+- **State no longer depends on colour alone** (#436). Audited every place a
+  conditional colour carried meaning. Most were already sound — the download
+  states each have their own glyph (checkmark, exclamation, stop), and error
+  text is words, with the colour only reinforcing them. Two were not:
+
+  - **Shuffle and repeat** signalled "on" by turning the accent colour and
+    nothing else: same glyph, same size, same position. Someone who cannot
+    separate the accent from the inactive grey could not tell whether shuffle
+    was running. Each now carries a dot beneath it when active — the
+    convention Apple Music and Spotify both use — which is a shape appearing
+    rather than a colour changing, and grows slightly when the system's
+    Differentiate Without Colour setting is on.
+  - **The artist page's track rows** marked the playing track by accent
+    colour only, while every other track list in the app draws the equalizer
+    over the artwork. It now uses the same component as the rest.
+
 ## 0.29.03 “Clarity” — 2026-09-28
 
 ### Fixed

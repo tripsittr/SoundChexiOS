@@ -157,7 +157,12 @@ struct ArtistDetailView: View {
                         playback.play(sorted, startAt: pair.offset)
                     } label: {
                         HStack(spacing: 12) {
-                            Artwork(item: pair.element, size: 44)
+                            // The equalizer over the artwork, as every other
+                            // track list draws it. Without it this row marked
+                            // the playing track by accent colour alone, which
+                            // says nothing to someone who cannot separate the
+                            // colours (#436).
+                            TrackArtwork(item: pair.element, size: 44)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(pair.element.title)

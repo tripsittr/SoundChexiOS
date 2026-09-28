@@ -18,6 +18,7 @@ struct MediaFactsSection: View {
 
     let item: MediaItem
 
+    @State private var overview: String?
     @State private var cast: [APIClient.Credit] = []
     @State private var crew: [APIClient.Credit] = []
     @State private var loaded = false
@@ -31,6 +32,20 @@ struct MediaFactsSection: View {
                     .font(ScaledFont.system(size: 15, relativeTo: .subheadline))
                     .italic()
                     .foregroundStyle(SoundChexTheme.ink300)
+                    .padding(.horizontal, 16)
+            }
+
+            // The synopsis, above the facts (S-412). It is the thing
+            // someone reads to decide what to watch; a runtime and a rating
+            // are what they check afterwards.
+            //
+            // The owner's own words when they wrote any — the server prefers
+            // them over TMDB's — so this is not always a scraped blurb.
+            if let overview, !overview.isEmpty {
+                Text(overview)
+                    .font(.subheadline)
+                    .foregroundStyle(SoundChexTheme.ink200)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 16)
             }
 
@@ -56,6 +71,7 @@ struct MediaFactsSection: View {
                   let result = try? await api.details(itemID: item.id)
             else { return }
 
+            overview = result.overview
             cast = result.cast
             crew = result.crew
         }

@@ -177,8 +177,11 @@ struct APIClient {
     /// A separate call rather than part of the library sync: every device
     /// mirrors the whole catalogue, and credits for thousands of items would
     /// be a lot to carry so one screen can show a handful (S-412).
-    func details(itemID: Int) async throws -> (cast: [Credit], crew: [Credit], tags: [String]) {
+    func details(itemID: Int) async throws
+        -> (overview: String?, cast: [Credit], crew: [Credit], tags: [String])
+    {
         struct Response: Decodable {
+            let overview: String?
             let cast: [Credit]
             let crew: [Credit]
             let tags: [String]
@@ -186,7 +189,7 @@ struct APIClient {
 
         let response: Response = try await send("/api/v1/items/\(itemID)/details", method: "GET")
 
-        return (response.cast, response.crew, response.tags)
+        return (response.overview, response.cast, response.crew, response.tags)
     }
 
     /// What you started and did not finish (S-414).

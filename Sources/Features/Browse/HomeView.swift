@@ -62,6 +62,9 @@ struct HomeView: View {
 /// The hero: a blurred full-bleed backdrop with the title and a play/details
 /// button, matching the web hero's treatment.
 struct HeroBanner: View {
+    @Environment(ThemeStore.self) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+
     let item: MediaItem
     var onPlay: () -> Void
 
@@ -83,7 +86,7 @@ struct HeroBanner: View {
                 Text("Recently added")
                     .font(ScaledFont.system(size: 12, relativeTo: .caption, weight: .bold))
                     .tracking(2.5)
-                    .foregroundStyle(SoundChexTheme.accent)
+                    .foregroundStyle(theme.readableAccent(on: colorScheme))
 
                 Text(item.title)
                     .font(ScaledFont.system(size: 34, relativeTo: .largeTitle, weight: .heavy))

@@ -13,6 +13,7 @@ struct NowPlayingPage: View {
     // To resolve the playing track's artist and album to real pages (S-412).
     @Environment(LibraryStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var scrubbing = false
     @State private var scrubValue: Double = 0
@@ -207,7 +208,7 @@ struct NowPlayingPage: View {
                             MarqueeText(
                                 text: subtitle,
                                 font: ScaledFont.system(size: 16, relativeTo: .subheadline),
-                                color: SoundChexTheme.accent,
+                                color: theme.readableAccent(on: colorScheme),
                                 lineHeight: 20,
                             )
                         }

@@ -139,23 +139,57 @@ final class ThemeStore {
     /// background — the guardrail on full colour control. If the raw accent is
     /// too low-contrast against the background, it is lightened or darkened until
     /// it clears a minimum contrast ratio.
+    ///
+    /// 3:1 is the WCAG AA floor for *large* text and for UI shapes, which is
+    /// what this was written for. Body-sized text needs 4.5:1 — use
+    /// `readableAccent(on:)` for that (#437).
     func legibleAccent(on scheme: ColorScheme) -> Color {
         let bg = scheme == .light ? backgroundLightHex : backgroundDarkHex
         return Color(hex: adjustForContrast(accentHex, against: bg, minRatio: 3.0))
     }
 
+    /// The accent as *body text*: adjusted until it clears WCAG AA's 4.5:1.
+    ///
+    /// Measured, not judged (#437). The default accent is `0xE11D3A`, which
+    /// scores **4.23:1** on the default dark background — under the bar for
+    /// text at ordinary sizes, and the accent is fully user-configurable, so
+    /// someone else's choice can be far worse. Anywhere the accent carries
+    /// words rather than decorating a shape, it goes through here.
+    func readableAccent(on scheme: ColorScheme) -> Color {
+        let bg = scheme == .light ? backgroundLightHex : backgroundDarkHex
+        return Color(hex: adjustForContrast(accentHex, against: bg, minRatio: 4.5))
+    }
+
     // MARK: - Contrast maths (WCAG relative luminance)
 
+    /// Walks a colour until it clears `minRatio` against `bg`.
+    ///
+    /// Verified by sweeping the colour cube at a 17-step stride — 16,384
+    /// combinations across both backgrounds and both thresholds (3.0 and
+    /// 4.5) — with no failures. There is no iOS test target to hold that as
+    /// a test, so it is recorded here; re-run it if this maths changes.
     private func adjustForContrast(_ fg: UInt32, against bg: UInt32, minRatio: Double) -> UInt32 {
         var color = fg
         let bgLum = Self.luminance(bg)
         // Lighten on a dark background, darken on a light one, until it clears.
         let lightenTarget = bgLum < 0.5
+        // 20 steps was not enough to climb out of black: from #000000 it
+        // takes 38 to clear 4.5:1, and the loop used to give up at #1C1C1C
+        // and hand back text nobody could read (#437). 60 leaves room for
+        // the worst starting colour at either end.
         var steps = 0
-        while Self.contrastRatio(color, bg) < minRatio && steps < 20 {
+        while Self.contrastRatio(color, bg) < minRatio && steps < 60 {
             color = lightenTarget ? Self.scale(color, 1.08) : Self.scale(color, 0.92)
             steps += 1
         }
+
+        // A last resort, if some colour still cannot be walked to the target:
+        // plain white or black always clears it, and unreadable text is the
+        // one outcome not worth preserving the accent for.
+        if Self.contrastRatio(color, bg) < minRatio {
+            return lightenTarget ? 0xFFFFFF : 0x000000
+        }
+
         return color
     }
 
@@ -176,8 +210,16 @@ final class ThemeStore {
         return (hi + 0.05) / (lo + 0.05)
     }
 
+    /// Multiplies each channel, with a floor so that lightening can escape
+    /// black.
+    ///
+    /// Multiplication alone cannot: 0 × 1.08 is still 0, so an accent of pure
+    /// black stayed black however many times it was "lightened", the loop ran
+    /// out its twenty steps and handed back unreadable text (#437). Adding a
+    /// point when lightening gives it somewhere to start.
     private static func scale(_ hex: UInt32, _ factor: Double) -> UInt32 {
-        func c(_ v: UInt32) -> UInt32 { UInt32(min(255, max(0, Double(v) * factor))) }
+        let floor: Double = factor > 1 ? 1 : 0
+        func c(_ v: UInt32) -> UInt32 { UInt32(min(255, max(0, Double(v) * factor + floor))) }
         let r = c((hex >> 16) & 0xFF)
         let g = c((hex >> 8) & 0xFF)
         let b = c(hex & 0xFF)

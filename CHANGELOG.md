@@ -3,6 +3,39 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.03 “Clarity” — 2026-09-28
+
+### Fixed
+- **An accent set to black produced unreadable text** (#437). The guardrail
+  that keeps a chosen accent legible walks the colour lighter until it clears
+  a contrast ratio, but it walked by *multiplying* each channel — and 0 × 1.08
+  is still 0, so black never moved. It also gave up after 20 steps, where
+  black needs 38. The loop ended at #1C1C1C on a near-black background,
+  handed that back as text, and nobody could read it.
+
+  Lightening now adds a point as well as multiplying, the step limit is 60,
+  and if a colour still cannot be walked to the target it falls back to plain
+  white or black. Verified by sweeping the colour cube — 16,384 combinations
+  across both backgrounds and both thresholds — with no failures.
+
+### Added
+- **Accent text meets WCAG AA** (#437). Measured rather than judged: the
+  default accent scores **4.23:1** on the default dark background, under the
+  4.5:1 needed for body text, and the accent is fully user-configurable so
+  another choice can be far worse. `readableAccent(on:)` holds text to 4.5:1;
+  the existing `legibleAccent(on:)` stays at 3:1, which is the right floor for
+  large text and for shapes. Applied to the two places the accent carried
+  words: the artist link on the player and the "Recently added" eyebrow.
+
+- **Reduce Transparency** gives the now-playing bar a solid fill instead of a
+  blur. A blur behind text is the one place translucency costs legibility.
+
+### Measured, and fine
+The rest of the ink ramp passes on both themes — the dimmest text colour in
+use scores 5.28:1 at worst, above the 4.5:1 bar. `ink600` sits at 3.4:1 but
+is only ever a placeholder glyph and a tint, never text. This had been
+recorded as *suspected failing*; the arithmetic says otherwise.
+
 ## 0.29.02 “Clarity” — 2026-09-28
 
 ### Added

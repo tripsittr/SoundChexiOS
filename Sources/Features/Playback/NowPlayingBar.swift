@@ -40,17 +40,31 @@ struct NowPlayingBar: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    // One element, not three. Read separately, VoiceOver
+                    // announces the artwork, then the title, then the
+                    // subtitle, and never says any of it is a button.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(nowPlayingLabel(for: item))
+                    .accessibilityHint("Opens the full player")
+                    .accessibilityAddTraits(.isButton)
 
                     Button { playback.previous() } label: {
                         Image(systemName: "backward.fill")
                     }
+                    .accessibilityLabel("Previous")
+
                     Button { playback.togglePlayPause() } label: {
                         Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                             .font(.title3)
                     }
+                    // The label changes with the state, so VoiceOver describes
+                    // what the tap will do rather than what is happening now.
+                    .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+
                     Button { playback.next() } label: {
                         Image(systemName: "forward.fill")
                     }
+                    .accessibilityLabel("Next")
                 }
                 .foregroundStyle(SoundChexTheme.ink100)
                 .padding(.horizontal, 12)
@@ -66,6 +80,23 @@ struct NowPlayingBar: View {
         }
     }
 
+    /// What VoiceOver says for the info area: the track, then who it is by,
+    /// then that it is playing — the same three things a sighted person takes
+    /// from the bar at a glance.
+    private func nowPlayingLabel(for item: MediaItem) -> String {
+        var parts = ["Now playing", item.title]
+
+        if let subtitle = item.subtitle, !subtitle.isEmpty {
+            parts.append("by \(subtitle)")
+        }
+
+        if !playback.isPlaying {
+            parts.append("paused")
+        }
+
+        return parts.joined(separator: ", ")
+    }
+
     private var progressTrack: some View {
         GeometryReader { geo in
             let fraction = playback.duration > 0 ? playback.position / playback.duration : 0
@@ -74,6 +105,13 @@ struct NowPlayingBar: View {
                 Rectangle().fill(SoundChexTheme.accent)
                     .frame(width: geo.size.width * fraction)
             }
+            // A two-point bar is not a touch target, but how far through you
+            // are is real information, and colour is the only thing carrying
+            // it. Stated as a percentage so it survives both VoiceOver and
+            // Differentiate Without Colour.
+            .accessibilityElement()
+            .accessibilityLabel("Progress")
+            .accessibilityValue("\(Int((fraction * 100).rounded())) percent")
         }
         .frame(height: 2)
     }

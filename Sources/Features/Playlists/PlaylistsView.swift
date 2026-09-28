@@ -32,13 +32,17 @@ final class PlaylistStore {
 /// The playlists grid — the Music tab's Playlists pill. Cover cards in a grid,
 /// with a "New playlist" tile first, Spotify/Apple style.
 struct PlaylistsGrid: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(Session.self) private var session
     @Environment(ThemeStore.self) private var theme
     @Environment(PlaylistStore.self) private var store
     @State private var creating = false
     @State private var importing = false
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    /// Wider tiles where there is room, rather than more tiny ones (S-408).
+    private var columns: [GridItem] {
+        AdaptiveGrid.columns(minimum: 150, spacing: 16, for: horizontalSizeClass)
+    }
 
     var body: some View {
         ScrollView {

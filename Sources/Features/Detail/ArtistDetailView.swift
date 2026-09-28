@@ -12,6 +12,7 @@ import SwiftUI
 /// order — the app has no play-count signal to rank by, so it degrades to that
 /// rather than inventing one (no server change; spec's out-of-scope rule).
 struct ArtistDetailView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
@@ -28,7 +29,10 @@ struct ArtistDetailView: View {
     @State private var songSort: SongSort = .album
     @State private var albumSort: AlbumSort = .releaseDate
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    /// Wider tiles where there is room, rather than more tiny ones (S-408).
+    private var columns: [GridItem] {
+        AdaptiveGrid.columns(minimum: 150, spacing: 16, for: horizontalSizeClass)
+    }
 
     /// Every track by the artist, album order then track order — the queue the
     /// Play button and the Popular list draw from.

@@ -14,6 +14,7 @@ struct NowPlayingPage: View {
     @Environment(LibraryStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var scrubbing = false
     @State private var scrubValue: Double = 0
@@ -72,7 +73,12 @@ struct NowPlayingPage: View {
                 VStack(spacing: 0) {
                     header(item)
                     Spacer(minLength: 12)
-                    Artwork(item: item, size: artworkSide, aspect: 1)
+                    // Sized against the width this page actually occupies,
+                    // not the whole display — in Split View those differ.
+                    Artwork(item: item, size: artworkCap, aspect: 1)
+                        .containerRelativeFrame(.horizontal) { width, _ in
+                            min(width - 56, artworkCap)
+                        }
                         .shadow(color: .black.opacity(0.6), radius: 30, y: 12)
                     Spacer(minLength: 12)
                     titleBlock(item)
@@ -107,10 +113,16 @@ struct NowPlayingPage: View {
         }
     }
 
-    /// The artwork side — most of the width, capped so it never crowds the
-    /// controls on a short screen.
-    private var artworkSide: CGFloat {
-        min(UIScreen.main.bounds.width - 56, 360)
+    /// The largest the artwork may be.
+    ///
+    /// Bigger where there is room (S-408): a 360pt sleeve on an iPad floats
+    /// in the middle of a mostly empty page. The actual size is the smaller
+    /// of this and the page's own width, applied with
+    /// `containerRelativeFrame` — which measures the container this view is
+    /// in, unlike `UIScreen.main.bounds`, which is the whole display and
+    /// would overflow a Split View window.
+    private var artworkCap: CGFloat {
+        horizontalSizeClass == .regular ? 520 : 360
     }
 
     private func header(_ item: MediaItem) -> some View {

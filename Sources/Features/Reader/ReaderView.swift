@@ -79,6 +79,12 @@ struct ReaderView: View {
                 }
                 .toolbarBackground(settings.theme.background, for: .navigationBar)
                 .tint(settings.theme.tint)
+                // Portrait, including on iPad where the rest of the app now
+                // rotates (S-408). A book is read in portrait, and
+                // BookPaginator is single-column and size-driven: a wider
+                // page is a shorter one, so landscape means fewer lines and
+                // more page turns for the same book.
+                .allowsOrientations(.portrait)
                 .sheet(isPresented: $showingSettings) {
                     ReaderSettingsSheet(settings: $settings)
                         .presentationDetents([.height(220)])

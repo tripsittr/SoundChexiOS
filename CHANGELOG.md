@@ -3,6 +3,19 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.05 “Clarity” — 2026-09-28
+
+### Fixed
+- **Titles in the Movies, Shows and Books grids were too small.** They were
+  `.caption` — 12pt, the size meant for fine print — which read as a footnote
+  beside the artwork rather than the name of the thing. Now `.subheadline`,
+  with the subtitle a step below it, and they wrap to two lines at the
+  accessibility text sizes instead of truncating.
+
+  Found on device (#434). Worth noting what it was *not*: `.caption` already
+  scales with Dynamic Type, so this was never a scaling bug — the size was
+  simply wrong, and the surrounding work is what made it noticeable.
+
 ## 0.29.04 “Clarity” — 2026-09-28
 
 ### Added

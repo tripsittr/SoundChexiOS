@@ -14,7 +14,7 @@ struct Rail: View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(ScaledFont.system(size: 17, relativeTo: .body, weight: .bold))
                     .foregroundStyle(SoundChexTheme.ink100)
                     .padding(.horizontal, 16)
 

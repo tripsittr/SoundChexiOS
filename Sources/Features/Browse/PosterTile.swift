@@ -28,12 +28,12 @@ struct PosterTile: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(ScaledFont.system(size: 14, relativeTo: .footnote, weight: .semibold))
                     .foregroundStyle(SoundChexTheme.ink100)
                     .lineLimit(2)
                 if let sub = subtitle {
                     Text(sub)
-                        .font(.system(size: 12))
+                        .font(ScaledFont.system(size: 12, relativeTo: .caption))
                         .foregroundStyle(SoundChexTheme.ink300)
                         .lineLimit(1)
                 }

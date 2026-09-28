@@ -115,7 +115,7 @@ struct AdminDashboardView: View {
                             .frame(width: 40, height: 40).clipShape(.rect(cornerRadius: 6))
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
+                                Text(item.title).foregroundStyle(SoundChexTheme.ink100).scalableTitle()
                                 if let subtitle = item.subtitle {
                                     Text(subtitle).font(.caption).foregroundStyle(SoundChexTheme.ink500).lineLimit(1)
                                 }
@@ -133,7 +133,7 @@ struct AdminDashboardView: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .semibold)).tracking(1).textCase(.uppercase)
+            .font(ScaledFont.system(size: 13, relativeTo: .footnote, weight: .semibold)).tracking(1).textCase(.uppercase)
             .foregroundStyle(SoundChexTheme.ink500)
     }
 
@@ -142,7 +142,7 @@ struct AdminDashboardView: View {
             Image(systemName: icon).foregroundStyle(SoundChexTheme.accent)
                 .accessibilityHidden(true)
             Text(value.formatted())
-                .font(.system(size: 26, weight: .bold))
+                .font(ScaledFont.system(size: 26, relativeTo: .title, weight: .bold))
                 .foregroundStyle(SoundChexTheme.ink100)
             Text(label).font(.caption).foregroundStyle(SoundChexTheme.ink500)
         }
@@ -161,7 +161,7 @@ struct AdminDashboardView: View {
             Image(systemName: icon).foregroundStyle(SoundChexTheme.accent)
                 .accessibilityHidden(true)
             Text(value)
-                .font(.system(size: 24, weight: .bold))
+                .font(ScaledFont.system(size: 24, relativeTo: .title2, weight: .bold))
                 .foregroundStyle(SoundChexTheme.ink100)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)

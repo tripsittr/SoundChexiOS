@@ -39,7 +39,7 @@ struct LyricsSection: View {
                     .frame(maxWidth: .infinity, minHeight: 220)
             } else {
                 Text("No lyrics for this track.")
-                    .font(.system(size: 15))
+                    .font(ScaledFont.system(size: 15, relativeTo: .subheadline))
                     .foregroundStyle(SoundChexTheme.ink500)
                     .frame(maxWidth: .infinity, minHeight: 220)
             }
@@ -57,13 +57,13 @@ struct LyricsSection: View {
     private func plainLyrics(_ text: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Lyrics")
-                .font(.system(size: 13, weight: .semibold))
+                .font(ScaledFont.system(size: 13, relativeTo: .footnote, weight: .semibold))
                 .tracking(1)
                 .textCase(.uppercase)
                 .foregroundStyle(SoundChexTheme.ink500)
 
             Text(text)
-                .font(.system(size: 16))
+                .font(ScaledFont.system(size: 16, relativeTo: .subheadline))
                 .foregroundStyle(SoundChexTheme.ink200)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
@@ -137,7 +137,7 @@ private struct SyncedLyricsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Lyrics")
-                .font(.system(size: 13, weight: .semibold))
+                .font(ScaledFont.system(size: 13, relativeTo: .footnote, weight: .semibold))
                 .tracking(1)
                 .textCase(.uppercase)
                 .foregroundStyle(SoundChexTheme.ink500)
@@ -147,7 +147,10 @@ private struct SyncedLyricsView: View {
                     ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
                         let isActive = index == activeIndex
                         Text(line.text.isEmpty ? " " : line.text)
-                            .font(.system(size: 18, weight: isActive ? .bold : .regular))
+                            // Lyrics are the one thing on this screen that is
+                            // read rather than glanced at, so they scale.
+                            .font(ScaledFont.system(size: 18, relativeTo: .body,
+                                                    weight: isActive ? .bold : .regular))
                             .foregroundStyle(isActive ? SoundChexTheme.ink100 : SoundChexTheme.ink400)
                             .opacity(isActive ? 1 : 0.55)
                             .frame(maxWidth: .infinity, alignment: .leading)

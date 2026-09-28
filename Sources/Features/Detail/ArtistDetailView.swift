@@ -94,7 +94,7 @@ struct ArtistDetailView: View {
 
             HStack(alignment: .bottom) {
                 Text(artist.name)
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(ScaledFont.system(size: 34, relativeTo: .largeTitle, weight: .heavy))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .shadow(color: .black.opacity(0.4), radius: 8, y: 2)

@@ -30,7 +30,15 @@ struct MarqueeText: View {
     /// The line height to reserve. A GeometryReader has no intrinsic height,
     /// so the row must be told how tall one line of this font is — passed in
     /// rather than guessed, since the title and the context line differ.
+    ///
+    /// Given at the default text size. The fonts here scale with Dynamic Type
+    /// (#434), so a fixed height would clip the title at the larger settings —
+    /// `scaledLineHeight` grows it in step.
     var lineHeight: CGFloat
+
+    /// Which text style the height tracks. `.body` matches what the titles
+    /// using this view are closest to.
+    var lineHeightStyle: Font.TextStyle = .body
     /// How text that *fits* is placed. Only applies when it fits: text long
     /// enough to scroll always starts at the leading edge, or it would begin
     /// mid-word.
@@ -85,7 +93,7 @@ struct MarqueeText: View {
             .onAppear { containerWidth = proxy.size.width }
             .onChange(of: proxy.size.width) { _, new in containerWidth = new }
         }
-        .frame(height: lineHeight)
+        .frame(height: ScaledFont.scaled(lineHeight, relativeTo: lineHeightStyle))
         // Keyed on everything the cycle depends on, so a track change, a
         // re-measure or a rotation tears the old task down and starts a fresh
         // one rather than leaving two driving the same offset.

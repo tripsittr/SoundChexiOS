@@ -128,14 +128,14 @@ struct NowPlayingPage: View {
             // album since the queue carries no separate source label.
             VStack(spacing: 2) {
                 Text("Playing from")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(ScaledFont.system(size: 9, relativeTo: .caption2, weight: .semibold))
                     .tracking(1.4)
                     .textCase(.uppercase)
                     .foregroundStyle(SoundChexTheme.ink500)
                 if let context = playbackContext(item) {
                     MarqueeText(
                         text: context,
-                        font: .system(size: 12, weight: .semibold),
+                        font: ScaledFont.system(size: 12, relativeTo: .caption, weight: .semibold),
                         color: SoundChexTheme.ink200,
                         lineHeight: 16,
                         alignment: .center,
@@ -191,7 +191,7 @@ struct NowPlayingPage: View {
                 // says which track it is (S-377).
                 MarqueeText(
                     text: item.title,
-                    font: .system(size: 22, weight: .bold),
+                    font: ScaledFont.system(size: 22, relativeTo: .title2, weight: .bold),
                     color: SoundChexTheme.ink100,
                     lineHeight: 27,
                 )
@@ -206,7 +206,7 @@ struct NowPlayingPage: View {
                         } label: {
                             MarqueeText(
                                 text: subtitle,
-                                font: .system(size: 16),
+                                font: ScaledFont.system(size: 16, relativeTo: .subheadline),
                                 color: SoundChexTheme.accent,
                                 lineHeight: 20,
                             )
@@ -221,7 +221,7 @@ struct NowPlayingPage: View {
                     } else {
                         MarqueeText(
                             text: subtitle,
-                            font: .system(size: 16),
+                            font: ScaledFont.system(size: 16, relativeTo: .subheadline),
                             color: SoundChexTheme.ink300,
                             lineHeight: 20,
                         )
@@ -237,7 +237,7 @@ struct NowPlayingPage: View {
                     } label: {
                         MarqueeText(
                             text: album.title,
-                            font: .system(size: 14),
+                            font: ScaledFont.system(size: 14, relativeTo: .footnote),
                             color: SoundChexTheme.ink400,
                             lineHeight: 18,
                         )
@@ -302,7 +302,7 @@ struct NowPlayingPage: View {
                 Spacer()
                 Text(timeString(playback.duration))
             }
-            .font(.system(size: 12).monospacedDigit())
+            .font(ScaledFont.system(size: 12, relativeTo: .caption).monospacedDigit())
             .foregroundStyle(SoundChexTheme.ink500)
         }
         .padding(.top, 24)
@@ -405,7 +405,7 @@ struct NowPlayingPage: View {
         HStack {
             Button { showingLyrics = true } label: {
                 Label("Lyrics", systemImage: "quote.bubble")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(ScaledFont.system(size: 14, relativeTo: .footnote, weight: .semibold))
                     .foregroundStyle(SoundChexTheme.ink300)
             }
             Spacer()
@@ -420,7 +420,7 @@ struct NowPlayingPage: View {
             Spacer()
             Button { showingQueue = true } label: {
                 Label("Queue", systemImage: "list.bullet")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(ScaledFont.system(size: 14, relativeTo: .footnote, weight: .semibold))
                     .foregroundStyle(SoundChexTheme.ink300)
             }
         }

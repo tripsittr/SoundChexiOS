@@ -27,7 +27,7 @@ struct AppHeader: View {
                         .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
                         .frame(width: 15, height: 15)
                     Text("Search")
-                        .font(.system(size: 15))
+                        .font(ScaledFont.system(size: 15, relativeTo: .subheadline))
                     Spacer(minLength: 0)
                 }
                 .foregroundStyle(SoundChexTheme.ink500)

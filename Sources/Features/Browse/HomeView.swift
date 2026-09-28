@@ -81,19 +81,19 @@ struct HeroBanner: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recently added")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(ScaledFont.system(size: 12, relativeTo: .caption, weight: .bold))
                     .tracking(2.5)
                     .foregroundStyle(SoundChexTheme.accent)
 
                 Text(item.title)
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(ScaledFont.system(size: 34, relativeTo: .largeTitle, weight: .heavy))
                     .foregroundStyle(SoundChexTheme.ink100)
                     .shadow(color: .black.opacity(0.85), radius: 12, y: 2)
                     .lineLimit(2)
 
                 if let subtitle = item.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 17))
+                        .font(ScaledFont.system(size: 17, relativeTo: .body))
                         .foregroundStyle(SoundChexTheme.ink300)
                         .lineLimit(1)
                 }
@@ -101,7 +101,7 @@ struct HeroBanner: View {
                 if item.type == .music {
                     Button(action: onPlay) {
                         Label("Play", systemImage: "play.fill")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(ScaledFont.system(size: 14, relativeTo: .footnote, weight: .bold))
                             .padding(.horizontal, 22).padding(.vertical, 11)
                             .background(SoundChexTheme.ink100, in: .rect(cornerRadius: 6))
                             .foregroundStyle(SoundChexTheme.base900)

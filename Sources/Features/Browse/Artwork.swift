@@ -56,6 +56,9 @@ struct Artwork: View {
                     .foregroundStyle(SoundChexTheme.ink500)
                     .font(.system(size: size * 0.4))
             )
+            // A stand-in for artwork that has not loaded. The row's own
+            // label already says what the item is.
+            .accessibilityHidden(true)
     }
 
     private var glyph: String {

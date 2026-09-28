@@ -110,6 +110,7 @@ struct MediaFactsSection: View {
                     Spacer()
                 }
                 .padding(.vertical, 7)
+                .accessibilityElement(children: .combine)
 
                 if pair.offset < facts.count - 1 {
                     Divider().overlay(SoundChexTheme.base700)
@@ -139,6 +140,7 @@ struct MediaFactsSection: View {
                                     Image(systemName: "person.fill")
                                         .foregroundStyle(SoundChexTheme.ink600))
                             }
+                            .accessibilityHidden(true)
                             .frame(width: 72, height: 72)
                             .clipShape(.circle)
 
@@ -158,6 +160,7 @@ struct MediaFactsSection: View {
                             }
                         }
                         .frame(width: 84)
+                        .accessibilityElement(children: .combine)
                     }
                 }
                 .padding(.horizontal, 16)

@@ -53,6 +53,7 @@ struct RetentionPicker: View {
                                     ? "internaldrive"
                                     : "clock")
                                     .foregroundStyle(SoundChexTheme.ink500)
+                                    .accessibilityHidden(true)
                             }
                             .contentShape(.rect)
                         }

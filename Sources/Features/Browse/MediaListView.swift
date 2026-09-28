@@ -112,6 +112,7 @@ struct SongRow: View {
                     .foregroundStyle(SoundChexTheme.ink500)
                     .frame(width: 32, height: 44)
                     .contentShape(.rect)
+                    .accessibilityLabel("More actions for \(item.title)")
             }
         }
         // Swipe right → add to queue; swipe left → add to playlist.

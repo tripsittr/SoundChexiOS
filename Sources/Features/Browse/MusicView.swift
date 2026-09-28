@@ -83,6 +83,7 @@ struct MusicView: View {
                                 SoundChexTheme.base700.overlay(
                                     Image(systemName: "music.mic").foregroundStyle(SoundChexTheme.ink500))
                             }
+                            .accessibilityHidden(true)
                             .frame(width: 44, height: 44).clipShape(.circle)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(artist.name).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
@@ -274,6 +275,7 @@ struct MusicView: View {
                 SoundChexTheme.base700.overlay(
                     Image(systemName: placeholder).foregroundStyle(SoundChexTheme.ink500))
             }
+            .accessibilityHidden(true)
             .frame(width: 56, height: 56)
             .clipShape(circular ? AnyShape(.circle)
                                 : AnyShape(.rect(cornerRadius: SoundChexTheme.radiusPoster)))
@@ -295,6 +297,7 @@ struct MusicView: View {
                 SoundChexTheme.base700.overlay(
                     Image(systemName: "music.mic").foregroundStyle(SoundChexTheme.ink500))
             }
+            .accessibilityHidden(true)
             .frame(width: 112, height: 112)
             .clipShape(.circle)
             Text(artist.name)
@@ -318,6 +321,7 @@ struct MusicView: View {
                 SoundChexTheme.base700.overlay(
                     Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500))
             }
+            .accessibilityHidden(true)
             .aspectRatio(1, contentMode: .fill)
             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusPoster))
             Text(album.title).font(.subheadline).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)

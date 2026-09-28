@@ -56,6 +56,13 @@ struct SendForReviewSheet: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        // Which option is chosen is carried by a filled
+                        // circle and the accent colour. The trait says it
+                        // instead, and reads as a radio button should.
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(
+                            reason == option ? [.isButton, .isSelected] : .isButton,
+                        )
                     }
                 } header: {
                     Text("What is wrong?")

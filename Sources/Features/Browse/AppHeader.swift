@@ -35,6 +35,8 @@ struct AppHeader: View {
                 .background(SoundChexTheme.base700, in: .capsule)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Search")
+            .accessibilityHint("Search your library")
 
             // A brand-accent chip rather than the system person.crop.circle —
             // the web account button is a coloured chip, so this echoes it and
@@ -50,6 +52,9 @@ struct AppHeader: View {
                     )
             }
             .buttonStyle(.plain)
+            // A coloured circle with a person glyph and no text at all — to
+            // VoiceOver this was an unlabelled button in the corner.
+            .accessibilityLabel("Account and settings")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)

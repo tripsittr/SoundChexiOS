@@ -81,6 +81,7 @@ struct ProfilePickerView: View {
                         Image(systemName: "lock.fill")
                             .font(.caption)
                             .foregroundStyle(.white)
+                            .accessibilityLabel("Needs a PIN")
                             .padding(6)
                             .background(.black.opacity(0.5), in: .circle)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)

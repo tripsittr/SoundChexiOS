@@ -36,6 +36,13 @@ struct DownloadButton: View {
                 .frame(width: 44, height: 44)
                 .contentShape(.rect)
         }
+        // The state of this button is otherwise carried by an icon shape and
+        // a colour, which VoiceOver cannot see and a colour-blind user may not
+        // distinguish (S-423). The label says the state in words; the hint
+        // says what a tap will do.
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(.isButton)
         .confirmationDialog("Remove download?", isPresented: $confirmingRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { downloads.remove(item.id) }
             Button("Cancel", role: .cancel) {}
@@ -45,6 +52,28 @@ struct DownloadButton: View {
                 downloads.download(item, keeping: retention)
             }
             .presentationDetents([.medium])
+        }
+    }
+
+    /// What this control is, said rather than drawn.
+    private var accessibilityLabel: String {
+        switch downloads.state(for: item.id) {
+        case .idle: "Download \(item.title)"
+        case .queued: "\(item.title), waiting to download"
+        case .downloading(let progress): "Downloading \(item.title), \(Int(progress * 100)) percent"
+        case .stored: "\(item.title), downloaded"
+        case .failed: "\(item.title), download failed"
+        }
+    }
+
+    /// What a tap does from here — different in every state, and not
+    /// guessable from an icon.
+    private var accessibilityHint: String {
+        switch downloads.state(for: item.id) {
+        case .idle: "Downloads this to the device"
+        case .queued, .downloading: "Waits for the download to finish"
+        case .stored: "Removes the downloaded copy"
+        case .failed: "Tries the download again"
         }
     }
 

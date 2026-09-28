@@ -66,6 +66,7 @@ struct PlaylistDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Playlist actions")
             }
         }
         .overlay { if loading { ProgressView().tint(SoundChexTheme.accent) } }
@@ -130,6 +131,7 @@ struct PlaylistDetailView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 44, height: 44)
                         .foregroundStyle(SoundChexTheme.ink200)
+                        .accessibilityLabel("Shuffle playlist")
                         .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
@@ -142,6 +144,7 @@ struct PlaylistDetailView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .frame(width: 44, height: 44)
                             .foregroundStyle(SoundChexTheme.ink200)
+                            .accessibilityLabel("Download playlist")
                             .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
 
                         if batch.isRunning {

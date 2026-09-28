@@ -38,6 +38,8 @@ struct TrackRowControls: View {
                     .frame(width: 32, height: 40)
                     .contentShape(.rect)
             }
+            .accessibilityLabel("More actions for \(item.title)")
+            .accessibilityHint("Play next, add to a playlist, download, and more")
         }
         // The row itself is a button that starts playback, so the controls
         // must not pass their taps up to it.

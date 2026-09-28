@@ -51,6 +51,7 @@ struct AlbumDetailView: View {
             CachedImage(url: album.artwork) { $0.resizable().scaledToFill() } placeholder: {
                 SoundChexTheme.base700.overlay(Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500))
             }
+            .accessibilityHidden(true)
             .frame(width: 220, height: 220)
             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusLargeArt))
             .shadow(color: .black.opacity(0.5), radius: 24, y: 10)
@@ -75,13 +76,13 @@ struct AlbumDetailView: View {
 
             // Secondary actions in a row under the title: shuffle and download.
             HStack(spacing: 20) {
-                circleButton(system: "shuffle") {
+                circleButton(system: "shuffle", label: "Shuffle") {
                     if !playback.isShuffled { playback.toggleShuffle() }
                     recents.record(.album, id: album.id)
                     recents.record(.album, id: album.id)
             playback.play(album.tracks)
                 }
-                circleButton(system: "arrow.down") { downloadAll() }
+                circleButton(system: "arrow.down", label: "Download all") { downloadAll() }
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -113,11 +114,16 @@ struct AlbumDetailView: View {
                 .background(SoundChexTheme.accent, in: .circle)
                 .shadow(color: SoundChexTheme.accent.opacity(0.4), radius: 12, y: 4)
         }
+        .accessibilityLabel("Play album")
     }
 
     /// A 44px bordered circle icon button — the secondary detail-screen action
     /// shape (shuffle, download) from the spec.
-    private func circleButton(system: String, action: @escaping () -> Void) -> some View {
+    private func circleButton(
+        system: String,
+        label: String,
+        action: @escaping () -> Void,
+    ) -> some View {
         Button(action: action) {
             Image(systemName: system)
                 .font(.system(size: 16, weight: .semibold))
@@ -125,6 +131,7 @@ struct AlbumDetailView: View {
                 .foregroundStyle(SoundChexTheme.ink200)
                 .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
         }
+        .accessibilityLabel(label)
     }
 
     /// "Artist · 2019 · 12 songs" — the "·"-joined meta line from the spec,

@@ -80,6 +80,7 @@ struct AdminDashboardView: View {
                         HStack(spacing: 10) {
                             Image(systemName: "music.note")
                                 .foregroundStyle(SoundChexTheme.accent)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
                                     .foregroundStyle(SoundChexTheme.ink100)
@@ -139,11 +140,17 @@ struct AdminDashboardView: View {
     private func statCard(_ label: String, _ value: Int, _ icon: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon).foregroundStyle(SoundChexTheme.accent)
+                .accessibilityHidden(true)
             Text(value.formatted())
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(SoundChexTheme.ink100)
             Text(label).font(.caption).foregroundStyle(SoundChexTheme.ink500)
         }
+        // Read apart, a card is a number and then the thing it counts —
+        // "1,284", pause, "Tracks". Said as one, it is a fact.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value.formatted())
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(SoundChexTheme.base800, in: .rect(cornerRadius: 12))
@@ -152,6 +159,7 @@ struct AdminDashboardView: View {
     private func textCard(_ label: String, _ value: String, _ icon: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon).foregroundStyle(SoundChexTheme.accent)
+                .accessibilityHidden(true)
             Text(value)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(SoundChexTheme.ink100)
@@ -159,6 +167,11 @@ struct AdminDashboardView: View {
                 .minimumScaleFactor(0.75)
             Text(label).font(.caption).foregroundStyle(SoundChexTheme.ink500)
         }
+        // Read apart, a card is a number and then the thing it counts —
+        // "1,284", pause, "Tracks". Said as one, it is a fact.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(SoundChexTheme.base800, in: .rect(cornerRadius: 12))

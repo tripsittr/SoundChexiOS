@@ -121,6 +121,8 @@ struct NowPlayingPage: View {
                     .frame(width: 40, height: 40)
                     .background(SoundChexTheme.base800, in: .circle)
             }
+            .accessibilityLabel("Close player")
+            .accessibilityHint("Returns to the previous screen. Playback continues")
             Spacer()
             // "PLAYING FROM <ALBUM>" — the context line, derived from the track's
             // album since the queue carries no separate source label.
@@ -149,6 +151,8 @@ struct NowPlayingPage: View {
                     .foregroundStyle(SoundChexTheme.ink200)
                     .frame(width: 40, height: 40)
             }
+            .accessibilityLabel("More actions")
+            .accessibilityHint("Add to a playlist, send for review, and more")
         }
         .padding(.top, 12)
         .sheet(item: $addingToPlaylist) { pinned in
@@ -208,6 +212,12 @@ struct NowPlayingPage: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        // Accent colour is the only thing marking this as a
+                        // link, which fails both VoiceOver and Differentiate
+                        // Without Colour. The trait and hint say it out loud.
+                        .accessibilityLabel(subtitle)
+                        .accessibilityHint("Opens the artist")
+                        .accessibilityAddTraits(.isButton)
                     } else {
                         MarqueeText(
                             text: subtitle,
@@ -233,6 +243,9 @@ struct NowPlayingPage: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(album.title)
+                    .accessibilityHint("Opens the album")
+                    .accessibilityAddTraits(.isButton)
                 }
             }
             Spacer()
@@ -258,6 +271,21 @@ struct NowPlayingPage: View {
                 }
             )
             .tint(SoundChexTheme.accent)
+            // Left alone, VoiceOver reads the raw bound — "847" — and offers
+            // no useful adjustment. Named, spoken as a duration, and stepped
+            // in fifteens so a swipe up moves somewhere worth being.
+            .accessibilityLabel("Playback position")
+            .accessibilityValue("\(spokenTime(playback.position)) of \(spokenTime(playback.duration))")
+            .accessibilityAdjustableAction { direction in
+                let step: Double = 15
+                let target = switch direction {
+                case .increment: min(playback.position + step, playback.duration)
+                case .decrement: max(playback.position - step, 0)
+                default: playback.position
+                }
+
+                playback.seek(to: target)
+            }
             // A new song releases the scrubber. `scrubbing` is only cleared by
             // the Slider's editing-ended callback, and a track change while it
             // is held — or a gesture whose end is never reported — left the
@@ -281,6 +309,39 @@ struct NowPlayingPage: View {
     }
 
     /// What VoiceOver says the shuffle button will do next.
+    private var repeatValue: String {
+        switch playback.repeatMode {
+        case .off: "Off"
+        case .all: "Repeat all"
+        case .one: "Repeat one"
+        }
+    }
+
+    /// A duration for VoiceOver to speak.
+    ///
+    /// `timeString` produces "3:07", which a screen reader says as a clock
+    /// time — "three oh seven" — not as a length. Spelled out, it is a
+    /// duration again.
+    private func spokenTime(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "zero seconds" }
+
+        let total = Int(seconds)
+        let minutes = total / 60
+        let remainder = total % 60
+
+        var parts: [String] = []
+
+        if minutes > 0 {
+            parts.append("\(minutes) minute\(minutes == 1 ? "" : "s")")
+        }
+
+        if remainder > 0 || minutes == 0 {
+            parts.append("\(remainder) second\(remainder == 1 ? "" : "s")")
+        }
+
+        return parts.joined(separator: " ")
+    }
+
     private var shuffleLabel: String {
         switch playback.shuffleMode {
         case .off: "Shuffle"
@@ -304,6 +365,8 @@ struct NowPlayingPage: View {
             Button { playback.previous() } label: {
                 Image(systemName: "backward.fill").font(.title2)
             }
+            .accessibilityLabel("Previous")
+
             Button { playback.togglePlayPause() } label: {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 32))
@@ -312,9 +375,12 @@ struct NowPlayingPage: View {
                     .background(SoundChexTheme.accent, in: .circle)
                     .shadow(color: SoundChexTheme.accent.opacity(0.4), radius: 12, y: 4)
             }
+            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+
             Button { playback.next() } label: {
                 Image(systemName: "forward.fill").font(.title2)
             }
+            .accessibilityLabel("Next")
 
             // Repeat: off / all / one
             Button { playback.cycleRepeat() } label: {
@@ -322,6 +388,12 @@ struct NowPlayingPage: View {
                     .font(.system(size: 18))
                     .foregroundStyle(playback.repeatMode == .off ? SoundChexTheme.ink400 : SoundChexTheme.accent)
             }
+            // Three states shown by one glyph and a colour: repeat.1 is the
+            // only one with a distinct shape, so off and all are
+            // indistinguishable without colour. The value says which it is.
+            .accessibilityLabel("Repeat")
+            .accessibilityValue(repeatValue)
+            .accessibilityHint("Cycles through off, all and one")
         }
         .foregroundStyle(SoundChexTheme.ink200)
         .padding(.top, 24)

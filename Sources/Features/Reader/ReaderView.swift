@@ -15,6 +15,7 @@ import SwiftUI
 /// Resume is by chapter: the saved location is the chapter position, and opening
 /// the book jumps to that chapter's first page. Progress is reported as it reads.
 struct ReaderView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
     let item: MediaItem
@@ -139,7 +140,13 @@ struct ReaderView: View {
                     pages: pages, token: session.api?.token, settings: settings,
                     insets: insets, pageIndex: $pageIndex,
                     onTurn: { onPageChanged() },
-                    onToggleChrome: { withAnimation(.easeInOut(duration: 0.2)) { chromeVisible.toggle() } }
+                    onToggleChrome: {
+                        if reduceMotion {
+                            chromeVisible.toggle()
+                        } else {
+                            withAnimation(.easeInOut(duration: 0.2)) { chromeVisible.toggle() }
+                        }
+                    }
                 )
                 // Lay out (and re-lay out) whenever the area or the settings change.
                 .task(id: PaginationKey(size: area, settings: settings)) {
@@ -246,6 +253,8 @@ private struct PaginationKey: Equatable {
 /// The paged book: one full page at a time, turned by tap zones (left/right
 /// thirds) and swipes, with the centre tapping the bars on and off.
 private struct ReaderPager: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let pages: [BookPaginator.Page]
     let token: String?
     let settings: ReaderSettings
@@ -287,7 +296,14 @@ private struct ReaderPager: View {
     private func turn(by delta: Int) {
         let next = pageIndex + delta
         guard next >= 0, next < pages.count else { return }
-        withAnimation(.easeInOut(duration: 0.25)) { pageIndex = next }
+        // The page still turns under Reduced Motion — it simply arrives
+        // rather than sliding (#435). A reader who set this is likely to be
+        // turning pages for an hour at a time.
+        if reduceMotion {
+            pageIndex = next
+        } else {
+            withAnimation(.easeInOut(duration: 0.25)) { pageIndex = next }
+        }
     }
 }
 

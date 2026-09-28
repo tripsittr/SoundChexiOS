@@ -21,9 +21,30 @@ import UIKit
 /// full-screen AVPlayer, which handles rotation itself.
 @MainActor
 enum OrientationLock {
+    /// The app-wide default.
+    ///
+    /// **iPad rotates; iPhone does not** (S-408, stage 1).
+    ///
+    /// An iPad held sideways and refusing to rotate reads as a broken app
+    /// rather than a deliberate choice — it is the orientation a keyboard
+    /// case puts it in, and Apple's own guidance is that an iPad app should
+    /// support all four. The library grids, rails and player now size
+    /// themselves from the width they are given, so landscape is a wider
+    /// layout rather than a stretched one.
+    ///
+    /// iPhone stays portrait. Landscape on a phone is still a compact width,
+    /// so it gains nothing and the screens have not been designed for a
+    /// short, wide frame.
+    ///
+    /// The reader is portrait on both, by the owner's decision: a book is
+    /// read in portrait, and `BookPaginator` is single-column and
+    /// size-driven, so a wider page means fewer lines and more page turns.
+    static let deviceDefault: UIInterfaceOrientationMask =
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+
     /// What the app permits right now. Read by `AppDelegate`, which is the
     /// only thing iOS asks.
-    static var supported: UIInterfaceOrientationMask = .portrait {
+    static var supported: UIInterfaceOrientationMask = OrientationLock.deviceDefault {
         didSet {
             AppDelegate.current = supported
 
@@ -41,10 +62,12 @@ enum OrientationLock {
     }
 }
 
-/// Lets one screen widen the orientations while it is on screen.
+/// Lets one screen change the orientations while it is on screen.
 ///
-/// Applied to the video player, which is the one place landscape is the point
-/// rather than an accident.
+/// Two screens use it, in opposite directions: the video player widens to
+/// landscape, which is the point of a film; the reader narrows to portrait,
+/// because a book is read in portrait and a wider page means fewer lines per
+/// turn (S-408).
 struct AllowsOrientations: ViewModifier {
     let orientations: UIInterfaceOrientationMask
 
@@ -52,8 +75,9 @@ struct AllowsOrientations: ViewModifier {
         content
             .onAppear { OrientationLock.supported = orientations }
             // Back to the app-wide default on the way out, or leaving the
-            // video player would leave the whole app rotatable.
-            .onDisappear { OrientationLock.supported = .portrait }
+            // video player would leave the whole app rotatable — and on iPad
+            // that default is all four, not portrait.
+            .onDisappear { OrientationLock.supported = OrientationLock.deviceDefault }
     }
 }
 

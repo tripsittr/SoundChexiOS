@@ -5,11 +5,15 @@ import SwiftUI
 
 /// A poster grid — for films, shows and books, where the cover is the content.
 struct MediaGridView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(LibraryStore.self) private var store
     let type: MediaType
     let title: String
 
-    private let columns = [GridItem(.adaptive(minimum: 110), spacing: 14)]
+    /// Wider tiles where there is room, rather than more tiny ones (S-408).
+    private var columns: [GridItem] {
+        AdaptiveGrid.columns(minimum: 110, spacing: 14, for: horizontalSizeClass)
+    }
 
     var body: some View {
         NavigationStack {

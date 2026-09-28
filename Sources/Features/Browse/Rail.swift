@@ -6,6 +6,8 @@ import SwiftUI
 /// A horizontal rail of posters, matching the web `.rail`: a bold heading with an
 /// optional "View all →", then a snap-scrolling row of tiles.
 struct Rail: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let title: String
     let items: [MediaItem]
     var onTap: (MediaItem) -> Void = { _ in }
@@ -22,7 +24,14 @@ struct Rail: View {
                     HStack(spacing: 12) {
                         ForEach(items) { item in
                             Button { onTap(item) } label: {
-                                PosterTile(item: item, width: 144)
+                                // Bigger tiles where there is room, so a
+                                // rail on an iPad is not a phone's rail with
+                                // more of them off the edge (S-408).
+                                PosterTile(
+                                    item: item,
+                                    width: AdaptiveGrid.minimum(
+                                        for: horizontalSizeClass, base: 144),
+                                )
                             }
                             .buttonStyle(.plain)
                         }

@@ -3,6 +3,48 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.0 “Prelude” — 2026-09-28
+
+### Added
+- **The app rotates on iPad** (S-408, stage 1). It was locked to portrait on
+  every device — a stopgap, because the layouts had no landscape handling at
+  all and rotating into them would have shown a visibly broken app.
+
+  An iPad held sideways and refusing to turn reads as broken rather than
+  deliberate: it is the orientation a keyboard case puts it in. iPhone stays
+  portrait, where landscape is still a compact width and gains nothing.
+
+  The reader stays portrait on both, by the owner's decision: a book is read
+  in portrait, and the paginator is single-column and size-driven, so a wider
+  page means fewer lines and more page turns.
+
+- **Grids and rails size themselves to the screen.** The library grids were
+  already adaptive, so they filled an iPad — with **ten columns of 121pt
+  posters** on a 13-inch. Nothing was broken and nothing was browsable either;
+  artwork is the point of a library grid.
+
+  The minimum tile width now grows at regular width, which gives four to seven
+  poster columns at about 180pt instead. Rails do the same, so a rail on an
+  iPad is not a phone's rail with more of it off the edge.
+
+  Keyed on the horizontal size class rather than the device: an iPad in Split
+  View is compact and should look like a phone, and a phone in landscape
+  should not suddenly grow tiles.
+
+- **The player's artwork uses the space.** It was capped at 360pt and measured
+  from `UIScreen.main.bounds` — the whole display, not this view's share of
+  it, which is wrong in Split View. It now measures the container and caps at
+  520pt where the width allows.
+
+### Known gaps
+- Detail and now-playing screens still stack vertically at regular width; a
+  side-by-side variant is stage 2.
+- Settings, admin and auth are unchanged; they are mostly Lists, which adapt
+  on their own, but nothing has been designed for the wider frame.
+- The sign-in form sits at the top of a tall iPad screen rather than centred.
+  Cosmetic, and an attempt to centre it inside its ScrollView pushed the form
+  off-screen, so it was reverted rather than shipped half-working.
+
 ## 0.29.06 “Clarity” — 2026-09-28
 
 ### Added

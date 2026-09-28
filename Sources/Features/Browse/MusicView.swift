@@ -10,6 +10,7 @@ import SwiftUI
 /// (which left an invisible empty header on the list) or the toolbar's principal
 /// slot (a segmented control, not the spec's pills).
 struct MusicView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(LibraryStore.self) private var store
     @Environment(RecentContextsStore.self) private var recents
     @Environment(PlaylistStore.self) private var playlists
@@ -22,7 +23,10 @@ struct MusicView: View {
         case playlists = "Playlists", albums = "Albums", artists = "Artists", songs = "Songs"
     }
 
-    private let grid = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    /// Wider tiles where there is room, rather than more tiny ones (S-408).
+    private var grid: [GridItem] {
+        AdaptiveGrid.columns(minimum: 150, spacing: 16, for: horizontalSizeClass)
+    }
 
     var body: some View {
         NavigationStack {

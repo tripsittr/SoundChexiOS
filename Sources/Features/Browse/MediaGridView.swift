@@ -59,13 +59,16 @@ struct Poster: View {
         VStack(alignment: .leading, spacing: 6) {
             Artwork(item: item, size: 110, aspect: item.type == .music ? 1 : 1.5)
                 .frame(maxWidth: .infinity)
+            // .caption is 12pt — too small for the primary label on a tile,
+            // and it was reading as fine print next to the artwork. The title
+            // of the thing is subheadline; the subtitle stays a size below it.
             Text(item.title)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(SoundChexTheme.ink100)
-                .lineLimit(1)
+                .scalableTitle(limit: 2)
             if let subtitle = item.subtitle {
                 Text(subtitle)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(SoundChexTheme.ink500)
                     .lineLimit(1)
             }

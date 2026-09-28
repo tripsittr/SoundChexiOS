@@ -360,6 +360,7 @@ struct NowPlayingPage: View {
                 Image(systemName: playback.shuffleMode == .smart ? "shuffle.circle.fill" : "shuffle")
                     .font(.system(size: 18))
                     .foregroundStyle(playback.isShuffled ? SoundChexTheme.accent : SoundChexTheme.ink400)
+                    .activeDot(playback.isShuffled)
             }
             .accessibilityLabel(shuffleLabel)
 
@@ -388,6 +389,7 @@ struct NowPlayingPage: View {
                 Image(systemName: playback.repeatMode == .one ? "repeat.1" : "repeat")
                     .font(.system(size: 18))
                     .foregroundStyle(playback.repeatMode == .off ? SoundChexTheme.ink400 : SoundChexTheme.accent)
+                    .activeDot(playback.repeatMode != .off)
             }
             // Three states shown by one glyph and a colour: repeat.1 is the
             // only one with a distinct shape, so off and all are

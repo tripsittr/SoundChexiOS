@@ -39,6 +39,8 @@ resolves. Pick the next unused one at each minor bump.
 | 0.15.0 | **Porter** | |
 | 0.16.0 | **Tether** | Offline playback fixes, search kebab, now-playing indicators, resuming downloads. |
 | 0.17.0 | **Bridge** | Playlist duplicate warning, the sheet pinned to the song it was opened for, remove-from-playlist in the kebab, scrolling titles. |
+| 0.28.0 | **Cascade** | Downloads visible in the Files app, laid out as the desktop library. |
+| 0.29.0 | **Clarity** | The VoiceOver pass: every control named, rows spoken as sentences, state said rather than shown. |
 | 0.18.0 | Refrain | _(next)_ |
 | 0.19.0 | Cadence | |
 | 1.0.0 | Encore | The first stable release. |

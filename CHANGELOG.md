@@ -3,6 +3,53 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.0 “Clarity” — 2026-09-28
+
+### Added
+- **VoiceOver across the app** (#433). Labels existed in one file out of
+  eighty. Everywhere else the screen reader announced SF Symbol names, so the
+  transport bar read as "backward fill, play fill, forward fill" and the
+  account button was an unnamed circle. 30 of 84 files now carry accessibility
+  modifiers.
+
+  What changed, beyond naming buttons:
+
+  - **Rows are read as sentences.** A search result, a download, an episode
+    and a cast member were each several loose fragments — artwork, then a
+    title, then a subtitle, none of them saying it was a button. Each is now
+    one element that says what it is.
+  - **State that was only a colour is now spoken.** A dimmed search row means
+    "cannot play offline"; a green tick means "downloaded"; a faded download
+    row means "expired". All silent to a screen reader, and all invisible to
+    anyone who cannot distinguish the colours. Each is said aloud, which is
+    the Differentiate Without Colour work as much as the VoiceOver work.
+  - **The scrubber was unusable.** VoiceOver read the raw bound — "847" — and
+    offered no way to move it. It now speaks position and duration and takes
+    an adjustable action in fifteen-second steps.
+  - **Durations are spelled out for speech.** "3:07" is read as a clock time,
+    not a length, so spoken values say "3 minutes 7 seconds".
+  - **Countdowns too.** The download chip is written narrow — "3d" — which was
+    read as "three d". Aloud it is "Expires in 3 days".
+  - **Repeat has three states shown by one glyph and a colour**, so off and
+    all were indistinguishable. It announces which is active.
+  - **Send-for-review options are radio buttons** and carry the selected
+    trait rather than signalling the choice with a filled circle.
+  - **Subtitles announce their state** — on/off differed only by a filled
+    glyph. This is the control for a feature we declare as supported.
+  - **Decorative artwork placeholders are hidden** rather than announced;
+    they repeat what the row's label already says.
+
+  Voice Control benefits from the same labels, since it speaks them too.
+
+### Known gaps
+- **Not yet verified on a device with the screen curtain on**, which is the
+  only thing that proves any of this. Tracked on #433.
+- **Larger Text is not done** (#434): 25 files still use fixed point sizes
+  that ignore the reader's chosen text size.
+- **Contrast is unmeasured** (#437). The dimmer end of the ink ramp is
+  suspected to fall below WCAG AA for secondary text.
+- **Audio descriptions are unsupported** (#443) and are not declared.
+
 ## 0.28.1 “Cascade” — 2026-09-26
 
 ### Fixed

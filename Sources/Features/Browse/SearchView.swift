@@ -57,6 +57,12 @@ struct SearchResultsList: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            // One element rather than artwork plus two loose strings. The
+            // offline reason matters most here: dimming says "not available"
+            // to the eye and nothing at all to a screen reader.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(rowLabel(item, isCurrent: isCurrent, canPlay: canPlay))
+            .accessibilityAddTraits(.isButton)
             // Only the play half dims and stops responding. The kebab stays
             // live: remove a download, add to a playlist — the actions someone
             // reaches for are exactly the ones that still work offline (S-362).
@@ -75,6 +81,7 @@ struct SearchResultsList: View {
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("More actions for \(item.title)")
             }
             .listRowBackground(SoundChexTheme.base900)
         }
@@ -97,6 +104,33 @@ struct SearchResultsList: View {
         .onChange(of: term) { _, newValue in
             runSearch(newValue)
         }
+    }
+
+    /// A whole result row as one spoken sentence: what it is, who it is by,
+    /// whether it is the thing currently playing, and — when it will not
+    /// play — why not.
+    private func rowLabel(_ item: MediaItem, isCurrent: Bool, canPlay: Bool) -> String {
+        var parts: [String] = []
+
+        if isCurrent {
+            parts.append("Now playing")
+        }
+
+        parts.append(item.title)
+
+        if let subtitle = item.subtitle, !subtitle.isEmpty {
+            parts.append(subtitle)
+        }
+
+        if !canPlay {
+            // The visual cue is a dimmed row, which says nothing aloud.
+            parts.append(
+                Playability.reason(item, downloads: downloads, online: connectivity.isOnline)
+                    ?? "Not available",
+            )
+        }
+
+        return parts.joined(separator: ", ")
     }
 
     /// Debounced search: the cached catalogue at once, the server to refine it.

@@ -72,6 +72,15 @@ struct DownloadsView: View {
                             .opacity(pair.element.isExpired ? 0.55 : 1)
                         }
                         .buttonStyle(.plain)
+                        // One sentence instead of a title, a subtitle and a
+                        // countdown chip read as "three d". Expiry is the
+                        // whole point of this screen, so it is spoken.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Self.rowLabel(pair.element))
+                        .accessibilityHint(
+                            pair.element.isExpired ? "Downloads it again" : "Plays from here",
+                        )
+                        .accessibilityAddTraits(.isButton)
                         .listRowBackground(SoundChexTheme.base900)
                         .swipeActions {
                             Button(role: .destructive) {
@@ -120,6 +129,7 @@ private struct DownloadArtwork: View {
         SoundChexTheme.base700.overlay(
             Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500)
         )
+        .accessibilityHidden(true)
     }
 }
 
@@ -133,6 +143,38 @@ extension DownloadsView {
         if hours >= 1 { return "\(hours)h" }
 
         return "\(max(1, Int(remaining / 60)))m"
+    }
+
+    /// The same row, spoken.
+    ///
+    /// `remainingLabel` is written to be narrow — "3d" — which VoiceOver
+    /// reads as "three d". Aloud there is room to say it properly, and the
+    /// state that is otherwise carried by a dimmed row and a green tick has
+    /// to be said rather than shown.
+    static func rowLabel(_ item: DownloadedItem) -> String {
+        var parts = [item.title]
+
+        if let subtitle = item.subtitle, !subtitle.isEmpty {
+            parts.append(subtitle)
+        }
+
+        if item.isExpired {
+            parts.append("Expired")
+        } else if let remaining = item.timeRemaining {
+            let hours = Int(remaining / 3600)
+
+            let expiry = switch hours {
+            case 24...: "Expires in \(hours / 24) day\(hours / 24 == 1 ? "" : "s")"
+            case 1...: "Expires in \(hours) hour\(hours == 1 ? "" : "s")"
+            default: "Expires in \(max(1, Int(remaining / 60))) minutes"
+            }
+
+            parts.append(expiry)
+        } else {
+            parts.append("Downloaded")
+        }
+
+        return parts.joined(separator: ", ")
     }
 
     /// Queues an expired item again, keeping the window it originally had.

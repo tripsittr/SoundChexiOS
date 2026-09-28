@@ -72,6 +72,8 @@ struct ReaderView: View {
                             Image(systemName: "textformat.size")
                         }
                         .disabled(phase != .ready)
+                        .accessibilityLabel("Reading settings")
+                        .accessibilityHint("Text size, typeface and theme")
                     }
                 }
                 .toolbarBackground(settings.theme.background, for: .navigationBar)

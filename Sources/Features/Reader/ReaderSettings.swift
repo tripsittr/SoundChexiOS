@@ -79,8 +79,12 @@ struct ReaderSettingsSheet: View {
             // Font size.
             HStack(spacing: 20) {
                 Button { adjust(-1) } label: { Image(systemName: "textformat.size.smaller") }
+                    .accessibilityLabel("Smaller text")
                 Slider(value: $settings.fontSize, in: 13 ... 30, step: 1)
+                    .accessibilityLabel("Text size")
+                    .accessibilityValue("\(Int(settings.fontSize)) point")
                 Button { adjust(1) } label: { Image(systemName: "textformat.size.larger") }
+                    .accessibilityLabel("Larger text")
             }
             .font(.title3)
 

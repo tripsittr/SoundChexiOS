@@ -107,6 +107,9 @@ struct PlaylistsGrid: View {
             Text("New playlist").font(.subheadline).foregroundStyle(SoundChexTheme.ink100).lineLimit(1)
             Text("Create").font(.caption).foregroundStyle(SoundChexTheme.ink500)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("New playlist")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -154,6 +157,9 @@ struct PlaylistCover: View {
                 Image(systemName: "music.note.list")
                     .font(.system(size: 34))
                     .foregroundStyle(SoundChexTheme.ink500))
+                // A stand-in for missing artwork. It carries nothing the
+                // row's own label does not already say.
+                .accessibilityHidden(true)
         }
     }
 

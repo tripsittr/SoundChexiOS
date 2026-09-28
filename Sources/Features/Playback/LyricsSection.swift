@@ -121,6 +121,8 @@ struct LRCLine: Identifiable, Hashable {
 /// The scrolling, highlighted synced lyrics. The line for the current position is
 /// emphasised and kept in view; tapping a line seeks to it.
 private struct SyncedLyricsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let lines: [LRCLine]
     let position: Double
     let onSeek: (Double) -> Void
@@ -162,8 +164,17 @@ private struct SyncedLyricsView: View {
                 .animation(.easeInOut(duration: 0.25), value: activeIndex)
                 .onChange(of: activeIndex) { _, newIndex in
                     guard let newIndex else { return }
-                    withAnimation(.easeInOut(duration: 0.35)) {
+
+                    // Lyrics scroll themselves as the song plays. Under
+                    // Reduced Motion the line still has to be brought into
+                    // view — losing it would be worse — so the jump is made
+                    // without the travel (#435).
+                    if reduceMotion {
                         proxy.scrollTo(newIndex, anchor: .center)
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
                     }
                 }
             }

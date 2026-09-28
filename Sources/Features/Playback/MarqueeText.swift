@@ -58,11 +58,22 @@ struct MarqueeText: View {
     /// off screen.
     var wrapSpeedFactor: Double = 2.6
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
     @State private var offset: CGFloat = 0
 
-    private var scrolls: Bool { textWidth > containerWidth && containerWidth > 0 }
+    /// Whether the title travels.
+    ///
+    /// Reduced Motion stops it outright (#435). This is the app's one piece
+    /// of continuous, unprompted movement — a long title slides back and
+    /// forth for as long as the record plays — which is exactly what the
+    /// setting is for. Held still it truncates instead: less of the title,
+    /// but a now-playing screen that is not moving while someone reads it.
+    private var scrolls: Bool {
+        !reduceMotion && textWidth > containerWidth && containerWidth > 0
+    }
 
     /// How far the first copy travels before the second sits exactly where it
     /// started — one full turn of the door.
@@ -103,7 +114,7 @@ struct MarqueeText: View {
     /// Identity of the current cycle. A change to any of these invalidates the
     /// running task.
     private var cycleKey: String {
-        "\(text)|\(textWidth)|\(containerWidth)"
+        "\(text)|\(textWidth)|\(containerWidth)|\(reduceMotion)"
     }
 
     private var label: some View {

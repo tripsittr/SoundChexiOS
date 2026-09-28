@@ -3,6 +3,27 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.29.02 “Clarity” — 2026-09-28
+
+### Added
+- **Reduced Motion is honoured across the app** (#435). It was respected in
+  exactly one place — the playing equalizer — and ignored everywhere else.
+
+  - **The scrolling now-playing title holds still.** This was the app's one
+    piece of continuous, unprompted movement: a long title slides back and
+    forth for as long as the record plays. It truncates instead — less of the
+    title, but a screen that is not moving while someone reads it.
+  - **Lyrics still follow the song**, because losing your place would be
+    worse, but the line arrives instead of travelling.
+  - **Reader page turns and the chrome toggle** arrive rather than slide.
+    Someone who sets Reduced Motion may be turning pages for an hour.
+  - **Filter chips** change without the transition. The theme's curve is a
+    static constant and cannot read the environment, so the choice is made in
+    the view that draws them.
+
+  Cross-fades are left alone: an opacity change is not motion, and replacing
+  it with a hard cut makes the interface worse for no benefit.
+
 ## 0.29.01 “Clarity” — 2026-09-28
 
 ### Added

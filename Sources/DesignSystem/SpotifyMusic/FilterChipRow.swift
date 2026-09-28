@@ -14,10 +14,19 @@ import SwiftUI
 /// Generic over any `CaseIterable` label enum, so the same row drives the Music
 /// landing today and any other chip filter later.
 struct FilterChipRow<Option: Hashable>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let options: [Option]
     @Binding var selection: Option?
     /// The visible label for an option.
     let label: (Option) -> String
+
+    /// The chip transition, or none under Reduced Motion (#435). The theme's
+    /// curve is a static constant and cannot read the environment itself, so
+    /// the choice is made here, where there is a view to read it from.
+    private var transition: Animation? {
+        reduceMotion ? nil : SoundChexTheme.easeOut
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -25,7 +34,7 @@ struct FilterChipRow<Option: Hashable>: View {
                 if selection != nil {
                     // The clear chip — a round × that resets to "everything".
                     Button {
-                        withAnimation(SoundChexTheme.easeOut) { selection = nil }
+                        withAnimation(transition) { selection = nil }
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 13, weight: .semibold))
@@ -49,7 +58,7 @@ struct FilterChipRow<Option: Hashable>: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .animation(SoundChexTheme.easeOut, value: selection)
+            .animation(transition, value: selection)
         }
         .scrollClipDisabled()
     }
@@ -57,7 +66,7 @@ struct FilterChipRow<Option: Hashable>: View {
     private func chip(_ option: Option) -> some View {
         let active = selection == option
         return Button {
-            withAnimation(SoundChexTheme.easeOut) {
+            withAnimation(transition) {
                 selection = active ? nil : option
             }
         } label: {

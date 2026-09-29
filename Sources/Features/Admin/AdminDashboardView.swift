@@ -26,6 +26,12 @@ struct AdminDashboardView: View {
                     topItems(stats)
                 }
                 .padding(16)
+                // Capped and centred on a wide screen (S-408). A column of
+                // stats stretched across 1366pt puts the label at one edge
+                // and its number at the other, which is harder to read than
+                // the same column at a sensible width.
+                .frame(maxWidth: 900)
+                .frame(maxWidth: .infinity)
             } else if let loadError {
                 ContentUnavailableView("Couldn't load", systemImage: "chart.bar.xaxis",
                                        description: Text(loadError))

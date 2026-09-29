@@ -3,6 +3,49 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.01 “Prelude” — 2026-09-28
+
+### Added
+- **The player puts the artwork beside the controls on a wide screen**
+  (S-408, stage 2). Stacked, a square sleeve over a short column of controls
+  leaves an iPad in landscape mostly empty and pushes the transport to the
+  very bottom of a 13-inch screen — a long way from where a thumb or a cursor
+  is.
+
+  Only when the frame is short and wide. An iPad in portrait is regular width
+  but tall, and stacking suits it; the decision reads the view's own size, not
+  the display's, so Split View gets the right answer.
+
+  The controls keep their own column rather than stretching to fill: a
+  scrubber half a metre wide is harder to hit accurately, not easier.
+
+- **Detail and home screens use the space** (stage 3). Album and playlist
+  covers grow from 220pt to 300pt at regular width, where a phone-sized sleeve
+  looked marooned. The home hero grows from 440pt to 560pt — 440 is most of a
+  phone screen and a third of an iPad, which made it read as a banner rather
+  than the front of the library.
+
+- **Settings and admin** (stage 4). Settings is a `List` and already adapted.
+  The admin dashboard was a single column stretched across the full width,
+  putting a label at one edge and its number at the other; it is now capped at
+  900pt and centred.
+
+### Fixed
+- **The sign-in form is vertically centred on a tall screen.** It sat at the
+  top with two thirds of an iPad page empty beneath it.
+
+  This was attempted in 0.30.0 and reverted for pushing the form off-screen
+  entirely. The mistake was stretching the content *inside* the scroll view —
+  a `ScrollView` sizes to what it holds, so that does nothing useful. Sizing
+  the scroll view to its content and centring that works.
+
+### Known gaps
+- Stage 5 — deleting `OrientationLock` once every screen has opted in — is
+  still open, and should wait until the earlier stages have been used on a
+  real iPad.
+- None of this has been seen on hardware; it is verified on the 13-inch
+  simulator.
+
 ## 0.30.0 “Prelude” — 2026-09-28
 
 ### Added

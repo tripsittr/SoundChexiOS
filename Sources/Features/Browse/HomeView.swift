@@ -64,6 +64,7 @@ struct HomeView: View {
 struct HeroBanner: View {
     @Environment(ThemeStore.self) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     let item: MediaItem
     var onPlay: () -> Void
@@ -116,7 +117,10 @@ struct HeroBanner: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
         }
-        .frame(height: 440)
+        // Taller where the screen is (S-408). 440pt is most of a phone and a
+        // third of an iPad, which makes the hero read as a banner rather than
+        // the front of the library.
+        .frame(height: horizontalSizeClass == .regular ? 560 : 440)
         .clipped()
     }
 

@@ -8,6 +8,7 @@ import PhotosUI
 /// Play/Shuffle header, then the tracks — drag-reorderable, swipe-to-remove, and
 /// editable behind a ⋯ menu. Changes persist to the server as they happen.
 struct PlaylistDetailView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(Session.self) private var session
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
@@ -84,6 +85,11 @@ struct PlaylistDetailView: View {
         }
     }
 
+    /// The cover's side. Bigger at regular width (S-408).
+    private var coverSide: CGFloat {
+        horizontalSizeClass == .regular ? 300 : 220
+    }
+
     /// The playlist as currently known (detail once loaded, else the passed-in
     /// summary) — so edits show immediately.
     private var displayPlaylist: Playlist { playlist }
@@ -93,7 +99,9 @@ struct PlaylistDetailView: View {
         VStack(spacing: 14) {
             PlaylistCover(artworkURL: detail?.artworkURL ?? playlist.artworkURL,
                           mosaic: tracks.compactMap(\.artwork))
-                .frame(width: 220, height: 220)
+                // Larger where there is room (S-408): a 220pt sleeve is a
+                // phone-sized cover marooned on a wide screen.
+                .frame(width: coverSide, height: coverSide)
                 .clipShape(.rect(cornerRadius: SoundChexTheme.radiusLargeArt))
                 .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
 

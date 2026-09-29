@@ -9,6 +9,7 @@ import SwiftUI
 /// connect+login the web app arrived at. All three are required; a bad server or
 /// wrong credentials show a message here rather than failing silently.
 struct SignInView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(Session.self) private var session
     @Environment(ThemeStore.self) private var theme
 
@@ -60,6 +61,17 @@ struct SignInView: View {
                 .frame(maxWidth: 440)
                 .frame(maxWidth: .infinity)
             }
+            // The form is short and the screen is tall, so on an iPad it sat
+            // at the top with two thirds of the page empty below it (S-408).
+            //
+            // Sizing the ScrollView to its content and centring *that* in the
+            // ZStack, rather than stretching the content inside the scroll
+            // view — which does nothing, because a ScrollView sizes to what it
+            // holds, and pushed the form off screen when tried the other way.
+            //
+            // `.basedOnSize` stops it bouncing when everything already fits.
+            .scrollBounceBehavior(.basedOnSize)
+            .fixedSize(horizontal: false, vertical: horizontalSizeClass == .regular)
         }
         .tint(theme.accent)
         // The profile chooser is a full page, not a sheet — picking who is

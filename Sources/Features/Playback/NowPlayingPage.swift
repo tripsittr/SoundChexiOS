@@ -15,6 +15,7 @@ struct NowPlayingPage: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var scrubbing = false
     @State private var scrubValue: Double = 0
@@ -70,21 +71,46 @@ struct NowPlayingPage: View {
                 // Spotify's player is a fixed layout, not a long scroll: art,
                 // title, scrubber and transport fill the screen, with Lyrics and
                 // the queue raised as their own sheets from the bottom bar.
-                VStack(spacing: 0) {
-                    header(item)
-                    Spacer(minLength: 12)
-                    // Sized against the width this page actually occupies,
-                    // not the whole display — in Split View those differ.
-                    Artwork(item: item, size: artworkCap, aspect: 1)
-                        .containerRelativeFrame(.horizontal) { width, _ in
-                            min(width - 56, artworkCap)
+                //
+                // Stacked on a phone. Side by side where the screen is wide
+                // (S-408): a square sleeve above a short column of controls
+                // leaves an iPad in landscape mostly empty, and pushes the
+                // transport to the very bottom of a 13-inch screen — a long
+                // way from where a thumb or a cursor is.
+                GeometryReader { proxy in
+                    if isWide(proxy.size) {
+                        VStack(spacing: 0) {
+                            header(item)
+
+                            HStack(alignment: .center, spacing: 44) {
+                                artwork(item, wide: true)
+
+                                // The controls keep their own column rather
+                                // than stretching: a scrubber half a metre
+                                // wide is harder to hit accurately, not
+                                // easier.
+                                VStack(spacing: 0) {
+                                    titleBlock(item)
+                                    scrubber
+                                    transport
+                                    bottomBar(item)
+                                }
+                                .frame(maxWidth: 460)
+                            }
+                            .frame(maxHeight: .infinity)
                         }
-                        .shadow(color: .black.opacity(0.6), radius: 30, y: 12)
-                    Spacer(minLength: 12)
-                    titleBlock(item)
-                    scrubber
-                    transport
-                    bottomBar(item)
+                    } else {
+                        VStack(spacing: 0) {
+                            header(item)
+                            Spacer(minLength: 12)
+                            artwork(item, wide: false)
+                            Spacer(minLength: 12)
+                            titleBlock(item)
+                            scrubber
+                            transport
+                            bottomBar(item)
+                        }
+                    }
                 }
                 .padding(.horizontal, 28)
                 .padding(.bottom, 20)
@@ -111,6 +137,30 @@ struct NowPlayingPage: View {
                 }
             }
         }
+    }
+
+    /// Whether there is room to put the artwork beside the controls.
+    ///
+    /// Both dimensions matter: an iPad in portrait is `.regular` horizontally
+    /// but tall, and stacking suits it. Side by side is for the short, wide
+    /// frame — an iPad in landscape.
+    private func isWide(_ size: CGSize) -> Bool {
+        horizontalSizeClass == .regular && verticalSizeClass == .regular
+            && size.width > size.height
+    }
+
+    /// The sleeve, the same in either arrangement.
+    ///
+    /// Side by side it takes a share of the width; stacked it takes nearly
+    /// all of it.
+    private func artwork(_ item: MediaItem, wide: Bool) -> some View {
+        // Sized against the width this page actually occupies, not the whole
+        // display — in Split View those differ.
+        Artwork(item: item, size: artworkCap, aspect: 1)
+            .containerRelativeFrame(.horizontal) { width, _ in
+                min(wide ? width * 0.45 : width - 56, artworkCap)
+            }
+            .shadow(color: .black.opacity(0.6), radius: 30, y: 12)
     }
 
     /// The largest the artwork may be.

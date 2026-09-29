@@ -6,6 +6,7 @@ import SwiftUI
 /// An album: big artwork, a Play/Shuffle header, then its tracks. Tapping a
 /// track plays the album from there.
 struct AlbumDetailView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(PlaybackController.self) private var playback
     @Environment(DownloadStore.self) private var downloads
     @Environment(ThemeStore.self) private var theme
@@ -44,6 +45,11 @@ struct AlbumDetailView: View {
         }
     }
 
+    /// The cover's side. Bigger at regular width (S-408).
+    private var coverSide: CGFloat {
+        horizontalSizeClass == .regular ? 300 : 220
+    }
+
     private var header: some View {
         VStack(spacing: 16) {
             // The cover sits large over a gradient from a muted tint of the
@@ -52,7 +58,9 @@ struct AlbumDetailView: View {
                 SoundChexTheme.base700.overlay(Image(systemName: "music.note").foregroundStyle(SoundChexTheme.ink500))
             }
             .accessibilityHidden(true)
-            .frame(width: 220, height: 220)
+            // Larger where there is room (S-408): a 220pt sleeve is a
+            // phone-sized cover marooned on a wide screen.
+            .frame(width: coverSide, height: coverSide)
             .clipShape(.rect(cornerRadius: SoundChexTheme.radiusLargeArt))
             .shadow(color: .black.opacity(0.5), radius: 24, y: 10)
             .padding(.top, 8)

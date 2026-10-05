@@ -20,6 +20,14 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     /// When the current profile last played this, for a "recently played"
     /// sort. Nil for something never played (S-391).
     let lastPlayedAt: Date?
+
+    /// When this entered the library — not when it last changed.
+    ///
+    /// `updated_at` was the only date here, and it is the wrong one for
+    /// "recently added": an enrichment pass moves it on everything it
+    /// touches, so a row built on it fills with whatever the scanner last
+    /// looked at (S-451).
+    let addedAt: Date?
     /// Absolute artwork URL the server resolved, or nil. Public — no token.
     let artwork: URL?
     let meta: Meta?
@@ -28,6 +36,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     // against are already camelCase: parent_id arrives as "parentId".
     enum CodingKeys: String, CodingKey {
         case id, type, title, subtitle, playable, artwork, meta, lastPlayedAt
+        case addedAt = "added_at"
         case parentID = "parentId"
     }
 
@@ -43,6 +52,10 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         // those as never played rather than failing the whole item.
         lastPlayedAt = ((try? c.decodeIfPresent(String.self, forKey: .lastPlayedAt)) ?? nil)
             .flatMap { ISO8601DateFormatter().date(from: $0) }
+        // Same tolerance as lastPlayedAt: a server that predates this sends
+        // nothing, and those items simply sort last rather than failing.
+        addedAt = ((try? c.decodeIfPresent(String.self, forKey: .addedAt)) ?? nil)
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
         // A malformed or relative artwork string is treated as no artwork.
         artwork = (try? c.decodeIfPresent(String.self, forKey: .artwork)).flatMap { $0.flatMap(URL.init(string:)) }
         meta = try? c.decodeIfPresent(Meta.self, forKey: .meta)
@@ -53,7 +66,8 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     /// memberwise one).
     init(id: Int, type: MediaType, title: String, subtitle: String?,
          parentID: Int?, playable: Bool, artwork: URL?, meta: Meta?,
-         lastPlayedAt: Date? = nil) {
+         lastPlayedAt: Date? = nil,
+         addedAt: Date? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -63,6 +77,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         self.artwork = artwork
         self.meta = meta
         self.lastPlayedAt = lastPlayedAt
+        self.addedAt = addedAt
     }
 
     /// For the on-disk library cache. Written and read by us, so a plain encode
@@ -84,6 +99,12 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         try c.encodeIfPresent(
             lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) },
             forKey: .lastPlayedAt,
+        )
+        // Cached too, or "recently added" would be correct on a fetch and
+        // arbitrary again after a relaunch reads from disk.
+        try c.encodeIfPresent(
+            addedAt.map { ISO8601DateFormatter().string(from: $0) },
+            forKey: .addedAt,
         )
     }
 

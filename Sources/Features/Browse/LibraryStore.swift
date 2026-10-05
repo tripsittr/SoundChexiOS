@@ -118,6 +118,40 @@ final class LibraryStore {
         isLoading = false
     }
 
+    /// Everything, ignoring the delta baseline.
+    ///
+    /// For after a scan (S-450). `load()` syncs incrementally when it has a
+    /// baseline, which is right on launch and wrong here: a scan is exactly
+    /// the moment the catalogue has changed most, and a delta keyed on a
+    /// timestamp can miss rows whose `updated_at` the scanner did not move —
+    /// a re-import of an existing file, say. Asking for everything costs one
+    /// request and removes the question.
+    ///
+    /// The home shelves are refreshed with it, since "Recently added" is
+    /// built from a separate endpoint and would otherwise still show the
+    /// library as it was before the scan.
+    func reloadEverything() async {
+        guard let api else { return }
+
+        isLoading = items.isEmpty
+        loadError = nil
+
+        do {
+            try await fullFetch(api: api)
+            hasLoaded = true
+            lastSyncedAt = Date()
+        } catch {
+            if items.isEmpty {
+                loadError = (error as? APIClient.APIError)?.errorDescription
+                    ?? "Could not load your library."
+            }
+        }
+
+        isLoading = false
+
+        await loadContinue()
+    }
+
     /// Replaces the whole catalogue from the server and records the new baseline.
     private func fullFetch(api: APIClient) async throws {
         let response = try await api.library()

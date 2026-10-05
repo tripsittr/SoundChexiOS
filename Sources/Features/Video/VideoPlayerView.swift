@@ -185,7 +185,24 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
                 forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main
             ) { [weak self] time in
                 guard let model = self?.subtitles else { return }
-                MainActor.assumeIsolated { model.update(time: time.seconds) }
+
+                // `queue: .main` puts this on the main *thread*, which is not
+                // the same as being in the main *actor's* isolation domain —
+                // and `MainActor.assumeIsolated` **traps** when that
+                // assumption is wrong. AVFoundation does not promise which
+                // domain it calls back from, so the check could fail and take
+                // the app down with EXC_BREAKPOINT rather than return a wrong
+                // answer (S-447).
+                //
+                // That is what crashed the app on opening a show: shows are
+                // video, so this observer runs only for the thing that broke.
+                // The same hazard is written down in OrientationLock, for the
+                // same reason.
+                //
+                // An explicit hop asks to be on the main actor instead of
+                // asserting it, which is what the status observer in
+                // PlaybackController already does.
+                Task { @MainActor in model.update(time: time.seconds) }
             }
         }
 

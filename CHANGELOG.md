@@ -3,6 +3,39 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.02 “Prelude” — 2026-10-05
+
+### Fixed
+- **The app crashed when opening a show** (S-447). The crash report said
+  `signal 5` / `exceptionType 6` — SIGTRAP / EXC_BREAKPOINT, which is a
+  *deliberate* trap rather than a memory fault: a Swift runtime precondition
+  failed. The attributed thread ran from a dispatch queue, through
+  AVFoundation, into our code, into the Swift runtime's failure handler.
+
+  The cause was `MainActor.assumeIsolated` inside an AVFoundation time
+  observer. Passing `queue: .main` to `addPeriodicTimeObserver` guarantees the
+  main *thread*; it does not put the closure in the main *actor's* isolation
+  domain, and `assumeIsolated` **traps** when those differ. AVFoundation makes
+  no promise about which domain it calls back from, so the check could fail —
+  and failing means the app dies rather than returning a wrong answer.
+
+  Shows are video, so the subtitle observer that did this runs only for the
+  thing that was crashing.
+
+  All four `assumeIsolated` call sites are now explicit `Task { @MainActor }`
+  hops — asking to be on the main actor rather than asserting it, which is
+  what the player's status observer already did correctly:
+
+  - `VideoPlayerView` subtitle observer (the one that crashed)
+  - `PlaybackController` periodic time observer — fires four times a second
+    for the length of every track, so the most-run closure in the app
+  - `PlaybackController` audio-interruption notification
+  - `RecentContextsStore` storage-cleared notification
+
+  The hazard was already written down in `OrientationLock`, which avoids it
+  for the same reason: *"iOS does not promise to ask this on the main actor,
+  and `MainActor.assumeIsolated` traps when that assumption is wrong."*
+
 ## 0.30.01 “Prelude” — 2026-09-28
 
 ### Added

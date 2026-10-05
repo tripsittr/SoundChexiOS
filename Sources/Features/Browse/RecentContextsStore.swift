@@ -53,7 +53,9 @@ final class RecentContextsStore {
         observer = NotificationCenter.default.addObserver(
             forName: Self.storageClearedNotification, object: nil, queue: .main,
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.entries = [] }
+            // `queue: .main` is the main thread, not the main actor, and
+            // `assumeIsolated` traps on the difference (S-447).
+            Task { @MainActor in self?.entries = [] }
         }
     }
 

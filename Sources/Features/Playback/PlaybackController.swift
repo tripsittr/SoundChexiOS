@@ -635,7 +635,13 @@ final class PlaybackController {
         let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
-            MainActor.assumeIsolated {
+
+            // Hopped rather than asserted. `queue: .main` gives the main
+            // thread, not main-actor isolation, and `assumeIsolated` traps
+            // when the two differ — a crash rather than a wrong answer
+            // (S-447). This fires four times a second for the length of every
+            // track, so it is the most-run closure in the app.
+            Task { @MainActor in
                 // The scrubber belongs to the track on screen, and to no other.
                 // A tick can arrive for the item being replaced — during a skip,
                 // or from the old item just before `replaceCurrentItem` takes
@@ -788,7 +794,8 @@ final class PlaybackController {
         ) { [weak self] note in
             let typeRaw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             let optionsRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
-            MainActor.assumeIsolated { self?.handleInterruption(typeRaw: typeRaw, optionsRaw: optionsRaw) }
+            // Hopped, not asserted — see the time observer above (S-447).
+            Task { @MainActor in self?.handleInterruption(typeRaw: typeRaw, optionsRaw: optionsRaw) }
         }
     }
 

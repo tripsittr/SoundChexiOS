@@ -35,12 +35,18 @@ struct LibraryTabs: View {
         TabView {
             HomeView().nowPlayingInset()
                 .tabItem { Label { Text("Home") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Home()) } }
+            // Watch, not Movies and Shows (S-449). The web has four tabs
+            // — Home, Watch, Music, Books — and says why in its own nav:
+            // choosing what to watch rarely starts with deciding between a
+            // film and an episode, so the split is a sub-nav on that page.
+            //
+            // Five was also one short of the limit: iOS folds everything past
+            // the fifth into a "More" tab, so adding anything would have
+            // started hiding sections.
+            WatchView().nowPlayingInset()
+                .tabItem { Label { Text("Watch") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Watch()) } }
             MusicView().nowPlayingInset()
                 .tabItem { Label { Text("Music") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Music()) } }
-            MediaGridView(type: .movie, title: "Movies").nowPlayingInset()
-                .tabItem { Label { Text("Movies") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Watch()) } }
-            MediaGridView(type: .show, title: "Shows").nowPlayingInset()
-                .tabItem { Label { Text("Shows") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Watch()) } }
             MediaGridView(type: .book, title: "Books").nowPlayingInset()
                 .tabItem { Label { Text("Books") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Book()) } }
         }

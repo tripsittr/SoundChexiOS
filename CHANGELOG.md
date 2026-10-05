@@ -3,6 +3,37 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.03 “Prelude” — 2026-10-05
+
+### Changed
+- **The bars are painted the way the web app paints its own** (S-449). The
+  shape stays Apple's — a tab bar at the bottom, a nav bar at the top, where
+  iOS users expect them. The finish does not.
+
+  Apple's default is a translucent material that takes its colour from
+  whatever scrolls underneath. The media centre uses a flat fill with a
+  hairline edge, and that difference is most of what made the two look like
+  separate products.
+
+  Matched against `.mobile-tabs` in the web stylesheet rather than
+  approximated by eye:
+
+      background: color-mix(in srgb, var(--color-base-800) 94%, transparent);
+      border-top: 1px solid var(--color-base-600);
+
+  The tab bar and nav bar already carried the right fill; what they lacked was
+  the hairline. `shadowColor` draws it — named for a shadow it has not been
+  since iOS 13.
+
+  The now-playing bar kept Apple's `.ultraThinMaterial` and now uses the same
+  flat fill, with its top edge corrected from `base-700` to the `base-600` the
+  web draws. `base-700` was a shade too dark to read as an edge against the
+  bar itself.
+
+  This also retires the Reduce Transparency branch added in 0.29.03: there is
+  no longer a blur to opt out of, so the accessibility setting and the default
+  now agree rather than diverging.
+
 ## 0.30.02 “Prelude” — 2026-10-05
 
 ### Fixed

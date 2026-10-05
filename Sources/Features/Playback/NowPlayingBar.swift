@@ -8,7 +8,6 @@ import SwiftUI
 struct NowPlayingBar: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(ThemeStore.self) private var theme
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var showingPlayer = false
 
     var body: some View {
@@ -71,17 +70,19 @@ struct NowPlayingBar: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            // A blur behind text is the one place translucency costs
-            // legibility, so Reduce Transparency gets a solid fill (#437).
-            .background {
-                if reduceTransparency {
-                    SoundChexTheme.base800
-                } else {
-                    Rectangle().fill(.ultraThinMaterial)
-                }
-            }
+            // The web's fill, not Apple's material (S-449). `.mobile-tabs`
+            // uses base-800 at 94% with a hairline above it — a flat panel
+            // with a little of the page showing through, rather than a blur
+            // that takes its colour from whatever scrolls underneath.
+            //
+            // This also retires the Reduce Transparency branch added in #437:
+            // there is no longer a blur to opt out of, so the setting and the
+            // default now agree instead of diverging.
+            .background(SoundChexTheme.base800.opacity(0.94))
             .overlay(alignment: .top) {
-                Rectangle().fill(SoundChexTheme.base700).frame(height: 0.5)
+                // base-600, which is what the web draws. This was base-700 —
+                // a shade too dark to read as an edge against the bar itself.
+                Rectangle().fill(SoundChexTheme.base600).frame(height: 0.5)
             }
             .fullScreenCover(isPresented: $showingPlayer) {
                 NowPlayingPage().soundchexTheme(theme)

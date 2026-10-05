@@ -24,6 +24,10 @@ struct LibraryTabs: View {
     @State private var showingDownloads = false
     @State private var store = LibraryStore()
 
+    /// Which section is showing. Held here rather than by `TabView`, which no
+    /// longer draws the bar (S-449).
+    @State private var selection: MediaTab = .home
+
     var body: some View {
         // Each tab insets its own content for the now-playing bar, so the bar
         // sits *above* the system tab bar rather than being drawn over it — an
@@ -32,24 +36,32 @@ struct LibraryTabs: View {
         // on every page instead, alongside the account button.
         // Icons match the web media UI (SoundChexIcons) rather than SF Symbols,
         // so the native app reads as the same product and not as Apple Music.
-        TabView {
-            HomeView().nowPlayingInset()
-                .tabItem { Label { Text("Home") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Home()) } }
-            // Watch, not Movies and Shows (S-449). The web has four tabs
-            // — Home, Watch, Music, Books — and says why in its own nav:
-            // choosing what to watch rarely starts with deciding between a
-            // film and an episode, so the split is a sub-nav on that page.
-            //
-            // Five was also one short of the limit: iOS folds everything past
-            // the fifth into a "More" tab, so adding anything would have
-            // started hiding sections.
-            WatchView().nowPlayingInset()
-                .tabItem { Label { Text("Watch") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Watch()) } }
-            MusicView().nowPlayingInset()
-                .tabItem { Label { Text("Music") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Music()) } }
-            MediaGridView(type: .book, title: "Books").nowPlayingInset()
-                .tabItem { Label { Text("Books") } icon: { SoundChexIcons.tabImage(SoundChexIcons.Book()) } }
+        // Not a `TabView`. Two attempts at styling one got the colours right
+        // and still looked like iOS, because on iOS 26 the system tab bar is a
+        // floating rounded capsule inset from the screen edges — a shape no
+        // appearance property changes. The web's bar is full width, square and
+        // flush to the bottom, so it is drawn rather than configured; see
+        // `MediaTabBar`.
+        //
+        // The content is switched by hand in exchange. Each page keeps its own
+        // NavigationStack, so a `Group` over the selection is all that is
+        // needed — and the pages stay lazy, which `TabView` did not guarantee
+        // either.
+        VStack(spacing: 0) {
+            Group {
+                switch selection {
+                case .home: HomeView()
+                case .watch: WatchView()
+                case .music: MusicView()
+                case .books: MediaGridView(type: .book, title: "Books")
+                }
+            }
+            .nowPlayingInset()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            MediaTabBar(selection: $selection)
         }
+        .background(SoundChexTheme.base900)
         .environment(store)
         .tint(theme.accent)
         .onChange(of: notifications.destination) { _, destination in

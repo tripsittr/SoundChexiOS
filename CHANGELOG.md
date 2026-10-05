@@ -3,6 +3,31 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.05 “Prelude” — 2026-10-05
+
+### Changed
+- **The bottom bar is drawn, not configured** (S-449). Two earlier attempts
+  set `UITabBarAppearance` — the fill, the hairline, a selection indicator —
+  and the bar still looked like iOS, because the problem was never the colour.
+
+  On iOS 26 the system tab bar is a **floating rounded capsule, inset from the
+  screen edges**. No appearance property changes that: the shape belongs to
+  the platform. The web's bar is the opposite —
+
+      position: fixed; inset-inline: 0; bottom: 0;
+      border-top: 1px solid var(--color-base-600);
+
+  full width, square corners, flush to the bottom, with a hairline across the
+  whole top edge. A capsule cannot be made into that, so `MediaTabBar` draws
+  the bar instead of asking UIKit for one.
+
+  The numbers are the stylesheet's rather than an approximation: a 3.25rem
+  row, a 1.375rem icon, a 0.625rem label, and the 1.75rem × 2px accent bar on
+  the active tab's top edge.
+
+  `TabView` goes with it — the pages are switched on a `MediaTab` instead,
+  which also keeps them lazy, something `TabView` never guaranteed.
+
 ## 0.30.04 “Prelude” — 2026-10-05
 
 ### Changed

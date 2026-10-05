@@ -60,6 +60,29 @@ struct SoundChexApp: App {
 
 import UIKit
 
+/// A bar for the top edge of the selected tab.
+///
+/// Drawn rather than shipped as an asset: it is two points of flat colour, and
+/// an asset would have to be regenerated whenever the accent changes — which
+/// it can, since the accent is a user setting.
+///
+/// The image is the full height of the tab bar with the bar at its top, and
+/// `alignmentRectInsets` is not used: UIKit centres the indicator image
+/// vertically, so the transparent remainder is what puts the visible part at
+/// the top where the web draws it.
+@MainActor
+private func tabIndicator(width: CGFloat, height: CGFloat, colour: UIColor) -> UIImage {
+    // 49pt is the standard tab bar height; the extra transparent space below
+    // the bar is what pushes it to the top once UIKit centres the image.
+    let size = CGSize(width: width, height: 49)
+
+    return UIGraphicsImageRenderer(size: size).image { context in
+        colour.setFill()
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    }
+    .withRenderingMode(.alwaysOriginal)
+}
+
 /// The tab bar and nav bars painted the way the web app paints its own, so the
 /// system chrome belongs to SoundChex rather than to iOS (S-449).
 ///
@@ -92,6 +115,19 @@ private func configureBarAppearance() {
     // 13. Without this the bar and the content behind it share an edge, which
     // is exactly the floating look the web deliberately avoids.
     tab.shadowColor = base600
+
+    // The web marks the active tab with an accent bar along its TOP edge:
+    //
+    //     .mobile-tab.is-active::before { top: 0; width: 1.75rem; height: 2px }
+    //
+    // and says why — "the eye is already there after the icon, and an
+    // underline at the bottom would sit under the home indicator". iOS marks
+    // it by tinting the icon instead, so the bar is drawn here as the
+    // selection indicator image: 28pt wide and 2pt tall, which is the web's
+    // 1.75rem × 2px at the same scale.
+    tab.selectionIndicatorImage = tabIndicator(
+        width: 28, height: 2, colour: UIColor(SoundChexTheme.accent),
+    )
 
     UITabBar.appearance().standardAppearance = tab
     UITabBar.appearance().scrollEdgeAppearance = tab

@@ -3,6 +3,40 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.04 “Prelude” — 2026-10-05
+
+### Changed
+- **Four tabs, not five — the nav the web app actually has** (S-449). 0.30.03
+  repainted the bars and left their contents alone, which was half the job.
+
+  The media centre has **Home, Watch, Music, Books**. The phone had Home,
+  Music, Movies, Shows, Books. Movies and Shows are one *Watch* entry there,
+  and the web says why in its own nav:
+
+  > Movies and shows share one entry: choosing what to watch rarely starts
+  > with deciding between a film and an episode. The split lives as a sub-nav
+  > on that page instead.
+
+  So the phone now matches: a Watch tab, with Movies/Shows as a chip row at
+  the top of it. The chips are the same `FilterChipRow` the Music landing
+  uses, so the two sub-navs are one control rather than two that resemble
+  each other.
+
+  Five was also one short of the ceiling — iOS folds everything past the fifth
+  tab into "More", so the next section added would have started hiding things.
+
+- **The active tab is marked at its top edge**, as the web marks it:
+
+      .mobile-tab.is-active::before { top: 0; width: 1.75rem; height: 2px }
+
+  drawn as a 28×2pt selection indicator, which is that measurement at the same
+  scale. The web's reasoning holds here too — the eye is already at the top of
+  the tab after the icon, and an underline at the bottom would sit under the
+  home indicator.
+
+  Generated rather than shipped as an asset, because the accent is a user
+  setting and an asset would be stale the moment it changed.
+
 ## 0.30.03 “Prelude” — 2026-10-05
 
 ### Changed

@@ -3,6 +3,26 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.07 “Prelude” — 2026-10-05
+
+### Fixed
+- **"Recently added" now shows what was recently added** (S-451). It took the
+  first twenty items in the catalogue as the server happened to return them —
+  and `/api/v1/library` applies no ordering at all, so that was SQLite's own
+  row order. Stable, arbitrary, and unchanged when a scan added something,
+  which is the one thing the row exists to show.
+
+  The catalogue now carries `added_at` (the server half landed separately), so
+  the row sorts by when an item entered the library.
+
+  Not `updated_at`, which was already there and would have been worse than
+  arbitrary: an enrichment pass moves it on everything it touches, so the row
+  would have filled with whatever the scanner last looked at rather than with
+  what is new.
+
+  The date is cached alongside the rest of the item, or the row would be right
+  after a fetch and arbitrary again after a relaunch read from disk.
+
 ## 0.30.06 “Prelude” — 2026-10-05
 
 ### Fixed

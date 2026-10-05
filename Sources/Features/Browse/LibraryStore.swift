@@ -395,7 +395,16 @@ final class LibraryStore {
             rows.append(Row(title: "Recently played", items: Array(played)))
         }
 
-        let recent = items.filter { $0.parentID == nil }.prefix(20)
+        // Actually by when things were added (S-451). This took the first
+        // twenty items in whatever order the array happened to hold — the
+        // server's `/library` does no ordering, so SQLite's own row order
+        // decided it. The row was stable, arbitrary, and did not change when
+        // a scan added something, which is exactly what it was for.
+        let recent = items
+            .filter { $0.parentID == nil && $0.addedAt != nil }
+            .sorted { ($0.addedAt ?? .distantPast) > ($1.addedAt ?? .distantPast) }
+            .prefix(20)
+
         if !recent.isEmpty { rows.append(Row(title: "Recently added", items: Array(recent))) }
 
         for (type, label) in [(MediaType.music, "Music"), (.movie, "Movies"),

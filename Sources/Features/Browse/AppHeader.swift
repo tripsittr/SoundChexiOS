@@ -14,6 +14,7 @@ import SwiftUI
 struct AppHeader: View {
     @Environment(Session.self) private var session
     @Environment(ThemeStore.self) private var theme
+    @Environment(LibraryStore.self) private var store
 
     @State private var searching = false
     @State private var showingSettings = false
@@ -66,7 +67,12 @@ struct AppHeader: View {
             SearchOverlay().soundchexTheme(theme)
         }
         .fullScreenCover(isPresented: $showingSettings) {
-            SettingsView().soundchexTheme(theme)
+            // The store goes across explicitly. A cover gets a fresh
+            // environment — the same reason the theme is passed here — and
+            // Settings reads the library to refresh it after a scan (S-450).
+            SettingsView()
+                .environment(store)
+                .soundchexTheme(theme)
         }
     }
 }

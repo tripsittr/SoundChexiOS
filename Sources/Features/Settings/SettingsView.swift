@@ -10,6 +10,10 @@ struct SettingsView: View {
     @Environment(DownloadStore.self) private var downloads
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeStore.self) private var theme
+    @Environment(LibraryStore.self) private var store
+
+    /// True while a scan and the refresh after it are running.
+    @State private var scanning = false
 
     @State private var switching = false
     @State private var diagnosticsSent = false
@@ -46,10 +50,17 @@ struct SettingsView: View {
                             Label("Profiles", systemImage: "person.2.badge.gearshape")
                         }
                         Button {
-                            Task { try? await session.api?.triggerScan() }
+                            Task { await scanAndRefresh() }
                         } label: {
-                            Label("Scan for new media", systemImage: "arrow.clockwise")
+                            // The state is on the row because a scan is not
+                            // instant and the button otherwise looked inert —
+                            // tapping it twice was the obvious response.
+                            Label(
+                                scanning ? "Scanning…" : "Scan for new media",
+                                systemImage: scanning ? "arrow.triangle.2.circlepath" : "arrow.clockwise",
+                            )
                         }
+                        .disabled(scanning)
                     }
                 }
 
@@ -164,6 +175,39 @@ struct SettingsView: View {
                 ProfileSwitcherView { dismiss() }.soundchexTheme(theme)
             }
         }
+    }
+
+    /// Scan, wait for it, then pull the catalogue down again (S-450).
+    ///
+    /// The button used to fire the scan and stop there, so nothing on the
+    /// phone changed until the next launch — the scan worked and looked as
+    /// though it had not.
+    ///
+    /// The wait is the awkward part: `/admin/scan` queues the work and returns
+    /// immediately, so there is nothing to await. Rather than poll for a
+    /// completion the API does not report, this gives the server a moment and
+    /// then reloads. A scan of a large library outlasts that, which is why the
+    /// reload is a full fetch rather than a delta — a second tap, or the next
+    /// pull-to-refresh, picks up whatever finished later.
+    private func scanAndRefresh() async {
+        guard !scanning, let api = session.api else { return }
+
+        scanning = true
+        defer { scanning = false }
+
+        do {
+            try await api.triggerScan()
+        } catch {
+            AppLog.error("Scan request failed: \(error.localizedDescription)", category: "library")
+            // Still refresh: the scan may have been queued before the response
+            // was lost, and a stale catalogue helps nobody either way.
+        }
+
+        // Long enough for a small library to finish and for the queue to have
+        // started on a large one.
+        try? await Task.sleep(for: .seconds(3))
+
+        await store.reloadEverything()
     }
 
     private var appVersion: String { AppRelease.display }

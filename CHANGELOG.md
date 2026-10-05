@@ -3,6 +3,32 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## 0.30.06 “Prelude” — 2026-10-05
+
+### Fixed
+- **"Scan for new media" now refreshes the library** (S-450). The button asked
+  the server to scan and stopped there, so nothing on the phone changed until
+  the next launch — a scan that worked looked exactly like one that had not.
+
+  Two things needed refreshing, not one. The catalogue, and the home shelves:
+  "Recently added" comes from a separate endpoint and would otherwise still
+  show the library as it was before the scan.
+
+  The reload is a **full fetch**, not a delta. `load()` syncs incrementally
+  when it has a baseline, which is right at launch and wrong here — a scan is
+  the moment the catalogue has changed most, and a delta keyed on a timestamp
+  can miss rows whose `updated_at` the scanner did not move.
+
+  The row says "Scanning…" while it runs, because a scan is not instant and an
+  inert-looking button invites a second tap.
+
+  One honest limitation: `/admin/scan` queues the work and returns
+  immediately, so there is nothing to await. This gives the server three
+  seconds and then reloads. A large library outlasts that, which is the other
+  reason the reload is a full fetch — a second tap, or a pull-to-refresh,
+  picks up whatever finished later. A completion signal on the server would be
+  the real fix.
+
 ## 0.30.05 “Prelude” — 2026-10-05
 
 ### Changed

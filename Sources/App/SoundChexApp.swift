@@ -60,22 +60,46 @@ struct SoundChexApp: App {
 
 import UIKit
 
-/// The tab bar and nav bars painted in the SoundChex dark palette, so the system
-/// chrome matches the rest of the app rather than showing a translucent default.
+/// The tab bar and nav bars painted the way the web app paints its own, so the
+/// system chrome belongs to SoundChex rather than to iOS (S-449).
+///
+/// The shape stays Apple's — a tab bar at the bottom, a nav bar at the top, in
+/// the positions and sizes iOS users already know. What changes is the finish.
+/// Apple's default is a translucent material that takes its colour from
+/// whatever scrolls under it; the web app uses a flat fill with a hairline
+/// edge, and that is what makes the two look like one product.
+///
+/// Matched against `.mobile-tabs` in the media centre's stylesheet, rather
+/// than approximated:
+///
+///     background: color-mix(in srgb, var(--color-base-800) 94%, transparent);
+///     border-top: 1px solid var(--color-base-600);
+///
+/// The 94% is the web's own value and is kept — it is a flat fill with a
+/// little of the page behind it, not a blur that samples the content.
 @MainActor
 private func configureBarAppearance() {
     let base800 = UIColor(SoundChexTheme.base800)
     let base900 = UIColor(SoundChexTheme.base900)
+    let base600 = UIColor(SoundChexTheme.base600)
 
     let tab = UITabBarAppearance()
     tab.configureWithOpaqueBackground()
     tab.backgroundColor = base800.withAlphaComponent(0.94)
+
+    // The hairline the web draws and iOS does not. `shadowColor` is the
+    // separator above the bar — named for a shadow it has not been since iOS
+    // 13. Without this the bar and the content behind it share an edge, which
+    // is exactly the floating look the web deliberately avoids.
+    tab.shadowColor = base600
+
     UITabBar.appearance().standardAppearance = tab
     UITabBar.appearance().scrollEdgeAppearance = tab
 
     let nav = UINavigationBarAppearance()
     nav.configureWithOpaqueBackground()
     nav.backgroundColor = base900
+    nav.shadowColor = base600
     nav.titleTextAttributes = [.foregroundColor: UIColor(SoundChexTheme.ink100)]
     nav.largeTitleTextAttributes = [.foregroundColor: UIColor(SoundChexTheme.ink100)]
     UINavigationBar.appearance().standardAppearance = nav

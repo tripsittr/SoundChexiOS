@@ -3,6 +3,23 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
+## Unreleased
+
+### Changed
+- **The fact strip on a film or show page** (#511). Year, certificate and length
+  as a row rather than a dot-joined sentence: the pieces are different kinds of
+  thing, and running them together made the certificate read as another word
+  rather than as a classification. It is boxed now, as the streaming apps show
+  it.
+
+  Length reads as **"1h 51m"** rather than "111 min", which is how long a film is
+  in every place a person has seen one described. A show's length is its season
+  count instead -- nobody asks how many minutes a series runs to.
+
+- **The Play button is white**, and weighted like the one thing somebody came to
+  the page to press. The accent colour competed with the poster on a page that is
+  mostly artwork and dark surfaces.
+
 ## 0.30.07 “Prelude” — 2026-10-05
 
 ### Fixed

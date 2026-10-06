@@ -127,9 +127,12 @@ struct ShowDetailView: View {
                 .foregroundStyle(SoundChexTheme.ink500)
             Text(item.title).font(.title3.bold()).foregroundStyle(SoundChexTheme.ink100)
                 .multilineTextAlignment(.center)
-            if let meta = metaLine {
-                Text(meta).font(.subheadline).foregroundStyle(SoundChexTheme.ink500)
-            }
+
+            // The fact strip, in the shape the streaming apps use: year, the
+            // certificate in a box, then the length. A boxed rating reads as a
+            // classification rather than as another word in a sentence, which
+            // is the point of the box.
+            factStrip
         }
         .padding(.top, 12)
     }
@@ -140,6 +143,61 @@ struct ShowDetailView: View {
 
     /// "2024 · 3 seasons" for a show, "2024" for a film, or the subtitle — the
     /// "·"-joined meta line, skipping missing parts.
+    /// Year, certificate and length, as a row rather than a sentence.
+    ///
+    /// Replaces a `·`-joined string. The pieces are different kinds of thing --
+    /// a number, a classification, a duration -- and running them together made
+    /// the certificate read as another word rather than as a rating.
+    private var factStrip: some View {
+        HStack(spacing: 10) {
+            if let year = item.meta?.releaseYear {
+                Text(String(year))
+            }
+
+            if let certificate = item.meta?.mpaaRating ?? item.meta?.contentRating {
+                Text(certificate)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(SoundChexTheme.ink500.opacity(0.25), in: RoundedRectangle(cornerRadius: 3))
+            }
+
+            if let length = lengthLabel {
+                Text(length)
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(SoundChexTheme.ink300)
+        // Read as one line rather than three unrelated fragments.
+        .accessibilityElement(children: .combine)
+    }
+
+    /// "1h 23m" for a film, "11 Seasons" for a show.
+    ///
+    /// Hours and minutes rather than "83 min", which is how long a film is in
+    /// every place a person has seen one described. A show's length is its
+    /// season count: nobody asks how many minutes a series runs to.
+    private var lengthLabel: String? {
+        if !episodes.isEmpty {
+            let seasons = Set(episodes.compactMap { $0.meta?.seasonNumber }).count
+
+            return seasons > 0 ? "\(seasons) Season\(seasons == 1 ? "" : "s")" : nil
+        }
+
+        guard let minutes = item.meta?.runtimeMinutes, minutes > 0 else {
+            return item.subtitle
+        }
+
+        let hours = minutes / 60
+        let rest = minutes % 60
+
+        if hours == 0 {
+            return "\(rest)m"
+        }
+
+        return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+    }
+
     private var metaLine: String? {
         var parts: [String] = []
         if let year = item.meta?.releaseYear { parts.append(String(year)) }
@@ -229,13 +287,21 @@ struct ShowDetailView: View {
         return parts.joined(separator: ", ")
     }
 
+    /// The primary action, weighted like one.
+    ///
+    /// White on black rather than tinted: on a page that is mostly artwork and
+    /// dark surfaces, the accent colour competes with the poster while white
+    /// does not. It is the one thing somebody came to the page to press.
     private func playButton(for item: MediaItem, label: String) -> some View {
         Button {
             playing = item
         } label: {
             Label(label, systemImage: "play.fill")
-                .fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
-                .background(SoundChexTheme.accent, in: .capsule).foregroundStyle(.white)
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(.white, in: .capsule)
+                .foregroundStyle(.black)
         }
     }
 

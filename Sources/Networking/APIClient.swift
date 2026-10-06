@@ -637,8 +637,15 @@ struct APIClient {
     }
 
     /// Reports a playback position back to the server.
-    func saveProgress(itemID: Int, position: Int, duration: Int) async throws {
-        struct Body: Encodable { let position: Int; let duration: Int }
+    /// Saves a resume position.
+    ///
+    /// `duration` is optional because it genuinely is not always known: an
+    /// HLS stream reports an indefinite duration until enough of the playlist
+    /// has loaded. The server validates it as nullable and treats a missing
+    /// one as unknown, so sending nil is better than inventing a zero that
+    /// would make "completed" arithmetic wrong.
+    func saveProgress(itemID: Int, position: Int, duration: Int?) async throws {
+        struct Body: Encodable { let position: Int; let duration: Int? }
         _ = try await sendRaw("/api/v1/items/\(itemID)/progress", method: "POST",
                               body: Body(position: position, duration: duration))
     }

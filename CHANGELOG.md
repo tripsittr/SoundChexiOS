@@ -5,6 +5,24 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Fixed
+- **The app crashed on opening any episode that transcodes.** `Int(NaN)` traps
+  in Swift, and `player.currentItem.duration.seconds` is **NaN** for an HLS
+  stream until enough of the playlist has loaded to know a duration —
+  `CMTime.indefinite.seconds` is NaN by definition.
+
+  The `?? 0` that looked like a guard was not one: the optional chain succeeds
+  and hands back NaN, which `Int(_:)` then traps on. So the very first progress
+  tick of a transcoded episode killed the app, while episodes that direct-play
+  (whose duration is known at once) were fine — which is exactly the pattern
+  that was reported.
+
+  Symbolicated from the device crash report: `report(seconds:)` at
+  `VideoPlayerView.swift:286`, called from the periodic time observer.
+
+  `Int(exactly:)` answers nil instead of trapping, and `duration` is now
+  optional end to end — the server has always validated it as nullable.
+
 ### Added
 - **A video that fails now says why.** The player was silent when it broke: a
   stream it could not read looked exactly like one that had not buffered yet,

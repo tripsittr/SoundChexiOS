@@ -280,12 +280,33 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
 
         private func report(seconds: Double) {
             guard seconds.isFinite else { return }
+
             let s = Int(seconds)
+
             guard s != lastReported, s > 0 else { return }
+
             lastReported = s
-            let duration = Int(player?.currentItem?.duration.seconds ?? 0)
+
+            // `Int(duration.seconds)` **traps** on a duration that is not a
+            // number, and `?? 0` does not save it: the optional chain
+            // succeeds and hands back NaN, which `Int(_:)` then crashes on.
+            //
+            // That is not a rare case. `CMTime.indefinite.seconds` is NaN,
+            // and an HLS stream has an indefinite duration until enough of
+            // the playlist has loaded to know one -- so the first progress
+            // tick of a transcoded episode landed on it. It crashed the app
+            // on opening exactly the episodes that transcode, while the ones
+            // that direct-play (whose duration is known immediately) were
+            // fine.
+            //
+            // `Int(exactly:)` answers nil rather than trapping, and a nil
+            // duration is a perfectly good thing to send: the server already
+            // treats it as unknown.
+            let duration = (player?.currentItem?.duration.seconds).flatMap { Int(exactly: $0.rounded()) }
+
             let id = itemID
             let api = api
+
             Task { try? await api?.saveProgress(itemID: id, position: s, duration: duration) }
         }
 

@@ -23,6 +23,10 @@ struct VideoPlayerView: View {
     /// the screen back -- the player cannot re-present itself.
     var onRestore: () -> Void = {}
 
+    /// Marks this player as one restored from Picture in Picture, so it does
+    /// not immediately dismiss itself again during the handover.
+    var restoredFromPictureInPicture = false
+
     @State private var subtitles = SubtitleModel()
 
     /// Dismisses this screen the moment Picture in Picture takes the video.
@@ -35,8 +39,23 @@ struct VideoPlayerView: View {
     private func pictureInPictureChanged(_ active: Bool) {
         guard active else { return }
 
+        // Not while the system is handing the video *back*.
+        //
+        // Restoring re-presents this screen, and AVKit reports PiP as active
+        // again briefly during that handover -- so dismissing unconditionally
+        // closed the screen the instant it reappeared. The video paused, the
+        // audio did not return, and asking for full screen took the window
+        // away entirely.
+        guard !isRestoring else { return }
+
         dismiss()
     }
+
+    /// Whether this screen was just re-presented out of Picture in Picture.
+    ///
+    /// Cleared once the handover has settled, so an ordinary entry into PiP
+    /// afterwards still dismisses as it should.
+    @State private var isRestoring = false
 
     var body: some View {
         VideoPlayerContainer(
@@ -84,6 +103,18 @@ struct VideoPlayerView: View {
                 // Video takes over audio: stop the music player so the two don't
                 // both hold the audio session.
                 if playback.isPlaying { playback.togglePlayPause() }
+
+                guard restoredFromPictureInPicture else { return }
+
+                // Held only for the handover. A second of grace is enough for
+                // AVKit to finish reporting the old window's state, and short
+                // enough that a deliberate re-entry into PiP still dismisses.
+                isRestoring = true
+
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1))
+                    isRestoring = false
+                }
             }
     }
 
@@ -140,6 +171,13 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         guard let api else { return controller }
 
         // Video should keep playing (or PiP) in the background, like audio.
+        //
+        // Set on **every** build of the player, not once per app launch, and
+        // deliberately so: a player restored out of Picture in Picture is a
+        // fresh controller, and the session may have been deactivated while
+        // the window was up. Without re-activating here the picture came
+        // back and the sound did not -- which is exactly what was reported
+        // after a PiP round trip.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
 

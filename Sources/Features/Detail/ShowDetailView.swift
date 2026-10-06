@@ -19,6 +19,16 @@ struct ShowDetailView: View {
 
     /// The item to play in the video player, when one is tapped.
     @State private var playing: MediaItem?
+
+    /// An item Picture in Picture has asked to put back on screen.
+    ///
+    /// Separate from `playing` because the request arrives *after* the player
+    /// screen has dismissed itself, so it cannot be made from inside that
+    /// screen's own closure.
+    @State private var restoringItem: MediaItem?
+
+    /// Whether the player about to be shown is coming back from PiP.
+    @State private var wasRestored = false
     /// The book to open in the reader.
     @State private var reading: MediaItem?
 
@@ -118,22 +128,30 @@ struct ShowDetailView: View {
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
-            // `onRestore` re-presents this cover when Picture in Picture's
-            // restore button is tapped. Without it PiP is a one-way trip:
-            // the player shows "playing in Picture in Picture" and there is
-            // no way back to it and no way to close.
+            // The restore request is handled *outside* this closure, through
+            // `restoringItem` below.
             //
-            // Dismissed first, then re-presented on the next runloop pass --
-            // SwiftUI will not re-present a cover that it still considers
-            // shown, and the system has already torn this one's view down.
-            VideoPlayerView(item: toPlay) {
-                playing = nil
-
-                DispatchQueue.main.async {
-                    playing = toPlay
-                }
-            }
+            // It cannot be handled here: the screen now dismisses itself when
+            // PiP starts, so by the time the restore button is tapped this
+            // content is gone and `playing` is already nil. Setting it nil
+            // again and re-presenting from inside the view being torn down
+            // raced the teardown -- the video paused, the audio did not come
+            // back, and asking for full screen made the window disappear.
+            VideoPlayerView(
+                item: toPlay,
+                onRestore: { restoringItem = toPlay },
+                restoredFromPictureInPicture: wasRestored,
+            )
             .soundchexTheme(theme)
+        }
+        // Re-presents the player after PiP hands it back. A separate piece of
+        // state so the request outlives the screen that made it.
+        .onChange(of: restoringItem) { _, item in
+            guard let item else { return }
+
+            restoringItem = nil
+            wasRestored = true
+            playing = item
         }
         .sheet(item: $downloadTarget) { episode in
             RetentionPicker(title: episode.meta?.episodeTitle ?? episode.title) { retention in
@@ -382,6 +400,7 @@ struct ShowDetailView: View {
             onPlay: { episode in
                 // A floating window and a new video must not play at once.
                 PictureInPictureSession.shared.stopForNewPlayback()
+                wasRestored = false
                 playing = episode
             },
             onDownload: { downloadTarget = $0 },
@@ -417,6 +436,7 @@ struct ShowDetailView: View {
     private func playButton(for item: MediaItem, label: String) -> some View {
         Button {
             PictureInPictureSession.shared.stopForNewPlayback()
+            wasRestored = false
             playing = item
         } label: {
             Label(label, systemImage: "play.fill")

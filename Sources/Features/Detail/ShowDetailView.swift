@@ -72,33 +72,17 @@ struct ShowDetailView: View {
                         HStack(spacing: 12) {
                             playButton(for: item, label: "Play")
 
-                            // A film has no episode rows to hang a kebab off,
-                            // so its download sits here. It still asks how
-                            // long to keep it (S-404) — a film is the single
-                            // largest thing this app will ever store.
-                            if downloads.isStored(item.id) {
-                                Button {
-                                    downloads.remove(item.id)
-                                } label: {
-                                    Image(systemName: "arrow.down.circle.fill")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .frame(width: 44, height: 44)
-                                        .foregroundStyle(SoundChexTheme.storedGreen)
-                                        .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
-                                        .accessibilityLabel("Downloaded. Remove download")
-                                }
-                            } else {
-                                Button {
-                                    downloadTarget = item
-                                } label: {
-                                    Image(systemName: "arrow.down")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .frame(width: 44, height: 44)
-                                        .foregroundStyle(SoundChexTheme.ink200)
-                                        .overlay(Circle().stroke(SoundChexTheme.base600, lineWidth: 1))
-                                        .accessibilityLabel("Download")
-                                }
-                            }
+                            // A film has no episode rows to hang a kebab
+                            // off, so its download sits here.
+                            //
+                            // `DownloadButton` rather than a hand-rolled
+                            // pair of states: this used to be a binary
+                            // `isStored` check, so a multi-gigabyte film
+                            // showed a plain arrow for the whole download and
+                            // then silently became a green tick. The shared
+                            // control has all five states and a progress ring,
+                            // and it already asks how long to keep a video.
+                            DownloadButton(item: item, size: 16)
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 16)

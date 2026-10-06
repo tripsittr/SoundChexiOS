@@ -5,6 +5,29 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Fixed
+- **Episode stills stayed blank** against a server that was answering
+  correctly. The library syncs incrementally against a baseline keyed on
+  `updated_at`, so it only re-fetches rows the *database* touched — and the
+  artwork fallback changed the **serialiser**, which touches no rows. Every
+  cached episode kept its old, artwork-less payload and the app would never
+  have asked again.
+
+  There is now a payload version: when this build expects fields a cached
+  catalogue was not written with, the baseline is dropped and a full fetch
+  runs. **Raise it whenever the server starts sending a field the app reads.**
+
+- **Downloads showed no progress on video.** `DownloadStore` has tracked five
+  states and live progress all along, and `DownloadButton` renders all of them
+  with a progress ring — but no video surface used it. A multi-gigabyte film
+  showed a plain arrow for the whole download and then silently became a green
+  tick.
+
+  Films now use the shared button. Episode rows show every state as a mark
+  (a row is already a button, and a button inside one is a tap target nobody
+  can hit), including a progress ring while downloading, and say the state to
+  VoiceOver.
+
 ### Added
 - **MKVs play.** iOS cannot demux Matroska *at all*, whatever codec is inside,
   so a direct fetch was a black rectangle — and the player always fetched the

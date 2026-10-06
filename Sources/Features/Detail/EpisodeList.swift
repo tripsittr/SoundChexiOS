@@ -138,12 +138,16 @@ private struct EpisodeRow: View {
 
                     Spacer(minLength: 0)
 
-                    if downloads.isStored(episode.id) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(SoundChexTheme.storedGreen)
-                            .accessibilityHidden(true)
-                    }
+                    // The download state, as a mark rather than a control:
+                    // the whole row is already a button, and a button inside
+                    // a button is a tap target nobody can hit reliably.
+                    // Downloading is in the row's long-press menu.
+                    //
+                    // All of the states, not just "stored": this showed a
+                    // green tick or nothing at all, so an episode downloading
+                    // for several minutes looked exactly like one nobody had
+                    // asked for.
+                    downloadMark
                 }
                 .contentShape(.rect)
             }
@@ -169,6 +173,48 @@ private struct EpisodeRow: View {
         .accessibilityAction(named: "Download", onDownload)
         .contextMenu {
             EpisodeActions(episode: episode) { _ in onDownload() }
+        }
+    }
+
+    /// Where this episode's download has got to.
+    @ViewBuilder
+    private var downloadMark: some View {
+        switch downloads.state(for: episode.id) {
+        case .idle:
+            EmptyView()
+
+        case .queued:
+            Image(systemName: "clock")
+                .font(.footnote)
+                .foregroundStyle(SoundChexTheme.ink500)
+                .accessibilityHidden(true)
+
+        case .downloading(let progress):
+            // The same ring the shared button draws, at row scale. A floor on
+            // the trim so a download that has just started is visibly
+            // *something* rather than an empty circle.
+            ZStack {
+                Circle()
+                    .stroke(SoundChexTheme.base600, lineWidth: 2)
+                Circle()
+                    .trim(from: 0, to: max(progress, 0.02))
+                    .stroke(SoundChexTheme.accent, style: .init(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 16, height: 16)
+            .accessibilityHidden(true)
+
+        case .stored:
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(SoundChexTheme.storedGreen)
+                .accessibilityHidden(true)
+
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
         }
     }
 
@@ -243,8 +289,12 @@ private struct EpisodeRow: View {
             parts.append("\(Int(progress * 100)) percent watched")
         }
 
-        if downloads.isStored(episode.id) {
-            parts.append("Downloaded")
+        switch downloads.state(for: episode.id) {
+        case .queued: parts.append("Waiting to download")
+        case .downloading(let progress): parts.append("Downloading, \(Int(progress * 100)) percent")
+        case .stored: parts.append("Downloaded")
+        case .failed: parts.append("Download failed")
+        case .idle: break
         }
 
         if let overview = episode.meta?.overview, !overview.isEmpty {

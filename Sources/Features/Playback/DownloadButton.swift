@@ -16,6 +16,19 @@ struct DownloadButton: View {
     @State private var confirmingRemove = false
     @State private var choosingRetention = false
 
+    /// The item whose copy is being chosen, and the retention already picked.
+    /// The two questions are asked in sequence, so the first answer has to
+    /// survive until the second is given.
+    @State private var choosingVariant: MediaItem?
+    @State private var chosenRetention: DownloadRetention = .forever
+
+    /// Whether the file itself would play on this device. Nil until asked;
+    /// false only for a container this device cannot open, which is the one
+    /// case worth a second question.
+    @State private var directPlayable: Bool?
+
+    @Environment(Session.self) private var session
+
     var body: some View {
         Button {
             switch downloads.state(for: item.id) {
@@ -49,9 +62,31 @@ struct DownloadButton: View {
         }
         .sheet(isPresented: $choosingRetention) {
             RetentionPicker(title: item.title) { retention in
-                downloads.download(item, keeping: retention)
+                chosenRetention = retention
+
+                // Only ask which copy where the answer is not obvious: a file
+                // this device cannot open, which the server also has
+                // converted. An MP4 that plays everywhere is fetched without
+                // a word.
+                if directPlayable == false {
+                    choosingVariant = item
+                } else {
+                    downloads.download(item, keeping: retention)
+                }
             }
             .presentationDetents([.medium])
+        }
+        .downloadVariantPicker(for: $choosingVariant) { target, variant in
+            downloads.download(target, keeping: chosenRetention, variant: variant)
+        }
+        // Asked once, so the button knows whether the two copies differ
+        // before anybody taps it. Silent on failure: nil means "not known",
+        // and an unknown answer downloads the compatible copy rather than
+        // asking a question it cannot justify.
+        .task {
+            guard item.type.isVideo, let api = session.api else { return }
+
+            directPlayable = (try? await api.playback(itemID: item.id))?.directPlayable
         }
     }
 

@@ -199,6 +199,10 @@ struct APIClient {
         let rtScore: Int?
         let metascore: Int?
 
+        /// How many people voted on IMDb, which is what tells a 9.2 from
+        /// eleven people apart from a 9.2 from three million.
+        let imdbVotes: Int?
+
         /// The sentence OMDb writes, not parsed counts: "Nominated for 7
         /// Oscars. 21 wins & 43 nominations total".
         let awards: String?
@@ -228,6 +232,7 @@ struct APIClient {
             case contentRating = "content_rating"
             case imdbRating = "imdb_rating"
             case rtScore = "rt_score"
+            case imdbVotes = "imdb_votes"
             case fileSize = "file_size"
             case addedAt = "added_at"
         }

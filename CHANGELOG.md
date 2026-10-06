@@ -6,6 +6,25 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 ## Unreleased
 
 ### Changed
+- **Every rating in one row, with icons.** They were in three places: a score
+  row at the top, *the same* IMDb and Rotten Tomatoes numbers again as
+  label/value pairs in the fact grid, and awards on their own further down with
+  a rosette. **Metacritic appeared only in the first** -- which is why it looked
+  separate from the others.
+
+  Now one scrolling row: IMDb with its vote count ("3.2M", which is what tells a
+  9.2 from eleven people apart from a 9.2 from three million), Rotten Tomatoes
+  coloured at the 60% fresh line, Metacritic in its own 40/61 banding, and the
+  awards as "4 Oscars" or "7 Oscars nom.".
+
+  The icons are SF Symbols standing in for the services' marks, not the marks
+  themselves: those are trademarks with licensing terms, and a shape that reads
+  as the right *kind* of thing carries the meaning without the claim.
+
+  Parsing the awards sentence was checked against real OMDb strings, which is
+  how two bugs surfaced: taking the first word and stripping its "s" turned
+  "Golden Globes" into "Goldens" and dropped the "Emmy" from "Primetime Emmy".
+
 - **The episode list, rebuilt** (#511). It was a file listing: a number, a
   title, a chevron, with every season stacked at once. A sixty-episode series
   is unusable that way, and an episode title alone ("Aunt Ginger") says nothing

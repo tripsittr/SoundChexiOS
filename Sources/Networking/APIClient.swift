@@ -222,19 +222,27 @@ struct APIClient {
         let fileSize: Int64?
         let addedAt: String?
 
+        // The decoder applies `.convertFromSnakeCase`, so by the time a key
+        // reaches here `imdb_rating` has ALREADY become `imdbRating`. Mapping
+        // a case to the wire's spelling therefore matches nothing and decodes
+        // as nil -- silently, because every field is optional.
+        //
+        // That is what hid IMDb and Rotten Tomatoes on the detail page while
+        // Metacritic showed: `metascore` has no underscore, so it was the one
+        // key that survived. The same fault took runtime, file size, season
+        // and episode counts, the content rating and the capability badges
+        // with it, each of which merely looked like missing data.
+        //
+        // So these are spelled camelCase, matching the property names and
+        // what the strategy produces. Kept explicit rather than synthesised so
+        // the mapping is visible and cannot drift again.
         enum CodingKeys: String, CodingKey {
             case type, year, director, studio, creator, network, tagline
             case capabilities
             case language, country, awards, metascore, artist, album, author
-            case runtimeMinutes = "runtime_minutes"
-            case seasonCount = "season_count"
-            case episodeCount = "episode_count"
-            case contentRating = "content_rating"
-            case imdbRating = "imdb_rating"
-            case rtScore = "rt_score"
-            case imdbVotes = "imdb_votes"
-            case fileSize = "file_size"
-            case addedAt = "added_at"
+            case runtimeMinutes, seasonCount, episodeCount, contentRating
+            case imdbRating, rtScore, imdbVotes
+            case fileSize, addedAt
         }
     }
 
@@ -460,8 +468,10 @@ struct APIClient {
             let sourceLabel: String?
             var id: String { [title, artist, album, sourceLabel].compactMap { $0 }.joined(separator: "|") }
 
+            // camelCase: `.convertFromSnakeCase` has already turned
+            // `source_label` into `sourceLabel` by the time this is matched.
             enum CodingKeys: String, CodingKey {
-                case title, artist, album, sourceLabel = "source_label"
+                case title, artist, album, sourceLabel
             }
         }
 
@@ -473,9 +483,12 @@ struct APIClient {
         let unmatched: [Unmatched]
         let playlistID: Int?
 
+        // `playlistID` needs the mapping because the strategy produces
+        // `playlistId` -- a different spelling from the property name. The
+        // rule is to match what the STRATEGY emits, not what the wire sends.
         enum CodingKeys: String, CodingKey {
             case id, name, status, total, matched, unmatched
-            case playlistID = "playlist_id"
+            case playlistID = "playlistId"
         }
     }
 

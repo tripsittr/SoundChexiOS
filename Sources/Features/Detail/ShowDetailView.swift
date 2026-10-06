@@ -169,37 +169,62 @@ struct ShowDetailView: View {
         }
     }
 
-    /// The backdrop: full width, 16:9, fading into the page.
+    /// The header image, fading into the page.
     ///
-    /// The fade is what stops it reading as a pasted-in rectangle — the
-    /// streaming apps all do it, and without it the join between image and
-    /// page is a hard line across the screen.
+    /// **The poster, at a poster's shape** — not cropped to 16:9. There is no
+    /// backdrop in the schema: `cover_image_url` is the only image an item
+    /// has, and it is a 2:3 poster. Forcing that into a cinematic banner shows
+    /// a thin horizontal slice of the middle, which is usually an actor's
+    /// chin.
+    ///
+    /// So it fills the width at its own ratio, cropped from the top where the
+    /// title artwork usually sits, and capped so a tall poster cannot push the
+    /// play button off the first screen. The fade is what stops it reading as
+    /// a pasted-in rectangle; without it the join is a hard line.
+    ///
+    /// `GeometryReader` for the width because `Artwork` sizes itself from the
+    /// `size` it is given — it applies its own `.frame(width:height:)`
+    /// internally. Passing a placeholder `1` and expecting the parent frame to
+    /// stretch it produced a **one-point-wide** image: an entirely blank
+    /// header, which is what shipped.
     private var backdrop: some View {
-        Artwork(item: item, size: 1, aspect: 0.5625, shape: .roundedSquare(0))
-            .frame(maxWidth: .infinity)
-            .aspectRatio(16 / 9, contentMode: .fill)
-            .frame(height: 210)
+        GeometryReader { geometry in
+            Artwork(
+                item: item,
+                size: geometry.size.width,
+                // A poster is 2:3, and `Artwork` multiplies the width by this
+                // for its height.
+                aspect: 1.5,
+                shape: .roundedSquare(0),
+            )
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             .clipped()
             .overlay(alignment: .bottom) {
                 LinearGradient(
-                    colors: [.clear, SoundChexTheme.base900],
+                    colors: [.clear, SoundChexTheme.base900.opacity(0.85), SoundChexTheme.base900],
                     startPoint: .top,
                     endPoint: .bottom,
                 )
-                .frame(height: 90)
+                .frame(height: 120)
+                .allowsHitTesting(false)
             }
-            .accessibilityHidden(true)
+        }
+        // Tall enough to read as an image, short enough that Play stays on the
+        // first screen. Reserved up front so the page does not jump as the
+        // image arrives.
+        .frame(height: 320)
+        .accessibilityHidden(true)
     }
 
     /// The synopsis, directly under the primary action.
     ///
     /// Where the streaming apps put it, and for a good reason: having decided
-    /// to press Play or not, the next question is "what is this" — not
-    /// "who directed it", which is what sat here while the description was
-    /// buried below the credits.
+    /// to press Play or not, the next question is "what is this" — not "who
+    /// directed it", which is what sat here while the description was buried
+    /// below the credits.
     ///
-    /// Empty until the detail call returns, and nothing is reserved for it:
-    /// a blank gap that later fills is worse than content arriving.
+    /// Empty until the detail call returns, and nothing is reserved for it: a
+    /// blank gap that later fills is worse than content arriving.
     @ViewBuilder
     private var synopsis: some View {
         if let overview, !overview.isEmpty {

@@ -5,6 +5,34 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Fixed
+- **IMDb and Rotten Tomatoes were missing from every detail page**, while
+  Metacritic showed. The decoder applies `.convertFromSnakeCase`, so by the
+  time a key is matched `imdb_rating` has *already* become `imdbRating` — and
+  the `CodingKeys` mapped the cases to the wire's spelling, which therefore
+  matched nothing and decoded as nil. Silently, because every field is
+  optional. `metascore` has no underscore, which is the only reason it
+  survived and the reason the fault looked like missing data.
+
+  The same bug took **runtime, file size, season and episode counts, the
+  content rating and the capability badges** with it, and in `MediaItem` it
+  took `addedAt` — so the "recently added" sort had nothing to sort by.
+
+- **The header image was blank.** `Artwork` applies its own
+  `.frame(width:height:)` from the `size` it is given, so passing a
+  placeholder `1` and expecting the parent frame to stretch it rendered a
+  one-point-wide image. It now takes its width from a `GeometryReader`.
+
+  It also shows the poster at **a poster's shape** rather than cropped to
+  16:9: there is no backdrop in the schema — `cover_image_url` is the only
+  image an item has — and forcing a 2:3 poster into a cinematic banner shows a
+  thin slice of the middle, usually an actor's chin.
+
+- **Awards appeared twice**, once as "1 win" in the score row and again as
+  "1 win & 7 nominations total" a few inches below. The old rosette line is
+  gone; the full sentence is now a row in the fact grid, where the page keeps
+  its details.
+
 ### Changed
 - **Every rating in one row, with icons.** They were in three places: a score
   row at the top, *the same* IMDb and Rotten Tomatoes numbers again as

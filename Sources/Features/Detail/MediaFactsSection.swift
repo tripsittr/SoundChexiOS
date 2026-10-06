@@ -83,16 +83,10 @@ struct MediaFactsSection: View {
                 factGrid
             }
 
-            if let awards = detail?.awards, !awards.isEmpty {
-                // The sentence as the source writes it -- "Nominated for 7
-                // Oscars. 21 wins & 43 nominations total" -- rather than
-                // parsed counts, which would invent structure it does not
-                // have.
-                Label(awards, systemImage: "rosette")
-                    .font(.footnote)
-                    .foregroundStyle(SoundChexTheme.ink200)
-                    .padding(.horizontal, 16)
-            }
+            // Awards are in the score row above as "4 Oscars", and the full
+            // sentence is a row in the fact grid. This rosette line was a
+            // third copy: the page showed "1 win" in the row and "1 win & 7
+            // nominations total" again a few inches below it.
 
             if !cast.isEmpty {
                 creditRail("Cast", cast)
@@ -343,6 +337,14 @@ struct MediaFactsSection: View {
         }
 
         if let status = meta.status { rows.append(("Status", status.capitalized)) }
+
+        // The sentence as OMDb writes it -- "Nominated for 2 Oscars. 28 wins &
+        // 34 nominations total". The score row above carries the headline
+        // ("2 Oscars nom."); this is the detail behind it, in the one place
+        // the page keeps details.
+        if let awards = detail?.awards, !awards.isEmpty {
+            rows.append(("Awards", awards))
+        }
 
         // No scores here: they are the row of icons at the top. They used to
         // appear in both places, and Metacritic in only one of them.

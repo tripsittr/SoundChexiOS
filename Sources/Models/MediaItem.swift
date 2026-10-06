@@ -41,10 +41,14 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
 
     // The decoder applies .convertFromSnakeCase first, so the keys these match
     // against are already camelCase: parent_id arrives as "parentId".
+    //
+    // Which is exactly why `addedAt` must NOT be mapped to "added_at": that
+    // spelling never arrives, so it decoded as nil on every item and the
+    // "recently added" sort had nothing to sort by. The comment above was
+    // right and the line below it did the opposite.
     enum CodingKeys: String, CodingKey {
         case id, type, title, subtitle, playable, artwork, meta, lastPlayedAt
-        case resumePosition
-        case addedAt = "added_at"
+        case resumePosition, addedAt
         case parentID = "parentId"
     }
 

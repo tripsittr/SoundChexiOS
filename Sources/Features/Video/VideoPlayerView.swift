@@ -110,16 +110,34 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
 
+        // The player exists before the URL does.
+        //
+        // An `AVPlayer` with no item is valid and idle, so the controller can
+        // be handed back fully formed and the item swapped in when it is
+        // known. The alternative -- resolving the URL first and building the
+        // player afterwards -- means the asynchronous work has to reach back
+        // into `makeUIViewController`'s `context`, which is only valid for the
+        // duration of that call. Capturing it in a `Task` and touching
+        // `context.coordinator` after the function returned is what crashed
+        // the player on every video.
+        let player = AVPlayer()
+        controller.player = player
+
+        // The coordinator is attached now, while `context` is still live. It
+        // observes the player rather than the item, so it does not care that
+        // nothing is loaded yet.
+        context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
+
         // A downloaded copy needs no decision: it is on the device precisely
-        // because it plays here. Started synchronously so the common case has
-        // no delay at all.
+        // because it plays here, so this path never waits.
         if let local = DownloadStore.shared.localURL(for: item.id) {
             // Watching resets the clock on a timed download (S-404): the
             // window means "unused for this long", so a series you are
             // part-way through does not vanish between two episodes.
             DownloadStore.shared.extendRetention(for: item.id)
 
-            start(controller, with: AVPlayerItem(asset: AVURLAsset(url: local)), api: api, context: context)
+            player.replaceCurrentItem(with: AVPlayerItem(asset: AVURLAsset(url: local)))
+            player.play()
 
             return controller
         }
@@ -131,10 +149,9 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // rectangle for every MKV in the library. The server knows the
         // container and answers with HLS where the file will not play.
         //
-        // One request before the first frame, which is why the audio session
-        // and the controller are set up first: by the time the answer lands
-        // there is nothing left to do but attach the item.
-        Task { @MainActor in
+        // Only `player` and `api` are captured: both are references that
+        // outlive this call, unlike `context`.
+        Task { @MainActor [player, api] in
             let url = (try? await api.playback(itemID: item.id))?.url
                 // A failed decision must not mean a blank screen. Falling back
                 // to the direct stream is exactly the old behaviour: right for
@@ -143,24 +160,13 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
 
             guard let url else { return }
 
-            start(controller, with: AVPlayerItem(asset: AVURLAsset(url: url, options: assetOptions(api: api))), api: api, context: context)
+            player.replaceCurrentItem(
+                with: AVPlayerItem(asset: AVURLAsset(url: url, options: assetOptions(api: api))),
+            )
+            player.play()
         }
 
         return controller
-    }
-
-    /// Attaches an item and begins playing.
-    private func start(
-        _ controller: AVPlayerViewController,
-        with playerItem: AVPlayerItem,
-        api: APIClient,
-        context: Context,
-    ) {
-        let player = AVPlayer(playerItem: playerItem)
-        controller.player = player
-
-        context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
-        player.play()
     }
 
     /// The bearer header, which a remote asset needs and a local file does not.
@@ -197,12 +203,32 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
 
             Task { @MainActor [weak player] in
                 let resume = (try? await api.progress(itemID: item.id))?.position ?? 0
-                if resume > 5, let player {
-                    let time = CMTime(seconds: Double(resume), preferredTimescale: 600)
-                    // Completion form, to avoid the async seek overload being
-                    // selected inside this async task.
-                    player.seek(to: time, completionHandler: { _ in })
+
+                guard resume > 5, let player else { return }
+
+                // Wait for an item before seeking.
+                //
+                // The player is now created empty and its item swapped in once
+                // the server has said how to play this, so a seek issued the
+                // moment the position arrives has nothing to seek *in* and is
+                // silently discarded -- the film would start from the
+                // beginning, which is the one thing resuming exists to avoid.
+                //
+                // Polling rather than observing: this is a handful of 50ms
+                // checks over the one request that is already in flight, and
+                // a KVO observer here would have to be torn down on every exit
+                // path for the sake of the same wait.
+                for _ in 0 ..< 100 where player.currentItem == nil {
+                    try? await Task.sleep(for: .milliseconds(50))
                 }
+
+                guard player.currentItem != nil else { return }
+
+                let time = CMTime(seconds: Double(resume), preferredTimescale: 600)
+
+                // Completion form, to avoid the async seek overload being
+                // selected inside this async task.
+                player.seek(to: time, completionHandler: { _ in })
             }
 
             timeObserver = player.addPeriodicTimeObserver(

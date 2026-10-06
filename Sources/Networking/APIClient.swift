@@ -239,7 +239,7 @@ struct APIClient {
     /// be a lot to carry so one screen can show a handful (S-412).
     func details(itemID: Int) async throws
         -> (overview: String?, cast: [Credit], crew: [Credit], tags: [String],
-            genres: [String], facts: ItemFacts?)
+            genres: [String], facts: ItemFacts?, capabilities: [String])
     {
         struct Response: Decodable {
             let overview: String?
@@ -252,12 +252,16 @@ struct APIClient {
             // renders what it has rather than failing to decode at all.
             let genres: [String]?
             let detail: ItemFacts?
+
+            /// What the file can do -- HD, Dolby Vision, 5.1. Optional because
+            /// an older server answers without it.
+            let capabilities: [String]?
         }
 
         let response: Response = try await send("/api/v1/items/\(itemID)/details", method: "GET")
 
         return (response.overview, response.cast, response.crew, response.tags,
-                response.genres ?? [], response.detail)
+                response.genres ?? [], response.detail, response.capabilities ?? [])
     }
 
     /// What you started and did not finish (S-414).

@@ -45,6 +45,16 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   under a score in a row of three -- "3,235,958" would wrap and push the other
   two off the screen -- and formatted on the device so each platform uses its
   own locale's separators.
+### Added
+- **Capability badges on a film or show page** (#511). HD, Dolby Vision, 5.1,
+  CC -- what the file can do, as small outlined chips above the scores. They
+  answer "will this look and sound good on my setup", which is a different
+  question from the facts below and is answered at a glance rather than read.
+
+  The server decides what earns a badge; the app renders whatever strings
+  arrive. So an unprobed file shows none, which is honest -- absent badges mean
+  "not measured" rather than "ordinary".
+
 ### Changed
 - **The fact strip on a film or show page** (#511). Year, certificate and length
   as a row rather than a dot-joined sentence: the pieces are different kinds of

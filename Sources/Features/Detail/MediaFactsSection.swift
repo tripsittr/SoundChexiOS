@@ -23,6 +23,7 @@ struct MediaFactsSection: View {
     @State private var crew: [APIClient.Credit] = []
     @State private var genres: [String] = []
     @State private var detail: APIClient.ItemFacts?
+    @State private var capabilities: [String] = []
     @State private var loaded = false
 
     var body: some View {
@@ -35,6 +36,13 @@ struct MediaFactsSection: View {
                     .italic()
                     .foregroundStyle(SoundChexTheme.ink300)
                     .padding(.horizontal, 16)
+            }
+
+            if !capabilities.isEmpty {
+                // What the file can do, as small outlined chips. A different
+                // question from the facts below -- "will this look and sound
+                // good on my setup" -- answered at a glance rather than read.
+                capabilityRow
             }
 
             if !scores.isEmpty {
@@ -102,7 +110,34 @@ struct MediaFactsSection: View {
             crew = result.crew
             genres = result.genres
             detail = result.facts
+            capabilities = result.capabilities
         }
+    }
+
+    /// The capability badges, wrapping rather than scrolling.
+    ///
+    /// Three or four short labels fit a phone; a horizontal scroll would hide
+    /// the last one behind an edge with nothing to say it was there.
+    private var capabilityRow: some View {
+        HStack(spacing: 6) {
+            ForEach(capabilities, id: \.self) { badge in
+                Text(badge)
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(SoundChexTheme.ink500.opacity(0.5), lineWidth: 1),
+                    )
+                    .foregroundStyle(SoundChexTheme.ink300)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        // One announcement rather than four unrelated words.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Available in " + capabilities.joined(separator: ", "))
     }
 
     /// The critic scores, as a source and a value.

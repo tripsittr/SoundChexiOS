@@ -25,12 +25,26 @@ struct VideoPlayerView: View {
 
     @State private var subtitles = SubtitleModel()
 
+    /// Dismisses this screen the moment Picture in Picture takes the video.
+    ///
+    /// AVKit otherwise leaves a bare "this video is playing in Picture in
+    /// Picture" placeholder behind -- no transport, no close button, and the
+    /// app unreachable underneath it. That placeholder should never be on
+    /// screen: either the window floats over the app, with the app usable,
+    /// or it floats outside the app. There is no third state worth showing.
+    private func pictureInPictureChanged(_ active: Bool) {
+        guard active else { return }
+
+        dismiss()
+    }
+
     var body: some View {
         VideoPlayerContainer(
             item: item,
             api: session.api,
             subtitles: subtitles,
             onRestore: onRestore,
+            onPictureInPictureChange: pictureInPictureChanged,
         )
             .ignoresSafeArea()
             .background(.black)
@@ -113,6 +127,10 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     /// show the player again. Without it PiP is a one-way trip.
     let onRestore: () -> Void
 
+    /// Reports whether a floating window currently holds the video, so the
+    /// screen can offer its own way out while AVKit's chrome is gone.
+    let onPictureInPictureChange: (Bool) -> Void
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.allowsPictureInPicturePlayback = true
@@ -145,6 +163,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // a dismissed player from one that is still floating.
         controller.delegate = context.coordinator
         context.coordinator.onRestore = onRestore
+        context.coordinator.onPictureInPictureChange = onPictureInPictureChange
 
         context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
 
@@ -208,9 +227,14 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // is for. YouTube's behaviour, and the one people expect, is that
         // leaving the page is exactly when the floating window takes over.
         //
-        // `isPictureInPictureActive` is the system's own answer to "is this
-        // still on screen somewhere", so it is the right thing to ask rather
-        // than tracking a flag of our own.
+        // This is now also what makes the auto-dismiss safe: the screen
+        // closes itself the moment PiP starts, so this runs on *every* entry
+        // into Picture in Picture, and pausing here would stop the window
+        // before it had shown a frame.
+        //
+        // The flag is tracked from the start/stop delegate callbacks.
+        // `AVPlayerViewController` exposes no `isPictureInPictureActive` --
+        // I assumed one and the compiler corrected me.
         if coordinator.isInPictureInPicture {
             return
         }
@@ -234,12 +258,21 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         /// cover can present it a second time.
         var onRestore: (() -> Void)?
 
+        /// Tells the screen when PiP takes the video and gives it back.
+        var onPictureInPictureChange: ((Bool) -> Void)?
+
         /// Whether the PiP window is closing because the user asked for the
         /// player back, rather than because they dismissed it.
         private var isRestoring = false
 
         func playerViewControllerDidStartPictureInPicture(_ controller: AVPlayerViewController) {
             isInPictureInPicture = true
+            onPictureInPictureChange?(true)
+
+            // Registered so the rest of the app can find this window --
+            // starting another video has to take it down rather than leave
+            // two things playing at once.
+            Task { @MainActor in PictureInPictureSession.shared.began(controller: controller) }
         }
 
         /// Puts the player screen back when PiP's restore button is tapped.
@@ -282,6 +315,9 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
 
         func playerViewControllerDidStopPictureInPicture(_ controller: AVPlayerViewController) {
             isInPictureInPicture = false
+            onPictureInPictureChange?(false)
+
+            Task { @MainActor in PictureInPictureSession.shared.ended() }
 
             // This fires for both endings: the restore button, and closing
             // the window. Only the second is the end of the viewing.

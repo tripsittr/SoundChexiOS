@@ -379,7 +379,11 @@ struct ShowDetailView: View {
         EpisodeList(
             episodes: episodes,
             progress: episodeProgress,
-            onPlay: { playing = $0 },
+            onPlay: { episode in
+                // A floating window and a new video must not play at once.
+                PictureInPictureSession.shared.stopForNewPlayback()
+                playing = episode
+            },
             onDownload: { downloadTarget = $0 },
         )
     }
@@ -412,6 +416,7 @@ struct ShowDetailView: View {
     /// does not. It is the one thing somebody came to the page to press.
     private func playButton(for item: MediaItem, label: String) -> some View {
         Button {
+            PictureInPictureSession.shared.stopForNewPlayback()
             playing = item
         } label: {
             Label(label, systemImage: "play.fill")

@@ -18,6 +18,20 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   the player.
 
 ### Added
+- **The "playing in Picture in Picture" placeholder is gone.** It should never
+  have been a state at all: either the window floats over the app with the app
+  usable, or it floats outside the app. There is no third thing worth showing.
+
+  The player screen now dismisses itself the moment PiP takes the video, so
+  what is behind it — the episode list, the rest of the app — is immediately
+  there and usable. Before, the placeholder sat on top with no transport, no
+  close button and nothing reachable underneath; the only exits were PiP's own
+  restore and close buttons.
+
+  Starting another video while a window floats now takes the window down
+  first, rather than leaving two things playing and fighting for the audio
+  session.
+
 - **Picture in Picture can be returned from.** Tapping the restore button did
   nothing: the player screen showed *"this video is playing in Picture in
   Picture"* with no way back to it and no way to close, because

@@ -5,6 +5,21 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Added
+- **A video that fails now says why.** The player was silent when it broke: a
+  stream it could not read looked exactly like one that had not buffered yet,
+  so the screen stayed black with the clock running and nothing was recorded.
+
+  Three things are watched, because they fail differently — `currentItem.status`
+  for an asset that cannot load at all, `AVPlayerItemFailedToPlayToEndTime` for
+  playback that starts and then dies, and `errorLog()` for the HTTP detail on
+  an HLS stream. That last one carries the segment's status code, which is the
+  line that would have read **302** during the segment-auth bug instead of
+  leaving a black rectangle to guess at.
+
+  Sent to the server as a diagnostic and visible at `/admin/device-reports`,
+  because the phone that hit the failure is not the machine anybody debugs on.
+
 ### Fixed
 - **Episode stills stayed blank** against a server that was answering
   correctly. The library syncs incrementally against a baseline keyed on

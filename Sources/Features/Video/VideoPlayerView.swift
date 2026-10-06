@@ -195,6 +195,18 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         private var lastReported = -1
         private var subtitles: SubtitleModel?
 
+        /// Watches the item for a failure, so a playback that never starts
+        /// says why.
+        ///
+        /// Without this the player is silent when it breaks: a stream it
+        /// cannot read looks exactly like one that has not buffered yet, and
+        /// the screen stays black with the clock running. That is what the
+        /// HLS segment bug looked like from the phone -- the playlist loaded,
+        /// so the duration was right, and every segment was a redirect to a
+        /// login page that AVPlayer dutifully decoded as video.
+        private var statusObserver: NSKeyValueObservation?
+        private var failureObserver: NSObjectProtocol?
+
         func attach(player: AVPlayer, item: MediaItem, api: APIClient, subtitles: SubtitleModel) {
             self.player = player
             self.api = api
@@ -230,6 +242,8 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
                 // selected inside this async task.
                 player.seek(to: time, completionHandler: { _ in })
             }
+
+            watchForFailure(player: player, item: item)
 
             timeObserver = player.addPeriodicTimeObserver(
                 forInterval: CMTime(seconds: 5, preferredTimescale: 1), queue: .main
@@ -275,11 +289,119 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             Task { try? await api?.saveProgress(itemID: id, position: s, duration: duration) }
         }
 
+        /// Reports a playback that fails, instead of showing a black screen.
+        ///
+        /// Three things are watched, because they fail differently:
+        ///
+        ///  - **`currentItem.status`** goes `.failed` when the asset itself
+        ///    cannot be loaded at all -- a 404, a container AVFoundation
+        ///    refuses, a URL that is not what it claims.
+        ///  - **`AVPlayerItemFailedToPlayToEndTime`** fires when playback
+        ///    starts and then dies part-way, which a status check misses.
+        ///  - **`errorLog()`** carries the HTTP detail for an HLS stream:
+        ///    which segment failed and with what status. For the segment-auth
+        ///    bug this is the line that would have said `302` instead of
+        ///    leaving a silent black rectangle.
+        ///
+        /// Sent to the server as a diagnostic, because the phone that hit the
+        /// failure is not the machine anybody is debugging on.
+        private func watchForFailure(player: AVPlayer, item: MediaItem) {
+            statusObserver = player.observe(\.currentItem?.status, options: [.new]) { [weak self] player, _ in
+                guard player.currentItem?.status == .failed else { return }
+
+                self?.report(
+                    failure: player.currentItem?.error,
+                    item: item,
+                    stage: "asset failed to load",
+                    log: player.currentItem?.errorLog(),
+                )
+            }
+
+            failureObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemFailedToPlayToEndTime,
+                object: nil,
+                queue: .main,
+            ) { [weak self] note in
+                let playerItem = note.object as? AVPlayerItem
+
+                self?.report(
+                    failure: note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error,
+                    item: item,
+                    stage: "stopped part-way",
+                    log: playerItem?.errorLog(),
+                )
+            }
+        }
+
+        /// One failure, in a line somebody can act on.
+        private func report(
+            failure: Error?,
+            item: MediaItem,
+            stage: String,
+            log: AVPlayerItemErrorLog?,
+        ) {
+            var parts = [
+                "video \(stage)",
+                "item \(item.id) \(item.title)",
+            ]
+
+            if let failure {
+                parts.append("error: \(failure.localizedDescription)")
+            }
+
+            // The last few HLS errors, which is where an HTTP status appears.
+            // Only the tail: a stream that has been failing for a while has
+            // hundreds, and the recent ones are the ones that matter.
+            if let events = log?.events.suffix(3) {
+                for event in events {
+                    var detail = "HLS"
+
+                    if event.errorStatusCode != 0 {
+                        detail += " HTTP \(event.errorStatusCode)"
+                    }
+
+                    if let comment = event.errorComment {
+                        detail += ": \(comment)"
+                    }
+
+                    if let uri = event.uri {
+                        detail += " [\(uri)]"
+                    }
+
+                    parts.append(detail)
+                }
+            }
+
+            let reason = parts.joined(separator: " | ")
+
+            // An explicit hop rather than `MainActor.assumeIsolated`: KVO and
+            // notification callbacks do not promise which isolation domain
+            // they arrive on, and assuming wrongly **traps**. The same hazard
+            // is written down on the subtitle observer above, for the same
+            // reason.
+            Task { @MainActor in
+                DeviceReporter.shared.sendDiagnostics(reason: reason)
+            }
+        }
+
         func stop() {
             if let timeObserver { player?.removeTimeObserver(timeObserver) }
             if let subtitleObserver { player?.removeTimeObserver(subtitleObserver) }
             timeObserver = nil
             subtitleObserver = nil
+
+            // The failure watchers too, or each opened video leaves a live
+            // KVO observation and a notification registration behind -- and a
+            // stale one would report a later film's failure against this
+            // item's id.
+            statusObserver?.invalidate()
+            statusObserver = nil
+
+            if let failureObserver {
+                NotificationCenter.default.removeObserver(failureObserver)
+            }
+
+            failureObserver = nil
         }
     }
 }

@@ -6,6 +6,33 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 ## Unreleased
 
 ### Fixed
+- **Pausing in Picture in Picture sometimes resumed silently.** The audio
+  session was activated once when the player was built and never again, and
+  nothing watched for interruptions — so a pause that let the system take the
+  session back resumed the *picture* with no sound. Intermittent, because it
+  depended on whether the session was actually taken.
+
+  `PlaybackController` has handled this for audio all along; video never got
+  it. Same shape: remember whether something was genuinely playing, and on
+  `.ended` with `.shouldResume`, reactivate the session **before** resuming
+  the player.
+
+### Added
+- **Picture in Picture survives leaving the player.** `dismantleUIViewController`
+  paused unconditionally, so dismissing the player screen killed the floating
+  window the instant the view went away — the opposite of what PiP is for.
+
+  The coordinator is now the `AVPlayerViewControllerDelegate` and tracks
+  whether PiP is running, so dismantling can tell a dismissed player from one
+  still on screen. Closing the floating window itself still tears everything
+  down.
+
+  System-wide PiP over other apps already worked: `UIBackgroundModes: [audio]`
+  and `allowsPictureInPicturePlayback` were both set. What was missing was
+  surviving the dismissal that makes it useful.
+
+
+### Fixed
 - **The app crashed on opening any episode that transcodes.** `Int(NaN)` traps
   in Swift, and `player.currentItem.duration.seconds` is **NaN** for an HLS
   stream until enough of the playlist has loaded to know a duration —

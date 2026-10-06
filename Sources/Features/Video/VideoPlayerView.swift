@@ -126,6 +126,10 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // The coordinator is attached now, while `context` is still live. It
         // observes the player rather than the item, so it does not care that
         // nothing is loaded yet.
+        // The coordinator answers the PiP callbacks, so dismantling can tell
+        // a dismissed player from one that is still floating.
+        controller.delegate = context.coordinator
+
         context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
 
         // A downloaded copy needs no decision: it is on the device precisely
@@ -181,12 +185,47 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
+        // Leave a Picture in Picture window alone.
+        //
+        // This paused unconditionally, so dismissing the player killed PiP
+        // the instant the view went away -- which is the opposite of what PiP
+        // is for. YouTube's behaviour, and the one people expect, is that
+        // leaving the page is exactly when the floating window takes over.
+        //
+        // `isPictureInPictureActive` is the system's own answer to "is this
+        // still on screen somewhere", so it is the right thing to ask rather
+        // than tracking a flag of our own.
+        if coordinator.isInPictureInPicture {
+            return
+        }
+
         coordinator.stop()
         controller.player?.pause()
     }
 
     /// Resumes from and reports progress to the server, off the UI.
-    final class Coordinator {
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        /// Whether the video is still on screen as a floating window.
+        ///
+        /// Asked by `dismantleUIViewController`, which otherwise pauses
+        /// unconditionally and so killed Picture in Picture the moment the
+        /// player screen was dismissed -- the opposite of what PiP is for.
+        private(set) var isInPictureInPicture = false
+
+        func playerViewControllerDidStartPictureInPicture(_ controller: AVPlayerViewController) {
+            isInPictureInPicture = true
+        }
+
+        func playerViewControllerDidStopPictureInPicture(_ controller: AVPlayerViewController) {
+            isInPictureInPicture = false
+
+            // Closing the floating window is the end of the viewing, and the
+            // view it belonged to is already gone -- so the observers have to
+            // be released here or they outlive the player.
+            stop()
+            controller.player?.pause()
+        }
+
         private var player: AVPlayer?
         private var timeObserver: Any?
         private var subtitleObserver: Any?
@@ -206,6 +245,29 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         /// login page that AVPlayer dutifully decoded as video.
         private var statusObserver: NSKeyValueObservation?
         private var failureObserver: NSObjectProtocol?
+
+        /// Watches for the audio session being interrupted and handed back.
+        ///
+        /// The audio player has had this for a long time; video never did, so
+        /// a pause in Picture in Picture could leave the session inactive and
+        /// the resume was silent -- the picture moved, the sound did not.
+        private var interruptionObserver: NSObjectProtocol?
+
+        /// Whether video was actually playing when an interruption began.
+        ///
+        /// Without it, something paused before the interruption starts on its
+        /// own when the interruption ends, which is worse than staying quiet.
+        ///
+        /// A main-actor box rather than a property on this class: the
+        /// `Coordinator` is not isolated, so sending `self` into the hop is a
+        /// data race the compiler rightly rejects. Only the box crosses, and
+        /// it lives on the actor that reads it.
+        @MainActor
+        private final class ResumeFlag {
+            var wasPlaying = false
+        }
+
+        @MainActor private static let resumeFlag = ResumeFlag()
 
         func attach(player: AVPlayer, item: MediaItem, api: APIClient, subtitles: SubtitleModel) {
             self.player = player
@@ -244,6 +306,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             }
 
             watchForFailure(player: player, item: item)
+            watchForInterruption(player: player)
 
             timeObserver = player.addPeriodicTimeObserver(
                 forInterval: CMTime(seconds: 5, preferredTimescale: 1), queue: .main
@@ -308,6 +371,75 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             let api = api
 
             Task { try? await api?.saveProgress(itemID: id, position: s, duration: duration) }
+        }
+
+        /// Re-activates the audio session when an interruption ends.
+        ///
+        /// Pausing in Picture in Picture, a phone call, or another app taking
+        /// the session can all leave it inactive. `AVPlayer` happily resumes
+        /// the *picture* without it, so the symptom is a video playing with
+        /// no sound rather than an error -- and it is intermittent, because
+        /// it depends on whether the system took the session away during the
+        /// pause.
+        ///
+        /// This is the same handling `PlaybackController` has had all along
+        /// for audio. Video simply never got it.
+        private func watchForInterruption(player: AVPlayer) {
+            let session = AVAudioSession.sharedInstance()
+
+            interruptionObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: session,
+                queue: .main,
+            ) { [weak player] note in
+                // Only these cross the hop. A `Notification` is not Sendable
+                // and neither is the (non-isolated) coordinator, so sending
+                // `self` here is a data race the compiler rightly rejects --
+                // the two UInts and a weak player reference are enough.
+                let typeRaw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let optionsRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+
+                Task { @MainActor in
+                    Coordinator.handleInterruption(
+                        typeRaw: typeRaw,
+                        optionsRaw: optionsRaw,
+                        player: player,
+                    )
+                }
+            }
+        }
+
+        @MainActor
+        private static func handleInterruption(typeRaw: UInt?, optionsRaw: UInt?, player: AVPlayer?) {
+            guard let typeRaw,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeRaw),
+                  let player
+            else { return }
+
+            switch type {
+            case .began:
+                resumeFlag.wasPlaying = player.timeControlStatus == .playing
+
+            case .ended:
+                // Only resume what was actually playing, and only when the
+                // system says we should -- somebody who switched away
+                // deliberately does not want this starting up behind them.
+                guard resumeFlag.wasPlaying else { return }
+
+                resumeFlag.wasPlaying = false
+
+                guard let optionsRaw,
+                      AVAudioSession.InterruptionOptions(rawValue: optionsRaw).contains(.shouldResume)
+                else { return }
+
+                // The session first: resuming the player without it gives a
+                // moving picture and silence, which is the reported bug.
+                try? AVAudioSession.sharedInstance().setActive(true)
+                player.play()
+
+            @unknown default:
+                break
+            }
         }
 
         /// Reports a playback that fails, instead of showing a black screen.
@@ -423,6 +555,12 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             }
 
             failureObserver = nil
+
+            if let interruptionObserver {
+                NotificationCenter.default.removeObserver(interruptionObserver)
+            }
+
+            interruptionObserver = nil
         }
     }
 }

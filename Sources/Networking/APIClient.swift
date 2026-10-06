@@ -199,6 +199,10 @@ struct APIClient {
         let rtScore: Int?
         let metascore: Int?
 
+        /// How many people voted on IMDb, which is what tells a 9.2 from
+        /// eleven people apart from a 9.2 from three million.
+        let imdbVotes: Int?
+
         /// The sentence OMDb writes, not parsed counts: "Nominated for 7
         /// Oscars. 21 wins & 43 nominations total".
         let awards: String?
@@ -207,22 +211,38 @@ struct APIClient {
         let album: String?
         let author: String?
 
+        /// What the file can do: "4K", "Dolby Vision", "5.1", "CC" (#296).
+        ///
+        /// Derived from the probe, so empty for anything not probed yet --
+        /// which is the honest answer rather than inferring "HD" from a name.
+        let capabilities: [String]?
+
         /// The file itself, which is part of "what is this" on a server the
         /// owner runs: how big it is and when it arrived.
         let fileSize: Int64?
         let addedAt: String?
 
+        // The decoder applies `.convertFromSnakeCase`, so by the time a key
+        // reaches here `imdb_rating` has ALREADY become `imdbRating`. Mapping
+        // a case to the wire's spelling therefore matches nothing and decodes
+        // as nil -- silently, because every field is optional.
+        //
+        // That is what hid IMDb and Rotten Tomatoes on the detail page while
+        // Metacritic showed: `metascore` has no underscore, so it was the one
+        // key that survived. The same fault took runtime, file size, season
+        // and episode counts, the content rating and the capability badges
+        // with it, each of which merely looked like missing data.
+        //
+        // So these are spelled camelCase, matching the property names and
+        // what the strategy produces. Kept explicit rather than synthesised so
+        // the mapping is visible and cannot drift again.
         enum CodingKeys: String, CodingKey {
             case type, year, director, studio, creator, network, tagline
+            case capabilities
             case language, country, awards, metascore, artist, album, author
-            case runtimeMinutes = "runtime_minutes"
-            case seasonCount = "season_count"
-            case episodeCount = "episode_count"
-            case contentRating = "content_rating"
-            case imdbRating = "imdb_rating"
-            case rtScore = "rt_score"
-            case fileSize = "file_size"
-            case addedAt = "added_at"
+            case runtimeMinutes, seasonCount, episodeCount, contentRating
+            case imdbRating, rtScore, imdbVotes
+            case fileSize, addedAt
         }
     }
 
@@ -448,8 +468,10 @@ struct APIClient {
             let sourceLabel: String?
             var id: String { [title, artist, album, sourceLabel].compactMap { $0 }.joined(separator: "|") }
 
+            // camelCase: `.convertFromSnakeCase` has already turned
+            // `source_label` into `sourceLabel` by the time this is matched.
             enum CodingKeys: String, CodingKey {
-                case title, artist, album, sourceLabel = "source_label"
+                case title, artist, album, sourceLabel
             }
         }
 
@@ -461,9 +483,12 @@ struct APIClient {
         let unmatched: [Unmatched]
         let playlistID: Int?
 
+        // `playlistID` needs the mapping because the strategy produces
+        // `playlistId` -- a different spelling from the property name. The
+        // rule is to match what the STRATEGY emits, not what the wire sends.
         enum CodingKeys: String, CodingKey {
             case id, name, status, total, matched, unmatched
-            case playlistID = "playlist_id"
+            case playlistID = "playlistId"
         }
     }
 
@@ -612,8 +637,15 @@ struct APIClient {
     }
 
     /// Reports a playback position back to the server.
-    func saveProgress(itemID: Int, position: Int, duration: Int) async throws {
-        struct Body: Encodable { let position: Int; let duration: Int }
+    /// Saves a resume position.
+    ///
+    /// `duration` is optional because it genuinely is not always known: an
+    /// HLS stream reports an indefinite duration until enough of the playlist
+    /// has loaded. The server validates it as nullable and treats a missing
+    /// one as unknown, so sending nil is better than inventing a zero that
+    /// would make "completed" arithmetic wrong.
+    func saveProgress(itemID: Int, position: Int, duration: Int?) async throws {
+        struct Body: Encodable { let position: Int; let duration: Int? }
         _ = try await sendRaw("/api/v1/items/\(itemID)/progress", method: "POST",
                               body: Body(position: position, duration: duration))
     }
@@ -664,6 +696,37 @@ struct APIClient {
     /// token is ignored by Sanctum), so no token rides on the URL.
     func streamURL(itemID: Int) -> URL? {
         baseURL.appendingPathComponent("/api/v1/items/\(itemID)/stream")
+    }
+
+    /// How this device should play an item, and from where.
+    struct Playback: Decodable {
+        /// Whether the server is sending a transcoded stream rather than the
+        /// file. Informational — `url` already points at the right one.
+        let transcode: Bool
+        /// Why, in words, for the diagnostics screen: "the container or codec
+        /// is not web-playable", "playing on the local network".
+        let reason: String?
+        /// Where to play from, absolute.
+        let url: URL
+        /// Whether a direct download would give this device something it can
+        /// actually open. False for an MKV on iOS whatever is inside it.
+        let directPlayable: Bool
+        /// Whether a playable copy is being made. The download sheet says so
+        /// rather than offering a file that is not there yet.
+        let converting: Bool
+    }
+
+    /// Asks the server how to play something.
+    ///
+    /// iOS cannot demux Matroska **at all**, whatever codec is inside, so a
+    /// direct fetch of an MKV is a black rectangle. The server knows the
+    /// container and applies the same policy the web player uses; asking is
+    /// the only way the app can know before it tries.
+    ///
+    /// Asking also queues a permanent playable copy when one is needed, so a
+    /// second play of the same film is direct rather than transcoded again.
+    func playback(itemID: Int) async throws -> Playback {
+        try await send("/api/v1/items/\(itemID)/playback", method: "GET")
     }
 
     /// The artwork URL for one item.

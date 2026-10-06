@@ -45,6 +45,29 @@ final class LibraryStore {
         set { UserDefaults.standard.set(newValue, forKey: Self.syncedAtKey) }
     }
 
+    /// What this build expects an item to contain.
+    ///
+    /// **Raise this whenever the server starts sending a field the app reads,
+    /// or changes what an existing one means.**
+    ///
+    /// The delta sync is keyed on `updated_at`, so it only ever re-fetches
+    /// rows the database touched. A change to the *serialiser* touches no
+    /// rows: when episodes began falling back to the series poster for their
+    /// artwork, every cached episode kept its old, artwork-less payload and
+    /// the app would never have asked again. The stills stayed blank against
+    /// a server that was answering correctly.
+    ///
+    /// 2 — episodes carry `series_title`, `overview`, `runtime_minutes` and
+    /// `resume_position`, and artwork falls back to the series poster.
+    private static let payloadVersion = 2
+    private static let payloadVersionKey = "library.payloadVersion"
+
+    /// Whether the cached catalogue was written by a build that expected the
+    /// same fields this one does.
+    private var cacheMatchesThisBuild: Bool {
+        UserDefaults.standard.integer(forKey: Self.payloadVersionKey) == Self.payloadVersion
+    }
+
     /// Where the catalogue is cached on disk, so it browses offline and a launch
     /// shows something immediately rather than waiting on the network.
     private static let cacheURL: URL = {
@@ -100,11 +123,17 @@ final class LibraryStore {
             // With a baseline and a non-empty cache, sync incrementally; a full
             // fetch on every launch would move ~0.8 MB to replace what is almost
             // always unchanged.
-            if let since = syncedAt, !items.isEmpty {
+            // A delta is only safe when the cache was written by a build that
+            // expected the same fields: it re-fetches rows the database
+            // touched, and a serialiser change touches none.
+            if let since = syncedAt, !items.isEmpty, cacheMatchesThisBuild {
                 try await applyDelta(since: since, api: api)
             } else {
                 try await fullFetch(api: api)
             }
+
+            UserDefaults.standard.set(Self.payloadVersion, forKey: Self.payloadVersionKey)
+
             hasLoaded = true
             lastSyncedAt = Date()
         } catch {

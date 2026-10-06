@@ -179,9 +179,19 @@ final class DownloadStore: NSObject {
     /// from where it stopped rather than starting over. Otherwise it starts fresh.
     /// Queues one item. A single tap goes through the same window as a batch,
     /// so one download does not jump ahead of a running "download all".
-    func download(_ item: MediaItem, keeping retention: DownloadRetention = .forever) {
+    func download(
+        _ item: MediaItem,
+        keeping retention: DownloadRetention = .forever,
+        variant: DownloadVariant = .compatible,
+    ) {
         if retention.deadline != nil {
             pendingRetention[item.id] = retention
+        }
+
+        // Only recorded when it differs from the default, so the common path
+        // stores nothing and behaves exactly as before.
+        if variant != .compatible {
+            pendingVariant[item.id] = variant
         }
 
         enqueue([item])
@@ -193,10 +203,23 @@ final class DownloadStore: NSObject {
     /// carry a choice the person actually made (S-404).
     @ObservationIgnored private var pendingRetention: [Int: DownloadRetention] = [:]
 
+    /// Which copy to fetch, for the few downloads where it was chosen.
+    ///
+    /// Same reasoning as the retention above: a batch cannot carry a choice
+    /// nobody made for each of its items, so only a single deliberate tap
+    /// records one.
+    @ObservationIgnored private var pendingVariant: [Int: DownloadVariant] = [:]
+
     /// Actually starts a transfer. Only `pumpQueue()` calls this, so the
     /// concurrency window is respected.
     private func startTransfer(for item: MediaItem) {
-        guard let api, let url = api.streamURL(itemID: item.id) else { return }
+        guard let api, let base = api.streamURL(itemID: item.id) else { return }
+
+        // `?variant=original` asks for the file as it sits on the server
+        // rather than the converted copy it serves by default.
+        let url = pendingVariant[item.id] == .original
+            ? base.appending(queryItems: [URLQueryItem(name: "variant", value: "original")])
+            : base
         guard state(for: item.id) != .stored else { return }
 
         let task: URLSessionDownloadTask

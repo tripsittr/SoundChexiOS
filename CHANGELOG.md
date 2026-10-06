@@ -5,7 +5,167 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Fixed
+- **The app crashed on opening any episode that transcodes.** `Int(NaN)` traps
+  in Swift, and `player.currentItem.duration.seconds` is **NaN** for an HLS
+  stream until enough of the playlist has loaded to know a duration —
+  `CMTime.indefinite.seconds` is NaN by definition.
+
+  The `?? 0` that looked like a guard was not one: the optional chain succeeds
+  and hands back NaN, which `Int(_:)` then traps on. So the very first progress
+  tick of a transcoded episode killed the app, while episodes that direct-play
+  (whose duration is known at once) were fine — which is exactly the pattern
+  that was reported.
+
+  Symbolicated from the device crash report: `report(seconds:)` at
+  `VideoPlayerView.swift:286`, called from the periodic time observer.
+
+  `Int(exactly:)` answers nil instead of trapping, and `duration` is now
+  optional end to end — the server has always validated it as nullable.
+
+### Added
+- **A video that fails now says why.** The player was silent when it broke: a
+  stream it could not read looked exactly like one that had not buffered yet,
+  so the screen stayed black with the clock running and nothing was recorded.
+
+  Three things are watched, because they fail differently — `currentItem.status`
+  for an asset that cannot load at all, `AVPlayerItemFailedToPlayToEndTime` for
+  playback that starts and then dies, and `errorLog()` for the HTTP detail on
+  an HLS stream. That last one carries the segment's status code, which is the
+  line that would have read **302** during the segment-auth bug instead of
+  leaving a black rectangle to guess at.
+
+  Sent to the server as a diagnostic and visible at `/admin/device-reports`,
+  because the phone that hit the failure is not the machine anybody debugs on.
+
+### Fixed
+- **Episode stills stayed blank** against a server that was answering
+  correctly. The library syncs incrementally against a baseline keyed on
+  `updated_at`, so it only re-fetches rows the *database* touched — and the
+  artwork fallback changed the **serialiser**, which touches no rows. Every
+  cached episode kept its old, artwork-less payload and the app would never
+  have asked again.
+
+  There is now a payload version: when this build expects fields a cached
+  catalogue was not written with, the baseline is dropped and a full fetch
+  runs. **Raise it whenever the server starts sending a field the app reads.**
+
+- **Downloads showed no progress on video.** `DownloadStore` has tracked five
+  states and live progress all along, and `DownloadButton` renders all of them
+  with a progress ring — but no video surface used it. A multi-gigabyte film
+  showed a plain arrow for the whole download and then silently became a green
+  tick.
+
+  Films now use the shared button. Episode rows show every state as a mark
+  (a row is already a button, and a button inside one is a tap target nobody
+  can hit), including a progress ring while downloading, and say the state to
+  VoiceOver.
+
+### Added
+- **MKVs play.** iOS cannot demux Matroska *at all*, whatever codec is inside,
+  so a direct fetch was a black rectangle — and the player always fetched the
+  file directly. It now asks the server how to play each item and gets HLS
+  where the file will not play, using the same policy the web player uses.
+
+  A failed question falls back to the direct stream, which is exactly the old
+  behaviour: right for an MP4, wrong for an MKV, and better than a blank
+  screen. A downloaded copy skips the question entirely — it is on the device
+  because it plays here.
+
+  Asking also queues a permanent playable copy on the server, so a second play
+  of the same film is direct rather than transcoded again.
+
+- **"Most compatible" or "Original" before a download**, as a confirmation
+  dialog rather than a sheet: two choices and one line each does not earn a
+  screen, and it already follows the retention question on a video.
+
+  Asked **only where the answer is not obvious** — a file this device cannot
+  open, which the server also has converted. An MP4 that plays everywhere is
+  downloaded without a word, and an unknown answer takes the compatible copy
+  rather than asking a question it cannot justify.
+
+### Fixed
+- **IMDb and Rotten Tomatoes were missing from every detail page**, while
+  Metacritic showed. The decoder applies `.convertFromSnakeCase`, so by the
+  time a key is matched `imdb_rating` has *already* become `imdbRating` — and
+  the `CodingKeys` mapped the cases to the wire's spelling, which therefore
+  matched nothing and decoded as nil. Silently, because every field is
+  optional. `metascore` has no underscore, which is the only reason it
+  survived and the reason the fault looked like missing data.
+
+  The same bug took **runtime, file size, season and episode counts, the
+  content rating and the capability badges** with it, and in `MediaItem` it
+  took `addedAt` — so the "recently added" sort had nothing to sort by.
+
+- **The header image was blank.** `Artwork` applies its own
+  `.frame(width:height:)` from the `size` it is given, so passing a
+  placeholder `1` and expecting the parent frame to stretch it rendered a
+  one-point-wide image. It now takes its width from a `GeometryReader`.
+
+  It also shows the poster at **a poster's shape** rather than cropped to
+  16:9: there is no backdrop in the schema — `cover_image_url` is the only
+  image an item has — and forcing a 2:3 poster into a cinematic banner shows a
+  thin slice of the middle, usually an actor's chin.
+
+- **Awards appeared twice**, once as "1 win" in the score row and again as
+  "1 win & 7 nominations total" a few inches below. The old rosette line is
+  gone; the full sentence is now a row in the fact grid, where the page keeps
+  its details.
+
 ### Changed
+- **Every rating in one row, with icons.** They were in three places: a score
+  row at the top, *the same* IMDb and Rotten Tomatoes numbers again as
+  label/value pairs in the fact grid, and awards on their own further down with
+  a rosette. **Metacritic appeared only in the first** -- which is why it looked
+  separate from the others.
+
+  Now one scrolling row: IMDb with its vote count ("3.2M", which is what tells a
+  9.2 from eleven people apart from a 9.2 from three million), Rotten Tomatoes
+  coloured at the 60% fresh line, Metacritic in its own 40/61 banding, and the
+  awards as "4 Oscars" or "7 Oscars nom.".
+
+  The icons are SF Symbols standing in for the services' marks, not the marks
+  themselves: those are trademarks with licensing terms, and a shape that reads
+  as the right *kind* of thing carries the meaning without the claim.
+
+  Parsing the awards sentence was checked against real OMDb strings, which is
+  how two bugs surfaced: taking the first word and stripping its "s" turned
+  "Golden Globes" into "Goldens" and dropped the "Emmy" from "Primetime Emmy".
+
+- **The episode list, rebuilt** (#511). It was a file listing: a number, a
+  title, a chevron, with every season stacked at once. A sixty-episode series
+  is unusable that way, and an episode title alone ("Aunt Ginger") says nothing
+  about whether you have seen it.
+
+  Now the shape the streaming apps settled on, for the reasons they settled on
+  it: a **season picker**, and rows carrying a **still**, a **duration** and a
+  **sentence about what happens**. The still is the strongest cue of the four --
+  recognising a frame is faster than reading a synopsis. Part-watched episodes
+  carry a resume bar.
+
+  The picker is a menu rather than chips: eleven seasons do not fit across a
+  phone, and every app with this problem solved it the same way. A series whose
+  episodes carry no season number at all stays one flat list.
+
+- **Continue Watching cards name the series.** A card read "But at Last Came a
+  Knock" with nothing saying it was Shameless -- an episode title on its own
+  identifies almost nothing. The series is the headline now, with
+  **"S1:E9 <episode>"** beneath it and a resume bar along the bottom.
+
+- **The film and show header**, towards the streaming layout: a full-width
+  backdrop fading into the page, the title and facts **left-aligned** under it,
+  the **capability badges** (4K, Dolby Vision, 5.1, CC) beside them, and the
+  **synopsis directly under the play button**.
+
+  It was a centred 220pt poster beneath a "FILM" eyebrow. The poster is the
+  image you just tapped, so repeating it small tells you nothing new; centred
+  text stops the eye at every line where left-aligned facts are scanned in one;
+  and the eyebrow spent a whole line restating what the page obviously is.
+
+  The badges and the synopsis come from the detail call `MediaFactsSection`
+  already makes, handed up rather than fetched again -- a second call would be
+  the same request twice on every open.
+
 - **The fact strip on a film or show page** (#511). Year, certificate and length
   as a row rather than a dot-joined sentence: the pieces are different kinds of
   thing, and running them together made the certificate read as another word

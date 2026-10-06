@@ -137,11 +137,7 @@ struct ShowDetailView: View {
             // again and re-presenting from inside the view being torn down
             // raced the teardown -- the video paused, the audio did not come
             // back, and asking for full screen made the window disappear.
-            VideoPlayerView(
-                item: toPlay,
-                onRestore: { restoringItem = toPlay },
-                restoredFromPictureInPicture: wasRestored,
-            )
+            VideoPlayerView(item: toPlay) { restoringItem = toPlay }
             .soundchexTheme(theme)
         }
         // Re-presents the player after PiP hands it back. A separate piece of
@@ -150,7 +146,6 @@ struct ShowDetailView: View {
             guard let item else { return }
 
             restoringItem = nil
-            wasRestored = true
             playing = item
         }
         .sheet(item: $downloadTarget) { episode in
@@ -400,7 +395,6 @@ struct ShowDetailView: View {
             onPlay: { episode in
                 // A floating window and a new video must not play at once.
                 PictureInPictureSession.shared.stopForNewPlayback()
-                wasRestored = false
                 playing = episode
             },
             onDownload: { downloadTarget = $0 },
@@ -436,7 +430,6 @@ struct ShowDetailView: View {
     private func playButton(for item: MediaItem, label: String) -> some View {
         Button {
             PictureInPictureSession.shared.stopForNewPlayback()
-            wasRestored = false
             playing = item
         } label: {
             Label(label, systemImage: "play.fill")

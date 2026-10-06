@@ -31,8 +31,28 @@ final class PictureInPictureSession {
     /// Whether a window is floating right now.
     var isActive: Bool { controller != nil }
 
+    /// Whether the window is coming down because the viewer asked for the
+    /// player back, rather than because they closed it.
+    ///
+    /// The player screen reads this to decide whether to dismiss itself when
+    /// PiP activates. It has to live out here: the screen that asked is gone
+    /// by the time the answer matters, so a flag passed into the screen is a
+    /// flag nobody is holding.
+    private(set) var isRestoring = false
+
     func began(controller: AVPlayerViewController) {
         self.controller = controller
+    }
+
+    /// The viewer tapped restore. Cleared once the new screen has appeared.
+    func restoring() {
+        isRestoring = true
+    }
+
+    /// Called by the restored screen once it is on, so an ordinary entry into
+    /// PiP afterwards dismisses as it should.
+    func restored() {
+        isRestoring = false
     }
 
     func ended() {

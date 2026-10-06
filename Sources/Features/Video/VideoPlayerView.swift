@@ -23,10 +23,6 @@ struct VideoPlayerView: View {
     /// the screen back -- the player cannot re-present itself.
     var onRestore: () -> Void = {}
 
-    /// Marks this player as one restored from Picture in Picture, so it does
-    /// not immediately dismiss itself again during the handover.
-    var restoredFromPictureInPicture = false
-
     @State private var subtitles = SubtitleModel()
 
     /// Dismisses this screen the moment Picture in Picture takes the video.
@@ -46,16 +42,14 @@ struct VideoPlayerView: View {
         // closed the screen the instant it reappeared. The video paused, the
         // audio did not return, and asking for full screen took the window
         // away entirely.
-        guard !isRestoring else { return }
+        // Asked of the session rather than a flag passed into this screen:
+        // the screen that requested the restore is gone by the time this
+        // matters, so a passed flag is one nobody is holding -- and the value
+        // SwiftUI captured when it built this cover may predate the request.
+        guard !PictureInPictureSession.shared.isRestoring else { return }
 
         dismiss()
     }
-
-    /// Whether this screen was just re-presented out of Picture in Picture.
-    ///
-    /// Cleared once the handover has settled, so an ordinary entry into PiP
-    /// afterwards still dismisses as it should.
-    @State private var isRestoring = false
 
     var body: some View {
         VideoPlayerContainer(
@@ -104,17 +98,9 @@ struct VideoPlayerView: View {
                 // both hold the audio session.
                 if playback.isPlaying { playback.togglePlayPause() }
 
-                guard restoredFromPictureInPicture else { return }
-
-                // Held only for the handover. A second of grace is enough for
-                // AVKit to finish reporting the old window's state, and short
-                // enough that a deliberate re-entry into PiP still dismisses.
-                isRestoring = true
-
-                Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(1))
-                    isRestoring = false
-                }
+                // The handover is over once this screen is on, so an
+                // ordinary entry into PiP from here dismisses as it should.
+                PictureInPictureSession.shared.restored()
             }
     }
 
@@ -282,7 +268,20 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     }
 
     /// Resumes from and reports progress to the server, off the UI.
-    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    ///
+    /// Main-actor isolated as a whole, not method by method: AVKit calls the
+    /// delegate on the main thread, and the restore callback has to touch
+    /// `PictureInPictureSession` **synchronously** -- the screen decides
+    /// whether to dismiss itself in the very next callback, so a flag set
+    /// after an `await` arrives too late and the placeholder comes back.
+    ///
+    /// Partial isolation is not an option: the compiler rejects a conformance
+    /// that crosses into actor-isolated code in only some of its methods, and
+    /// `AVPlayerViewControllerDelegate` is not itself isolated -- hence
+    /// `@preconcurrency`, which is the sanctioned way to say "this framework
+    /// calls me on the main thread" for a protocol predating concurrency.
+    @MainActor
+    final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
         /// Whether the video is still on screen as a floating window.
         ///
         /// Asked by `dismantleUIViewController`, which otherwise pauses
@@ -310,7 +309,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             // Registered so the rest of the app can find this window --
             // starting another video has to take it down rather than leave
             // two things playing at once.
-            Task { @MainActor in PictureInPictureSession.shared.began(controller: controller) }
+            PictureInPictureSession.shared.began(controller: controller)
         }
 
         /// Puts the player screen back when PiP's restore button is tapped.
@@ -340,6 +339,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             // restore as well as after a close, and it pauses. Without this
             // flag the restored video would come back already paused.
             isRestoring = true
+            PictureInPictureSession.shared.restoring()
 
             onRestore()
 
@@ -355,7 +355,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             isInPictureInPicture = false
             onPictureInPictureChange?(false)
 
-            Task { @MainActor in PictureInPictureSession.shared.ended() }
+            PictureInPictureSession.shared.ended()
 
             // This fires for both endings: the restore button, and closing
             // the window. Only the second is the end of the viewing.

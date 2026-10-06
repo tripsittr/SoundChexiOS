@@ -17,10 +17,21 @@ struct VideoPlayerView: View {
     @Environment(\.dismiss) private var dismiss
     let item: MediaItem
 
+    /// Shows this player again after Picture in Picture is restored.
+    ///
+    /// The presenting view owns the `fullScreenCover`, so only it can bring
+    /// the screen back -- the player cannot re-present itself.
+    var onRestore: () -> Void = {}
+
     @State private var subtitles = SubtitleModel()
 
     var body: some View {
-        VideoPlayerContainer(item: item, api: session.api, subtitles: subtitles)
+        VideoPlayerContainer(
+            item: item,
+            api: session.api,
+            subtitles: subtitles,
+            onRestore: onRestore,
+        )
             .ignoresSafeArea()
             .background(.black)
             // Video is the one screen where landscape is the point, and a
@@ -98,6 +109,10 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     let api: APIClient?
     let subtitles: SubtitleModel
 
+    /// Called when PiP's restore button is tapped, so the presenting view can
+    /// show the player again. Without it PiP is a one-way trip.
+    let onRestore: () -> Void
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.allowsPictureInPicturePlayback = true
@@ -129,6 +144,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // The coordinator answers the PiP callbacks, so dismantling can tell
         // a dismissed player from one that is still floating.
         controller.delegate = context.coordinator
+        context.coordinator.onRestore = onRestore
 
         context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
 
@@ -212,12 +228,68 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         /// player screen was dismissed -- the opposite of what PiP is for.
         private(set) var isInPictureInPicture = false
 
+        /// Asks the presenting view to show the player again.
+        ///
+        /// Set by the container, because only the view that presented the
+        /// cover can present it a second time.
+        var onRestore: (() -> Void)?
+
+        /// Whether the PiP window is closing because the user asked for the
+        /// player back, rather than because they dismissed it.
+        private var isRestoring = false
+
         func playerViewControllerDidStartPictureInPicture(_ controller: AVPlayerViewController) {
             isInPictureInPicture = true
         }
 
+        /// Puts the player screen back when PiP's restore button is tapped.
+        ///
+        /// **This was missing, and its absence is why PiP was a dead end
+        /// inside the app.** Without it the system has nowhere to return to:
+        /// the player view shows "this video is playing in Picture in
+        /// Picture" and the restore button does nothing, so there is no way
+        /// back and no way to close.
+        ///
+        /// The completion handler must be called either way. Reporting
+        /// `false` leaves the system believing the restore failed, which is
+        /// what leaves the placeholder on screen for ever.
+        func playerViewController(
+            _ controller: AVPlayerViewController,
+            restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completion: @escaping (Bool) -> Void,
+        ) {
+            guard let onRestore else {
+                // Nothing to restore to -- say so rather than claiming
+                // success, so the system dismisses PiP cleanly.
+                completion(false)
+
+                return
+            }
+
+            // Remembered because `DidStopPictureInPicture` fires after a
+            // restore as well as after a close, and it pauses. Without this
+            // flag the restored video would come back already paused.
+            isRestoring = true
+
+            onRestore()
+
+            // The cover is driven by SwiftUI state, so the presentation
+            // happens on the next runloop pass rather than synchronously.
+            // Reporting success immediately is correct: the restore *will*
+            // happen, and the alternative is the system tearing PiP down
+            // before the screen is back.
+            completion(true)
+        }
+
         func playerViewControllerDidStopPictureInPicture(_ controller: AVPlayerViewController) {
             isInPictureInPicture = false
+
+            // This fires for both endings: the restore button, and closing
+            // the window. Only the second is the end of the viewing.
+            if isRestoring {
+                isRestoring = false
+
+                return
+            }
 
             // Closing the floating window is the end of the viewing, and the
             // view it belonged to is already gone -- so the observers have to

@@ -18,6 +18,17 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   the player.
 
 ### Added
+- **Picture in Picture can be returned from.** Tapping the restore button did
+  nothing: the player screen showed *"this video is playing in Picture in
+  Picture"* with no way back to it and no way to close, because
+  `restoreUserInterfaceForPictureInPictureStopWithCompletionHandler` was never
+  implemented. The system had nowhere to return to.
+
+  The presenting view now re-presents its cover when the callback fires. It
+  also has to distinguish the two ways PiP ends — `DidStopPictureInPicture`
+  runs after a *restore* as well as a *close*, and it pauses, so without that
+  distinction the restored video came back already paused.
+
 - **Picture in Picture survives leaving the player.** `dismantleUIViewController`
   paused unconditionally, so dismissing the player screen killed the floating
   window the instant the view went away — the opposite of what PiP is for.

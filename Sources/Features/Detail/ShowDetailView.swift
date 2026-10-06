@@ -118,7 +118,22 @@ struct ShowDetailView: View {
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
-            VideoPlayerView(item: toPlay).soundchexTheme(theme)
+            // `onRestore` re-presents this cover when Picture in Picture's
+            // restore button is tapped. Without it PiP is a one-way trip:
+            // the player shows "playing in Picture in Picture" and there is
+            // no way back to it and no way to close.
+            //
+            // Dismissed first, then re-presented on the next runloop pass --
+            // SwiftUI will not re-present a cover that it still considers
+            // shown, and the system has already torn this one's view down.
+            VideoPlayerView(item: toPlay) {
+                playing = nil
+
+                DispatchQueue.main.async {
+                    playing = toPlay
+                }
+            }
+            .soundchexTheme(theme)
         }
         .sheet(item: $downloadTarget) { episode in
             RetentionPicker(title: episode.meta?.episodeTitle ?? episode.title) { retention in

@@ -106,17 +106,68 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
 
         guard let api else { return controller }
 
-        let player = AVPlayer(playerItem: makeItem(api: api))
-        controller.player = player
-
         // Video should keep playing (or PiP) in the background, like audio.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
 
-        context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
-        player.play()
+        // A downloaded copy needs no decision: it is on the device precisely
+        // because it plays here. Started synchronously so the common case has
+        // no delay at all.
+        if let local = DownloadStore.shared.localURL(for: item.id) {
+            // Watching resets the clock on a timed download (S-404): the
+            // window means "unused for this long", so a series you are
+            // part-way through does not vanish between two episodes.
+            DownloadStore.shared.extendRetention(for: item.id)
+
+            start(controller, with: AVPlayerItem(asset: AVURLAsset(url: local)), api: api, context: context)
+
+            return controller
+        }
+
+        // Otherwise ask the server how to play this.
+        //
+        // iOS cannot demux Matroska **at all**, whatever codec is inside, so
+        // fetching the file and hoping -- which is what this did -- is a black
+        // rectangle for every MKV in the library. The server knows the
+        // container and answers with HLS where the file will not play.
+        //
+        // One request before the first frame, which is why the audio session
+        // and the controller are set up first: by the time the answer lands
+        // there is nothing left to do but attach the item.
+        Task { @MainActor in
+            let url = (try? await api.playback(itemID: item.id))?.url
+                // A failed decision must not mean a blank screen. Falling back
+                // to the direct stream is exactly the old behaviour: right for
+                // an MP4, wrong for an MKV, and better than nothing.
+                ?? api.streamURL(itemID: item.id)
+
+            guard let url else { return }
+
+            start(controller, with: AVPlayerItem(asset: AVURLAsset(url: url, options: assetOptions(api: api))), api: api, context: context)
+        }
 
         return controller
+    }
+
+    /// Attaches an item and begins playing.
+    private func start(
+        _ controller: AVPlayerViewController,
+        with playerItem: AVPlayerItem,
+        api: APIClient,
+        context: Context,
+    ) {
+        let player = AVPlayer(playerItem: playerItem)
+        controller.player = player
+
+        context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
+        player.play()
+    }
+
+    /// The bearer header, which a remote asset needs and a local file does not.
+    private func assetOptions(api: APIClient) -> [String: Any] {
+        guard let token = api.token else { return [:] }
+
+        return ["AVURLAssetHTTPHeaderFieldsKey": ["Authorization": "Bearer \(token)"]]
     }
 
     func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {}
@@ -126,25 +177,6 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
         coordinator.stop()
         controller.player?.pause()
-    }
-
-    /// The asset for the item — the local file when downloaded, else the
-    /// token-authed stream with the bearer header.
-    private func makeItem(api: APIClient) -> AVPlayerItem {
-        if let local = DownloadStore.shared.localURL(for: item.id) {
-            // Watching resets the clock on a timed download (S-404): the
-            // window means "unused for this long", so a series you are
-            // part-way through does not vanish between two episodes.
-            DownloadStore.shared.extendRetention(for: item.id)
-
-            return AVPlayerItem(asset: AVURLAsset(url: local))
-        }
-        var options: [String: Any] = [:]
-        if let token = api.token {
-            options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": "Bearer \(token)"]
-        }
-        let url = api.streamURL(itemID: item.id)!
-        return AVPlayerItem(asset: AVURLAsset(url: url, options: options))
     }
 
     /// Resumes from and reports progress to the server, off the UI.

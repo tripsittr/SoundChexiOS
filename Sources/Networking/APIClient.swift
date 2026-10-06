@@ -691,6 +691,37 @@ struct APIClient {
         baseURL.appendingPathComponent("/api/v1/items/\(itemID)/stream")
     }
 
+    /// How this device should play an item, and from where.
+    struct Playback: Decodable {
+        /// Whether the server is sending a transcoded stream rather than the
+        /// file. Informational — `url` already points at the right one.
+        let transcode: Bool
+        /// Why, in words, for the diagnostics screen: "the container or codec
+        /// is not web-playable", "playing on the local network".
+        let reason: String?
+        /// Where to play from, absolute.
+        let url: URL
+        /// Whether a direct download would give this device something it can
+        /// actually open. False for an MKV on iOS whatever is inside it.
+        let directPlayable: Bool
+        /// Whether a playable copy is being made. The download sheet says so
+        /// rather than offering a file that is not there yet.
+        let converting: Bool
+    }
+
+    /// Asks the server how to play something.
+    ///
+    /// iOS cannot demux Matroska **at all**, whatever codec is inside, so a
+    /// direct fetch of an MKV is a black rectangle. The server knows the
+    /// container and applies the same policy the web player uses; asking is
+    /// the only way the app can know before it tries.
+    ///
+    /// Asking also queues a permanent playable copy when one is needed, so a
+    /// second play of the same film is direct rather than transcoded again.
+    func playback(itemID: Int) async throws -> Playback {
+        try await send("/api/v1/items/\(itemID)/playback", method: "GET")
+    }
+
     /// The artwork URL for one item.
     func artworkURL(itemID: Int) -> URL? {
         baseURL.appendingPathComponent("/api/v1/items/\(itemID)/artwork")

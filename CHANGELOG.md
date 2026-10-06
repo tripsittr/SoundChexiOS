@@ -5,6 +5,29 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Added
+- **MKVs play.** iOS cannot demux Matroska *at all*, whatever codec is inside,
+  so a direct fetch was a black rectangle — and the player always fetched the
+  file directly. It now asks the server how to play each item and gets HLS
+  where the file will not play, using the same policy the web player uses.
+
+  A failed question falls back to the direct stream, which is exactly the old
+  behaviour: right for an MP4, wrong for an MKV, and better than a blank
+  screen. A downloaded copy skips the question entirely — it is on the device
+  because it plays here.
+
+  Asking also queues a permanent playable copy on the server, so a second play
+  of the same film is direct rather than transcoded again.
+
+- **"Most compatible" or "Original" before a download**, as a confirmation
+  dialog rather than a sheet: two choices and one line each does not earn a
+  screen, and it already follows the retention question on a video.
+
+  Asked **only where the answer is not obvious** — a file this device cannot
+  open, which the server also has converted. An MP4 that plays everywhere is
+  downloaded without a word, and an unknown answer takes the compatible copy
+  rather than asking a question it cannot justify.
+
 ### Fixed
 - **IMDb and Rotten Tomatoes were missing from every detail page**, while
   Metacritic showed. The decoder applies `.convertFromSnakeCase`, so by the

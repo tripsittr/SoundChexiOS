@@ -10,6 +10,7 @@ struct ShowDetailView: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(ThemeStore.self) private var theme
     @Environment(DownloadStore.self) private var downloads
+    @Environment(Session.self) private var session
 
     /// The episode whose retention is being chosen (S-404). Held here because
     /// the context menu that starts the flow cannot present a sheet itself.
@@ -26,6 +27,17 @@ struct ShowDetailView: View {
     /// Asking for it twice would be the same request on every open.
     @State private var capabilities: [String] = []
     @State private var overview: String?
+
+    /// Whether the file itself would play on this device, from the server's
+    /// playback decision. Nil until asked; false only for a container iOS
+    /// cannot open, which is the one case worth a question.
+    @State private var directPlayable: Bool?
+
+    /// The item whose copy is being chosen, and the retention already picked
+    /// for it -- the two questions are asked in sequence, so the first
+    /// answer has to survive until the second is given.
+    @State private var variantTarget: MediaItem?
+    @State private var chosenRetention: DownloadRetention = .forever
 
     private var episodes: [MediaItem] { store.children(of: item.id) }
 
@@ -126,13 +138,38 @@ struct ShowDetailView: View {
         }
         .sheet(item: $downloadTarget) { episode in
             RetentionPicker(title: episode.meta?.episodeTitle ?? episode.title) { retention in
-                downloads.download(episode, keeping: retention)
+                chosenRetention = retention
+
+                // Only ask which copy where the answer is not obvious: a file
+                // this device cannot open, which the server also has
+                // converted. An MP4 that plays everywhere is fetched without
+                // a word -- a second question to save one film is how a
+                // feature becomes something people avoid.
+                if directPlayable == false {
+                    variantTarget = episode
+                } else {
+                    downloads.download(episode, keeping: retention)
+                }
             }
             .presentationDetents([.medium])
             .soundchexTheme(theme)
         }
+        .downloadVariantPicker(for: $variantTarget) { target, variant in
+            downloads.download(target, keeping: chosenRetention, variant: variant)
+        }
         .fullScreenCover(item: $reading) { toRead in
             NavigationStack { ReaderView(item: toRead) }.soundchexTheme(theme)
+        }
+        // Asked once, so the download button knows whether the two copies
+        // differ before anybody taps it. Silent on failure: `nil` means "not
+        // known", and an unknown answer downloads the compatible copy rather
+        // than asking a question it cannot justify.
+        .task {
+            guard item.type == .movie || item.type == .show,
+                  let api = session.api
+            else { return }
+
+            directPlayable = (try? await api.playback(itemID: item.id))?.directPlayable
         }
     }
 

@@ -5,6 +5,23 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 ## Unreleased
 
+### Added
+- **"Mark for review" on films, shows and episodes.** The reason picker has
+  existed since S-414 — five reasons and an optional note — but it was only
+  reachable from **music**: an album or artist track row, and a list view that
+  is never instantiated. There was no way to report a wrong cover on a film or
+  a broken episode from the app at all.
+
+  It is in each episode's long-press menu and on the detail page itself, since
+  a film has no episode rows to hang a menu off and a series is reportable in
+  its own right — a wrong poster belongs to the show, not to one episode.
+
+  The server flags the item `needs_review` with the reason **and clears
+  `reviewed_at`**, so it genuinely re-enters the queue rather than being noted
+  and skipped by the next sweep. That guarantee is now asserted server-side
+  (SoundChex #308) rather than resting on reading the model.
+
+
 ### Fixed
 - **The app crashed on opening any episode that transcodes.** `Int(NaN)` traps
   in Swift, and `player.currentItem.duration.seconds` is **NaN** for an HLS

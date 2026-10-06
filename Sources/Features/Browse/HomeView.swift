@@ -9,7 +9,25 @@ struct HomeView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(PlaybackController.self) private var playback
 
+    /// What the stack is showing. Driven by a path rather than by wrapping
+    /// each tile in a `NavigationLink`, because `Rail` takes a tap closure and
+    /// is shared with screens that do other things with it.
+    @State private var path: [MediaItem] = []
+
     var body: some View {
+        // Home was the only page without one, which is why nothing here could
+        // navigate: `LibraryTabs` switches pages by hand and says "each page
+        // keeps its own NavigationStack". A `NavigationLink` outside a stack
+        // renders as a plain label and swallows the tap.
+        NavigationStack(path: $path) {
+            content
+                .navigationDestination(for: MediaItem.self) { item in
+                    destination(for: item)
+                }
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             // The persistent search + account bar, on Home as on every page.
             AppHeader()
@@ -17,12 +35,20 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let hero = store.dynamicHero {
-                        HeroBanner(item: hero) { play(hero) }
+                        // The button plays; the banner itself opens the page.
+                        // Two different intentions, and conflating them is how
+                        // a tap on a film did nothing at all.
+                        NavigationLink {
+                            destination(for: hero)
+                        } label: {
+                            HeroBanner(item: hero) { play(hero) }
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     LazyVStack(alignment: .leading, spacing: 8) {
                         ForEach(store.homeRows) { row in
-                            Rail(title: row.title, items: row.items) { play($0) }
+                            Rail(title: row.title, items: row.items) { open($0) }
                         }
                     }
                     // Overlap the first rail onto the hero's fade.
@@ -51,10 +77,44 @@ struct HomeView: View {
         }
     }
 
+    /// What a tap on a tile does.
+    ///
+    /// Opening, not playing. `play()` below guarded on `.music` and returned
+    /// for everything else, so tapping a film or a show on Home did **nothing
+    /// at all** -- and tapping a song started it immediately with no way to
+    /// see what it was. A tile is a thing to look at; the play button is what
+    /// plays it.
+    private func open(_ item: MediaItem) {
+        path.append(item)
+    }
+
+    /// The screen behind a tile.
+    ///
+    /// `ShowDetailView` already handles films as well as shows -- its own
+    /// docblock says "a show or film" -- so there is no separate movie screen
+    /// to write. Music opens its album where it has one, since a track on its
+    /// own is a thin page and the album is what somebody is looking for.
+    @ViewBuilder
+    private func destination(for item: MediaItem) -> some View {
+        switch item.type {
+        case .music:
+            // The album the store already grouped this track into, found by
+            // the id it builds -- rather than assembling an `Album` here,
+            // which would differ from the one every other screen shows.
+            if let album = store.albums.first(where: { $0.tracks.contains(item) }) {
+                AlbumDetailView(album: album)
+            } else {
+                ShowDetailView(item: item)
+            }
+        default:
+            ShowDetailView(item: item)
+        }
+    }
+
     private func play(_ item: MediaItem) {
         guard item.type == .music else { return }
         // Play the album/artist context when we can derive it; a single item
-        // otherwise. Detail screens (IOS-04) will queue full track lists.
+        // otherwise.
         playback.play([item])
     }
 }

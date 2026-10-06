@@ -172,24 +172,86 @@ struct APIClient {
         }
     }
 
-    /// Cast, crew and tags for one item.
+    /// The facts a detail page shows, for one item.
+    ///
+    /// Decoded loosely on purpose: the server sends only the keys that apply
+    /// to the item's type and omits the rest, so a film carries `director`
+    /// and a song carries `artist` and neither carries the other's. Every
+    /// field is optional and a missing one simply does not render.
+    struct ItemFacts: Decodable, Sendable {
+        let type: String?
+        let year: Int?
+        let runtimeMinutes: Int?
+        let director: String?
+        let studio: String?
+        let creator: String?
+        let network: String?
+        let seasonCount: Int?
+        let episodeCount: Int?
+        let contentRating: String?
+        let tagline: String?
+        let language: String?
+        let country: String?
+
+        /// Critic scores. Null until an OMDb key is entered -- the columns
+        /// existed for a long time with nothing writing them.
+        let imdbRating: Double?
+        let rtScore: Int?
+        let metascore: Int?
+
+        /// The sentence OMDb writes, not parsed counts: "Nominated for 7
+        /// Oscars. 21 wins & 43 nominations total".
+        let awards: String?
+
+        let artist: String?
+        let album: String?
+        let author: String?
+
+        /// The file itself, which is part of "what is this" on a server the
+        /// owner runs: how big it is and when it arrived.
+        let fileSize: Int64?
+        let addedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case type, year, director, studio, creator, network, tagline
+            case language, country, awards, metascore, artist, album, author
+            case runtimeMinutes = "runtime_minutes"
+            case seasonCount = "season_count"
+            case episodeCount = "episode_count"
+            case contentRating = "content_rating"
+            case imdbRating = "imdb_rating"
+            case rtScore = "rt_score"
+            case fileSize = "file_size"
+            case addedAt = "added_at"
+        }
+    }
+
+    /// Cast, crew, genres and the facts for one item.
     ///
     /// A separate call rather than part of the library sync: every device
     /// mirrors the whole catalogue, and credits for thousands of items would
     /// be a lot to carry so one screen can show a handful (S-412).
     func details(itemID: Int) async throws
-        -> (overview: String?, cast: [Credit], crew: [Credit], tags: [String])
+        -> (overview: String?, cast: [Credit], crew: [Credit], tags: [String],
+            genres: [String], facts: ItemFacts?)
     {
         struct Response: Decodable {
             let overview: String?
             let cast: [Credit]
             let crew: [Credit]
             let tags: [String]
+
+            // Both added after the first clients shipped, so both are
+            // optional: an older server answers without them and the screen
+            // renders what it has rather than failing to decode at all.
+            let genres: [String]?
+            let detail: ItemFacts?
         }
 
         let response: Response = try await send("/api/v1/items/\(itemID)/details", method: "GET")
 
-        return (response.overview, response.cast, response.crew, response.tags)
+        return (response.overview, response.cast, response.crew, response.tags,
+                response.genres ?? [], response.detail)
     }
 
     /// What you started and did not finish (S-414).

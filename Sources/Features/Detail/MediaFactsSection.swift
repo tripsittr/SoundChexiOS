@@ -21,6 +21,8 @@ struct MediaFactsSection: View {
     @State private var overview: String?
     @State private var cast: [APIClient.Credit] = []
     @State private var crew: [APIClient.Credit] = []
+    @State private var genres: [String] = []
+    @State private var detail: APIClient.ItemFacts?
     @State private var loaded = false
 
     var body: some View {
@@ -31,6 +33,19 @@ struct MediaFactsSection: View {
                 Text(tagline)
                     .font(ScaledFont.system(size: 15, relativeTo: .subheadline))
                     .italic()
+                    .foregroundStyle(SoundChexTheme.ink300)
+                    .padding(.horizontal, 16)
+            }
+
+            if !scores.isEmpty {
+                scoreRow
+            }
+
+            if !genres.isEmpty {
+                // One line, not chips: a film has two or three and a row of
+                // pills would weigh more than the words are worth.
+                Text(genres.joined(separator: " · "))
+                    .font(.footnote)
                     .foregroundStyle(SoundChexTheme.ink300)
                     .padding(.horizontal, 16)
             }
@@ -51,6 +66,17 @@ struct MediaFactsSection: View {
 
             if !facts.isEmpty {
                 factGrid
+            }
+
+            if let awards = detail?.awards, !awards.isEmpty {
+                // The sentence as the source writes it -- "Nominated for 7
+                // Oscars. 21 wins & 43 nominations total" -- rather than
+                // parsed counts, which would invent structure it does not
+                // have.
+                Label(awards, systemImage: "rosette")
+                    .font(.footnote)
+                    .foregroundStyle(SoundChexTheme.ink200)
+                    .padding(.horizontal, 16)
             }
 
             if !cast.isEmpty {
@@ -74,7 +100,54 @@ struct MediaFactsSection: View {
             overview = result.overview
             cast = result.cast
             crew = result.crew
+            genres = result.genres
+            detail = result.facts
         }
+    }
+
+    /// The critic scores, as a source and a value.
+    ///
+    /// Null for everything until an OMDb key is entered: the two columns
+    /// existed for a long time with nothing writing them, so an empty row here
+    /// is the normal state on a fresh install rather than a failure.
+    private var scores: [(String, String)] {
+        guard let detail else { return [] }
+
+        var out: [(String, String)] = []
+
+        if let imdb = detail.imdbRating {
+            // One decimal, as IMDb shows it. "8.0" reads as a score where "8"
+            // reads as a count.
+            out.append(("IMDb", String(format: "%.1f", imdb)))
+        }
+
+        if let rt = detail.rtScore { out.append(("Rotten Tomatoes", "\(rt)%")) }
+        if let meta = detail.metascore { out.append(("Metacritic", "\(meta)")) }
+
+        return out
+    }
+
+    /// The scores in a row, each as a small stacked pair.
+    private var scoreRow: some View {
+        HStack(spacing: 20) {
+            ForEach(scores, id: \.0) { score in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(score.1)
+                        .font(ScaledFont.system(size: 17, relativeTo: .headline).weight(.semibold))
+                        .foregroundStyle(SoundChexTheme.ink100)
+
+                    Text(score.0)
+                        .font(.caption2)
+                        .foregroundStyle(SoundChexTheme.ink400)
+                }
+                // Read as one thing, not as a number and a stray word.
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(score.0) \(score.1)")
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
     }
 
     /// The short facts, as label/value pairs. Assembled rather than written
@@ -96,6 +169,13 @@ struct MediaFactsSection: View {
         if let seasons = meta.seasonCount {
             let episodes = meta.episodeCount.map { ", \($0) episodes" } ?? ""
             rows.append(("Seasons", "\(seasons)\(episodes)"))
+        }
+
+        // The file itself. On a server the owner runs, how big it is and when
+        // it arrived are facts about the thing, not plumbing.
+        if let size = detail?.fileSize, size > 0 {
+            rows.append(("Size", ByteCountFormatter.string(
+                fromByteCount: size, countStyle: .file)))
         }
 
         if let status = meta.status { rows.append(("Status", status.capitalized)) }

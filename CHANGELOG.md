@@ -39,6 +39,13 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   columns existed for a long time with nothing writing them -- so an empty score
   row is the normal state on a fresh install, not a failure.
 
+  The IMDb score carries its **vote count** underneath, as IMDb shows it: a
+  score alone could be three people or three million, and the number is what
+  makes 9.3 mean something. Abbreviated (`IMDb · 3.2M`) because the label sits
+  under a score in a row of three -- "3,235,958" would wrap and push the other
+  two off the screen -- and formatted on the device so each platform uses its
+  own locale's separators.
+
 ## 0.30.07 “Prelude” — 2026-10-05
 
 ### Fixed

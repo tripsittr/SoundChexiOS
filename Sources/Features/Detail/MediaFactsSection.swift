@@ -118,13 +118,45 @@ struct MediaFactsSection: View {
         if let imdb = detail.imdbRating {
             // One decimal, as IMDb shows it. "8.0" reads as a score where "8"
             // reads as a count.
-            out.append(("IMDb", String(format: "%.1f", imdb)))
+            //
+            // The vote count goes in the label beneath, which is where IMDb
+            // puts it and why: a score alone could be three people or three
+            // million, and the number is what makes 9.3 mean something.
+            out.append((Self.imdbLabel(votes: detail.imdbVotes), String(format: "%.1f", imdb)))
         }
 
         if let rt = detail.rtScore { out.append(("Rotten Tomatoes", "\(rt)%")) }
         if let meta = detail.metascore { out.append(("Metacritic", "\(meta)")) }
 
         return out
+    }
+
+    /// "IMDb" alone, or "IMDb · 3.2M" when the count is known.
+    ///
+    /// Abbreviated because the label sits under a score in a row of three and
+    /// has a few characters to work with -- "3,235,958" would wrap and push
+    /// the other two off the screen. Formatted here rather than on the server
+    /// so each platform can use its own locale's separators.
+    private static func imdbLabel(votes: Int?) -> String {
+        guard let votes, votes > 0 else { return "IMDb" }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 1
+
+        if votes >= 1_000_000 {
+            let millions = Double(votes) / 1_000_000
+
+            return "IMDb · \(formatter.string(from: NSNumber(value: millions)) ?? "")M"
+        }
+
+        if votes >= 1_000 {
+            let thousands = Double(votes) / 1_000
+
+            return "IMDb · \(formatter.string(from: NSNumber(value: thousands)) ?? "")K"
+        }
+
+        return "IMDb · \(votes)"
     }
 
     /// The scores in a row, each as a small stacked pair.

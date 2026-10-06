@@ -196,6 +196,11 @@ struct APIClient {
         /// Critic scores. Null until an OMDb key is entered -- the columns
         /// existed for a long time with nothing writing them.
         let imdbRating: Double?
+
+        /// How many people voted. IMDb never shows a score without it, and for
+        /// good reason: 9.3 could be three people or three million.
+        let imdbVotes: Int?
+
         let rtScore: Int?
         let metascore: Int?
 
@@ -220,6 +225,7 @@ struct APIClient {
             case episodeCount = "episode_count"
             case contentRating = "content_rating"
             case imdbRating = "imdb_rating"
+            case imdbVotes = "imdb_votes"
             case rtScore = "rt_score"
             case fileSize = "file_size"
             case addedAt = "added_at"

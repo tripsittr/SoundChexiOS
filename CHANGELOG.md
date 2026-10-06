@@ -19,6 +19,39 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 - **The Play button is white**, and weighted like the one thing somebody came to
   the page to press. The accent colour competed with the poster on a page that is
   mostly artwork and dark surfaces.
+### Fixed
+- **Tapping a film or a show on Home did nothing** (#506). `HomeView.play()`
+  was `guard item.type == .music else { return }`, so every poster that was not
+  a song swallowed the tap -- and a song started playing immediately rather than
+  opening anything.
+
+  The cause underneath: **Home was the only page without a `NavigationStack`**.
+  `LibraryTabs` switches pages by hand and its own comment says "each page keeps
+  its own NavigationStack"; Watch, Music and the grids all have one and Home did
+  not. A `NavigationLink` outside a stack renders as a plain label and eats the
+  gesture, so no amount of linking would have worked without this.
+
+  Tiles now open the item. Films and shows go to `ShowDetailView`, which already
+  handled both; a track opens the album the store grouped it into, found by
+  lookup rather than assembled here so it matches what every other screen shows.
+  The hero's Play button still plays -- the banner around it opens the page,
+  because those are two different intentions.
+
+### Added
+- **Ratings, awards and genres on the detail page** (#502). The screen showed
+  the overview, cast and crew and nothing else. It now shows the IMDb rating,
+  the Rotten Tomatoes score and Metacritic as a row, the awards sentence, the
+  genres, and the file's size.
+
+  All of it was already in the database and none of it reached the phone:
+  `APIClient.details()` decoded four fields, and the server had just started
+  sending `genres` and a `detail` block. Both are decoded as optional, so an
+  older server answers without them and the screen renders what it has rather
+  than failing to decode at all.
+
+  The scores are null until an OMDb key is entered on the server -- those two
+  columns existed for a long time with nothing writing them -- so an empty score
+  row is the normal state on a fresh install, not a failure.
 
 ## 0.30.07 “Prelude” — 2026-10-05
 

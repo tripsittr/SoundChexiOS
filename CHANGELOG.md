@@ -6,6 +6,40 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 ## Unreleased
 
 ### Changed
+- **The episode list, rebuilt** (#511). It was a file listing: a number, a
+  title, a chevron, with every season stacked at once. A sixty-episode series
+  is unusable that way, and an episode title alone ("Aunt Ginger") says nothing
+  about whether you have seen it.
+
+  Now the shape the streaming apps settled on, for the reasons they settled on
+  it: a **season picker**, and rows carrying a **still**, a **duration** and a
+  **sentence about what happens**. The still is the strongest cue of the four --
+  recognising a frame is faster than reading a synopsis. Part-watched episodes
+  carry a resume bar.
+
+  The picker is a menu rather than chips: eleven seasons do not fit across a
+  phone, and every app with this problem solved it the same way. A series whose
+  episodes carry no season number at all stays one flat list.
+
+- **Continue Watching cards name the series.** A card read "But at Last Came a
+  Knock" with nothing saying it was Shameless -- an episode title on its own
+  identifies almost nothing. The series is the headline now, with
+  **"S1:E9 <episode>"** beneath it and a resume bar along the bottom.
+
+- **The film and show header**, towards the streaming layout: a full-width
+  backdrop fading into the page, the title and facts **left-aligned** under it,
+  the **capability badges** (4K, Dolby Vision, 5.1, CC) beside them, and the
+  **synopsis directly under the play button**.
+
+  It was a centred 220pt poster beneath a "FILM" eyebrow. The poster is the
+  image you just tapped, so repeating it small tells you nothing new; centred
+  text stops the eye at every line where left-aligned facts are scanned in one;
+  and the eyebrow spent a whole line restating what the page obviously is.
+
+  The badges and the synopsis come from the detail call `MediaFactsSection`
+  already makes, handed up rather than fetched again -- a second call would be
+  the same request twice on every open.
+
 - **The fact strip on a film or show page** (#511). Year, certificate and length
   as a row rather than a dot-joined sentence: the pieces are different kinds of
   thing, and running them together made the certificate read as another word

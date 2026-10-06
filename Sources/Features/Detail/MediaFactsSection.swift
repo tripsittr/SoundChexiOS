@@ -18,6 +18,21 @@ struct MediaFactsSection: View {
 
     let item: MediaItem
 
+    /// Handed the capability badges and the synopsis once they load, so the
+    /// header above can show them.
+    ///
+    /// This view already fetches the detail; a second call from the header
+    /// would be the same request twice on every page. Optional, because every
+    /// other caller just wants the section.
+    var onFacts: ((_ capabilities: [String], _ overview: String?) -> Void)?
+
+    /// Whether to draw the synopsis here.
+    ///
+    /// False where the page shows it higher up, under the play button, so it
+    /// is not printed twice. The section keeps it by default because every
+    /// other caller relies on it.
+    var showsOverview: Bool = true
+
     @State private var overview: String?
     @State private var cast: [APIClient.Credit] = []
     @State private var crew: [APIClient.Credit] = []
@@ -56,7 +71,7 @@ struct MediaFactsSection: View {
             //
             // The owner's own words when they wrote any — the server prefers
             // them over TMDB's — so this is not always a scraped blurb.
-            if let overview, !overview.isEmpty {
+            if showsOverview, let overview, !overview.isEmpty {
                 Text(overview)
                     .font(.subheadline)
                     .foregroundStyle(SoundChexTheme.ink200)
@@ -102,6 +117,8 @@ struct MediaFactsSection: View {
             crew = result.crew
             genres = result.genres
             detail = result.facts
+
+            onFacts?(result.facts?.capabilities ?? [], result.overview)
         }
     }
 

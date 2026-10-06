@@ -28,6 +28,13 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     /// touches, so a row built on it fills with whatever the scanner last
     /// looked at (S-451).
     let addedAt: Date?
+    /// Seconds into this item for the viewing profile, or nil.
+    ///
+    /// Nil for anything never started *or* finished: a completed episode is
+    /// not in progress, and a full bar on one says the opposite of what it
+    /// means. Only present where the server loaded the play rows, so an item
+    /// from a plain listing carries nil rather than a wrong zero.
+    let resumePosition: Int?
     /// Absolute artwork URL the server resolved, or nil. Public — no token.
     let artwork: URL?
     let meta: Meta?
@@ -36,6 +43,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     // against are already camelCase: parent_id arrives as "parentId".
     enum CodingKeys: String, CodingKey {
         case id, type, title, subtitle, playable, artwork, meta, lastPlayedAt
+        case resumePosition
         case addedAt = "added_at"
         case parentID = "parentId"
     }
@@ -59,6 +67,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         // A malformed or relative artwork string is treated as no artwork.
         artwork = (try? c.decodeIfPresent(String.self, forKey: .artwork)).flatMap { $0.flatMap(URL.init(string:)) }
         meta = try? c.decodeIfPresent(Meta.self, forKey: .meta)
+        resumePosition = (try? c.decodeIfPresent(Int.self, forKey: .resumePosition)) ?? nil
     }
 
     /// A direct initialiser, for building an item from stored/offline data
@@ -67,7 +76,8 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
     init(id: Int, type: MediaType, title: String, subtitle: String?,
          parentID: Int?, playable: Bool, artwork: URL?, meta: Meta?,
          lastPlayedAt: Date? = nil,
-         addedAt: Date? = nil) {
+         addedAt: Date? = nil,
+         resumePosition: Int? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -78,6 +88,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         self.meta = meta
         self.lastPlayedAt = lastPlayedAt
         self.addedAt = addedAt
+        self.resumePosition = resumePosition
     }
 
     /// For the on-disk library cache. Written and read by us, so a plain encode
@@ -106,6 +117,8 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
             addedAt.map { ISO8601DateFormatter().string(from: $0) },
             forKey: .addedAt,
         )
+        // Cached as well, so an offline episode list still draws its bars.
+        try c.encodeIfPresent(resumePosition, forKey: .resumePosition)
     }
 
     struct Meta: Codable, Hashable, Sendable {
@@ -126,6 +139,15 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
         let discNumber: Int?
         let seasonNumber: Int?
         let episodeNumber: Int?
+        /// The series an episode belongs to, by name.
+        ///
+        /// An episode carries its own number and title but nothing saying what
+        /// it is an episode *of*, so a Continue Watching card could read "But
+        /// at Last Came a Knock" with no way to know it was Shameless. Nil on
+        /// a series row, which is its own title.
+        let seriesTitle: String?
+        /// The synopsis. `notes` on the server, `overview` on the wire.
+        let overview: String?
         let releaseYear: Int?
         let durationMs: Int?
 
@@ -170,6 +192,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
             case artist, primaryArtist, album, albumKey, author, director
             case episodeTitle, trackNumber, discNumber
             case seasonNumber, episodeNumber, releaseYear, durationMs
+            case seriesTitle, overview
             // Film and show detail (S-412). Snake_case on the wire; the
             // decoder converts, so these match the server's keys.
             case tagline, studio, language, country, imdbRating, rtScore
@@ -184,6 +207,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
              director: String? = nil, episodeTitle: String? = nil,
              trackNumber: Int? = nil, discNumber: Int? = nil,
              seasonNumber: Int? = nil, episodeNumber: Int? = nil,
+             seriesTitle: String? = nil, overview: String? = nil,
              releaseYear: Int? = nil, durationMs: Int? = nil,
              tagline: String? = nil, studio: String? = nil, language: String? = nil,
              country: String? = nil, imdbRating: Double? = nil, rtScore: Int? = nil,
@@ -197,6 +221,7 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
             self.director = director; self.episodeTitle = episodeTitle
             self.trackNumber = trackNumber; self.discNumber = discNumber
             self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
+            self.seriesTitle = seriesTitle; self.overview = overview
             self.releaseYear = releaseYear; self.durationMs = durationMs
             self.tagline = tagline; self.studio = studio; self.language = language
             self.country = country; self.imdbRating = imdbRating; self.rtScore = rtScore
@@ -220,6 +245,8 @@ struct MediaItem: Identifiable, Codable, Hashable, Sendable {
             discNumber = try? c.decodeIfPresent(Int.self, forKey: .discNumber)
             seasonNumber = try? c.decodeIfPresent(Int.self, forKey: .seasonNumber)
             episodeNumber = try? c.decodeIfPresent(Int.self, forKey: .episodeNumber)
+            seriesTitle = try? c.decodeIfPresent(String.self, forKey: .seriesTitle)
+            overview = try? c.decodeIfPresent(String.self, forKey: .overview)
             releaseYear = try? c.decodeIfPresent(Int.self, forKey: .releaseYear)
             durationMs = try? c.decodeIfPresent(Int.self, forKey: .durationMs)
             tagline = try? c.decodeIfPresent(String.self, forKey: .tagline)

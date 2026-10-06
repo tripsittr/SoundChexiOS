@@ -207,6 +207,12 @@ struct APIClient {
         let album: String?
         let author: String?
 
+        /// What the file can do: "4K", "Dolby Vision", "5.1", "CC" (#296).
+        ///
+        /// Derived from the probe, so empty for anything not probed yet --
+        /// which is the honest answer rather than inferring "HD" from a name.
+        let capabilities: [String]?
+
         /// The file itself, which is part of "what is this" on a server the
         /// owner runs: how big it is and when it arrived.
         let fileSize: Int64?
@@ -214,6 +220,7 @@ struct APIClient {
 
         enum CodingKeys: String, CodingKey {
             case type, year, director, studio, creator, network, tagline
+            case capabilities
             case language, country, awards, metascore, artist, album, author
             case runtimeMinutes = "runtime_minutes"
             case seasonCount = "season_count"

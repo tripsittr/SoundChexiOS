@@ -21,6 +21,12 @@ struct ShowDetailView: View {
     /// The book to open in the reader.
     @State private var reading: MediaItem?
 
+    /// What the file can do, and the synopsis — handed up by
+    /// `MediaFactsSection`, which fetches the detail this page needs anyway.
+    /// Asking for it twice would be the same request on every open.
+    @State private var capabilities: [String] = []
+    @State private var overview: String?
+
     private var episodes: [MediaItem] { store.children(of: item.id) }
 
     var body: some View {
@@ -85,15 +91,27 @@ struct ShowDetailView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 16)
                     }
+
+                    synopsis
                 } else {
+                    synopsis
                     episodeList
                 }
 
                 // Facts and credits: what the item is and who made it
                 // (S-412). Below the episodes for a show, because someone
                 // opening a series wants the next episode first.
-                MediaFactsSection(item: item)
-                    .padding(.top, 8)
+                // The synopsis is drawn above, under the play button, so the
+                // section does not repeat it.
+                MediaFactsSection(
+                    item: item,
+                    onFacts: { badges, synopsis in
+                        capabilities = badges
+                        overview = synopsis
+                    },
+                    showsOverview: false,
+                )
+                .padding(.top, 8)
             }
             .padding(.bottom, 24)
         }
@@ -118,23 +136,104 @@ struct ShowDetailView: View {
         }
     }
 
+    /// The header, in the shape the streaming apps use.
+    ///
+    /// A wide backdrop running to the edges, then the title, the fact strip
+    /// and the capability badges **left-aligned** beneath it.
+    ///
+    /// It was a centred 220pt poster under an "FILM" eyebrow. Three things
+    /// were wrong with that: the poster is the image you just tapped, so
+    /// repeating it small tells you nothing new; centred text stops the eye
+    /// at every line where a page of left-aligned facts is scanned in one;
+    /// and the eyebrow spent a whole line restating what the page obviously
+    /// is. A backdrop earns the space because it is the only part of the
+    /// header that is *about the film* rather than about the layout.
     private var header: some View {
-        VStack(spacing: 8) {
-            Artwork(item: item, size: 220, aspect: 1.5)
-                .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
-            Text(eyebrow)
-                .font(.caption2.bold()).tracking(1.5)
-                .foregroundStyle(SoundChexTheme.ink500)
-            Text(item.title).font(.title3.bold()).foregroundStyle(SoundChexTheme.ink100)
-                .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: 10) {
+            backdrop
 
-            // The fact strip, in the shape the streaming apps use: year, the
-            // certificate in a box, then the length. A boxed rating reads as a
-            // classification rather than as another word in a sentence, which
-            // is the point of the box.
-            factStrip
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.title)
+                    .font(.title2.bold())
+                    .foregroundStyle(SoundChexTheme.ink100)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                factStrip
+
+                if !capabilities.isEmpty {
+                    capabilityStrip
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
         }
-        .padding(.top, 12)
+    }
+
+    /// The backdrop: full width, 16:9, fading into the page.
+    ///
+    /// The fade is what stops it reading as a pasted-in rectangle — the
+    /// streaming apps all do it, and without it the join between image and
+    /// page is a hard line across the screen.
+    private var backdrop: some View {
+        Artwork(item: item, size: 1, aspect: 0.5625, shape: .roundedSquare(0))
+            .frame(maxWidth: .infinity)
+            .aspectRatio(16 / 9, contentMode: .fill)
+            .frame(height: 210)
+            .clipped()
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    colors: [.clear, SoundChexTheme.base900],
+                    startPoint: .top,
+                    endPoint: .bottom,
+                )
+                .frame(height: 90)
+            }
+            .accessibilityHidden(true)
+    }
+
+    /// The synopsis, directly under the primary action.
+    ///
+    /// Where the streaming apps put it, and for a good reason: having decided
+    /// to press Play or not, the next question is "what is this" — not
+    /// "who directed it", which is what sat here while the description was
+    /// buried below the credits.
+    ///
+    /// Empty until the detail call returns, and nothing is reserved for it:
+    /// a blank gap that later fills is worse than content arriving.
+    @ViewBuilder
+    private var synopsis: some View {
+        if let overview, !overview.isEmpty {
+            Text(overview)
+                .font(.subheadline)
+                .foregroundStyle(SoundChexTheme.ink300)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+        }
+    }
+
+    /// What the file can do: 4K, Dolby Vision, 5.1, CC (#296).
+    ///
+    /// Beside the year and certificate because that is the same question —
+    /// "what am I about to get" — and because an owner who ripped the 4K
+    /// disc wants to see that the 4K is what is here.
+    private var capabilityStrip: some View {
+        HStack(spacing: 6) {
+            ForEach(capabilities, id: \.self) { badge in
+                Text(badge)
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .foregroundStyle(SoundChexTheme.ink300)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(SoundChexTheme.base600, lineWidth: 1),
+                    )
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Quality: " + capabilities.joined(separator: ", "))
     }
 
     private var eyebrow: String {
@@ -210,81 +309,39 @@ struct ShowDetailView: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
+    /// Episodes, in the shape the streaming apps use: a season picker, and
+    /// rows with a still, a duration and a synopsis.
+    ///
+    /// Was a number, a title and a chevron -- a file listing. See
+    /// `EpisodeList` for why each of those four parts earns its place.
     private var episodeList: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
-            ForEach(groupedBySeason, id: \.season) { group in
-                if group.season > 0 {
-                    Text("Season \(group.season)")
-                        .font(ScaledFont.system(size: 13, relativeTo: .footnote, weight: .semibold)).tracking(1).textCase(.uppercase)
-                        .foregroundStyle(SoundChexTheme.ink500)
-                        .padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 6)
-                }
-                ForEach(group.episodes) { episode in
-                    Button {
-                        playing = episode
-                    } label: {
-                        HStack(spacing: 12) {
-                            if let n = episode.meta?.episodeNumber {
-                                Text("\(n)").font(.subheadline.monospacedDigit())
-                                    .foregroundStyle(SoundChexTheme.ink500).frame(width: 28)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(episode.meta?.episodeTitle ?? episode.title)
-                                    .foregroundStyle(SoundChexTheme.ink100).scalableTitle()
-                            }
-                            Spacer()
-
-                            // Stored episodes say so on the row; downloading
-                            // is in the kebab rather than a button of its own
-                            // (S-388). The owner's call, and the right one:
-                            // an episode is gigabytes, and a download control
-                            // on every row of a 60-episode series is an
-                            // invitation to fill a phone by accident. There
-                            // is deliberately no season or series
-                            // download-all for the same reason.
-                            if downloads.isStored(episode.id) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                    .font(.footnote)
-                                    .foregroundStyle(SoundChexTheme.storedGreen)
-                            }
-
-                            Image(systemName: "play.circle").foregroundStyle(SoundChexTheme.ink400)
-                                .accessibilityHidden(true)
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 11)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    // The number, the title and — if it is on the device — a
-                    // green tick, as one sentence. The tick is the only mark
-                    // of a downloaded episode, so it has to be said.
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(episodeLabel(episode))
-                    .accessibilityAddTraits(.isButton)
-                    .contextMenu {
-                        EpisodeActions(episode: episode) { downloadTarget = $0 }
-                    }
-                    Divider().overlay(SoundChexTheme.base700).padding(.leading, 56)
-                }
-            }
-        }
+        EpisodeList(
+            episodes: episodes,
+            progress: episodeProgress,
+            onPlay: { playing = $0 },
+            onDownload: { downloadTarget = $0 },
+        )
     }
 
-    /// An episode row, spoken.
-    private func episodeLabel(_ episode: MediaItem) -> String {
-        var parts: [String] = []
+    /// How far through each episode this viewer is, 0-1.
+    ///
+    /// Only for episodes with both a position and a known length: a fraction
+    /// of an unknown duration is not a fraction, and a bar drawn from one
+    /// would be a guess presented as fact. Taken from the item the server
+    /// sent rather than from a separate call, so an episode list drawn from
+    /// the offline cache keeps its bars.
+    private var episodeProgress: [Int: Double] {
+        var out: [Int: Double] = [:]
 
-        if let number = episode.meta?.episodeNumber {
-            parts.append("Episode \(number)")
+        for episode in episodes {
+            guard let seconds = episode.resumePosition, seconds > 0,
+                  let minutes = episode.meta?.runtimeMinutes, minutes > 0
+            else { continue }
+
+            out[episode.id] = min(Double(seconds) / Double(minutes * 60), 1)
         }
 
-        parts.append(episode.meta?.episodeTitle ?? episode.title)
-
-        if downloads.isStored(episode.id) {
-            parts.append("Downloaded")
-        }
-
-        return parts.joined(separator: ", ")
+        return out
     }
 
     /// The primary action, weighted like one.
@@ -310,41 +367,6 @@ struct ShowDetailView: View {
         let groups = Dictionary(grouping: episodes) { $0.meta?.seasonNumber ?? 0 }
         return groups.keys.sorted().map { season in
             (season, groups[season]!.sorted { ($0.meta?.episodeNumber ?? 0) < ($1.meta?.episodeNumber ?? 0) })
-        }
-    }
-}
-
-/// The per-episode actions, in a long-press menu rather than a row of buttons
-/// (S-388).
-///
-/// An episode is gigabytes. Putting a download control on every row of a
-/// 60-episode series — or a "download this season" button above it — makes
-/// filling a phone a one-tap mistake, so downloading an episode is a
-/// deliberate act you have to go looking for. Video also asks how long to
-/// keep it (S-404), which is what makes that choice low-stakes.
-private struct EpisodeActions: View {
-    @Environment(DownloadStore.self) private var downloads
-
-    let episode: MediaItem
-
-    /// Asks the parent to present the picker. A context menu is dismissed
-    /// before a sheet attached to it would appear, so the sheet has to belong
-    /// to the view the menu hangs off.
-    let onDownload: (MediaItem) -> Void
-
-    var body: some View {
-        if downloads.isStored(episode.id) {
-            Button(role: .destructive) {
-                downloads.remove(episode.id)
-            } label: {
-                Label("Remove download", systemImage: "trash")
-            }
-        } else {
-            Button {
-                onDownload(episode)
-            } label: {
-                Label("Download episode", systemImage: "arrow.down.circle")
-            }
         }
     }
 }

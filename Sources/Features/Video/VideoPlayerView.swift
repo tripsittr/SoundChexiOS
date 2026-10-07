@@ -24,6 +24,16 @@ struct VideoPlayerView: View {
     var onRestore: () -> Void = {}
 
     @State private var subtitles = SubtitleModel()
+    @State private var audio = AudioTrackModel()
+
+    /// Where to resume when a track switch has to reload the stream.
+    @State private var reloadAt: Double?
+
+    /// The track the reload is for, sent to the server as `?audio=N`.
+    @State private var reloadingTrack: Int?
+
+    /// Where playback is now, so a reload resumes rather than restarts.
+    @State private var currentTime: Double = 0
 
     /// Dismisses this screen the moment Picture in Picture takes the video.
     ///
@@ -56,9 +66,17 @@ struct VideoPlayerView: View {
             item: item,
             api: session.api,
             subtitles: subtitles,
+            audio: audio,
+            startAt: reloadAt,
+            audioTrack: reloadingTrack,
+            onTime: { currentTime = $0 },
             onRestore: onRestore,
             onPictureInPictureChange: pictureInPictureChanged,
         )
+            // A rebuilt player for a new audio track. The id forces SwiftUI
+            // to make a fresh container rather than reuse the one holding the
+            // old stream, which would keep playing the old audio.
+            .id(reloadingTrack ?? -1)
             .ignoresSafeArea()
             .background(.black)
             // Video is the one screen where landscape is the point, and a
@@ -82,16 +100,39 @@ struct VideoPlayerView: View {
                         .transition(.opacity)
                 }
             }
-            // A caption picker, top-trailing, shown once tracks are known.
+            // The pickers, top-trailing, each shown once its tracks are
+            // known. Stacked rather than overlaid: a file with both subtitles
+            // and several audio tracks would otherwise put one on top of the
+            // other.
             .overlay(alignment: .topTrailing) {
-                if !subtitles.tracks.isEmpty {
-                    subtitleMenu
-                        .padding(.top, 50).padding(.trailing, 16)
+                HStack(spacing: 8) {
+                    if audio.tracks.count > 1 {
+                        audioMenu
+                    }
+
+                    if !subtitles.tracks.isEmpty {
+                        subtitleMenu
+                    }
                 }
+                .padding(.top, 50)
+                .padding(.trailing, 16)
             }
             .task {
                 subtitles.configure(api: session.api, itemID: item.id)
                 await subtitles.loadTracks()
+
+                // The server's track list, used when the asset cannot offer
+                // its own. A transcoded stream carries one audio track --
+                // whichever `-map 0:a:N` encoded -- so there is nothing for
+                // AVFoundation to select between and the choice has to be
+                // made by asking for a different stream.
+                guard let api = session.api,
+                      let facts = try? await api.details(itemID: item.id).facts,
+                      let serverTracks = facts.audioTracks,
+                      serverTracks.count > 1
+                else { return }
+
+                audio.loadFromServer(serverTracks, selected: reloadingTrack ?? 0)
             }
             .onAppear {
                 // Video takes over audio: stop the music player so the two don't
@@ -102,6 +143,66 @@ struct VideoPlayerView: View {
                 // ordinary entry into PiP from here dismisses as it should.
                 PictureInPictureSession.shared.restored()
             }
+    }
+
+    /// Switches audio track, reloading only where that is unavoidable.
+    ///
+    /// A directly played file switches in place: `AVPlayer` has every track
+    /// and swaps between them with no interruption at all.
+    ///
+    /// A transcoded stream contains one track, because that is what the
+    /// server encoded -- so switching means asking for a different stream.
+    /// The position is carried across so it resumes where it was rather than
+    /// starting the episode again.
+    private func switchAudio(to track: AudioTrackModel.Track) {
+        if audio.select(track) {
+            return
+        }
+
+        // Could not switch in place, so the stream has to be rebuilt.
+        reloadAt = currentTime
+        reloadingTrack = track.id
+    }
+
+    /// Which audio track to hear.
+    ///
+    /// Only shown where there is a choice: a file with one track does not
+    /// need a menu saying so.
+    ///
+    /// Switching is instant for a directly played file -- `AVPlayer` has all
+    /// the tracks and swaps between them itself. A transcoded stream contains
+    /// only the track the server encoded, so switching means asking for a
+    /// different stream; the menu says so rather than letting the reload look
+    /// like a stutter.
+    private var audioMenu: some View {
+        Menu {
+            ForEach(audio.tracks) { track in
+                Button {
+                    switchAudio(to: track)
+                } label: {
+                    Label(
+                        track.label,
+                        systemImage: audio.selected == track.id ? "checkmark" : "",
+                    )
+                }
+            }
+
+            if audio.switchingReloads {
+                Section {
+                    Text("Switching reloads the stream")
+                }
+            }
+        } label: {
+            Image(systemName: "waveform")
+                .font(.title3)
+                .foregroundStyle(.white)
+                .padding(10)
+                .accessibilityLabel("Audio track")
+                .accessibilityValue(
+                    audio.tracks.first { $0.id == audio.selected }?.label ?? "Default",
+                )
+                .background(.black.opacity(0.5), in: .circle)
+        }
     }
 
     private var subtitleMenu: some View {
@@ -139,6 +240,18 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     let item: MediaItem
     let api: APIClient?
     let subtitles: SubtitleModel
+    let audio: AudioTrackModel
+
+    /// Where to resume, when this player replaced one that was already
+    /// playing -- a track switch rebuilds the stream and must not restart
+    /// the episode.
+    var startAt: Double?
+
+    /// Which audio track to ask the server for, for a transcoded stream.
+    var audioTrack: Int?
+
+    /// Reports playback position, so a track switch knows where to resume.
+    var onTime: (Double) -> Void = { _ in }
 
     /// Called when PiP's restore button is tapped, so the presenting view can
     /// show the player again. Without it PiP is a one-way trip.
@@ -188,6 +301,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         controller.delegate = context.coordinator
         context.coordinator.onRestore = onRestore
         context.coordinator.onPictureInPictureChange = onPictureInPictureChange
+        context.coordinator.onTime = onTime
 
         context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
 
@@ -215,18 +329,45 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // Only `player` and `api` are captured: both are references that
         // outlive this call, unlike `context`.
         Task { @MainActor [player, api] in
-            let url = (try? await api.playback(itemID: item.id))?.url
-                // A failed decision must not mean a blank screen. Falling back
-                // to the direct stream is exactly the old behaviour: right for
-                // an MP4, wrong for an MKV, and better than nothing.
-                ?? api.streamURL(itemID: item.id)
+            var url = (try? await api.playback(itemID: item.id))?.url
 
-            guard let url else { return }
+            // The chosen audio track, for a transcoded stream. The server
+            // encodes one track, so this is how a different one is asked for
+            // -- and it is part of the session identity there, so this
+            // genuinely produces a different stream rather than replaying the
+            // one already encoded with the old audio.
+            if let audioTrack, audioTrack > 0, let base = url {
+                url = base.appending(queryItems: [
+                    URLQueryItem(name: "audio", value: String(audioTrack)),
+                ])
+            }
+
+            // A failed decision must not mean a blank screen. Falling back
+            // to the direct stream is exactly the old behaviour: right for an
+            // MP4, wrong for an MKV, and better than nothing.
+            guard let url = url ?? api.streamURL(itemID: item.id) else { return }
 
             player.replaceCurrentItem(
                 with: AVPlayerItem(asset: AVURLAsset(url: url, options: assetOptions(api: api))),
             )
+
+            // A track switch rebuilt this player, so put it back where the
+            // last one was rather than starting the episode again.
+            if let startAt, startAt > 1 {
+                await player.seek(
+                    to: CMTime(seconds: startAt, preferredTimescale: 600),
+                    toleranceBefore: .zero,
+                    toleranceAfter: .zero,
+                )
+            }
+
             player.play()
+
+            // The asset's own tracks, where it has more than one. A directly
+            // played file carries them all and switches with no reload at
+            // all, which is far better than asking the server -- so this
+            // takes precedence over the list the view fetched.
+            _ = await audio.loadFromAsset(player: player)
         }
 
         return controller
@@ -380,6 +521,9 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         private var lastReported = -1
         private var subtitles: SubtitleModel?
 
+        /// Reports the playback position upward.
+        var onTime: ((Double) -> Void)?
+
         /// Watches the item for a failure, so a playback that never starts
         /// says why.
         ///
@@ -458,6 +602,12 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
                 forInterval: CMTime(seconds: 5, preferredTimescale: 1), queue: .main
             ) { [weak self] time in
                 self?.report(seconds: time.seconds)
+
+                // Where playback is, so a track switch -- which rebuilds the
+                // player -- can resume rather than restart.
+                if time.seconds.isFinite {
+                    self?.onTime?(time.seconds)
+                }
             }
 
             // A finer observer for captions — ~4×/second so a line changes on

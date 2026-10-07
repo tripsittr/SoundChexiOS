@@ -72,6 +72,28 @@ music-themed name per minor release â see `Plans/Versioning.md`.
   System-wide PiP over other apps already worked: `UIBackgroundModes: [audio]`
   and `allowsPictureInPicturePlayback` were both set. What was missing was
   surviving the dismissal that makes it useful.
+- **An audio track menu in the player.** A rip routinely carries the original
+  language, a dub or two and a commentary; the app played whichever came first
+  and offered no way to change it.
+
+  Two paths, one menu. A **directly played** file carries every track and
+  `AVPlayer` switches between them instantly through `AVMediaSelectionGroup`.
+  A **transcoded** stream contains one track — whatever `-map 0:a:N` encoded —
+  so switching asks the server for a different stream, resuming at the same
+  position rather than restarting. The menu says when a switch will reload.
+
+  Only shown where there is a choice: a single-track file gets no menu saying
+  so.
+
+### Fixed
+- **`capabilities` and `audio_tracks` never decoded.** Both are sent at the
+  **top level** of the details response; both were declared on `ItemFacts`,
+  which decodes the nested `detail` object. So they matched nothing and came
+  back nil on every response — silently, because both are optional.
+
+  That is why the capability badges (4K, Dolby Vision, 5.1, CC) have never
+  appeared: the server has been sending them correctly all along. Verified by
+  decoding the real response shape both ways.
 
 
 ### Fixed

@@ -38,6 +38,7 @@ enum AppRelease {
         "0.27": "Reverie",
         "0.28": "Cascade",
         "0.29": "Clarity",
+        "0.31": "Timbre",
         "0.30": "Prelude",
         "1.0": "Encore",
     ]

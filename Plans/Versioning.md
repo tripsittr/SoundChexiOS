@@ -40,6 +40,7 @@ resolves. Pick the next unused one at each minor bump.
 | 0.16.0 | **Tether** | Offline playback fixes, search kebab, now-playing indicators, resuming downloads. |
 | 0.17.0 | **Bridge** | Playlist duplicate warning, the sheet pinned to the song it was opened for, remove-from-playlist in the kebab, scrolling titles. |
 | 0.28.0 | **Cascade** | Downloads visible in the Files app, laid out as the desktop library. |
+| 0.31.0 | **Timbre** | Audio track selection, a rebuilt Picture in Picture, instant seeking, and the first iOS tests. |
 | 0.30.0 | **Prelude** | iPad: the app rotates, and grids, rails and player artwork size themselves to the screen. |
 | 0.29.0 | **Clarity** | The VoiceOver pass: every control named, rows spoken as sentences, state said rather than shown. |
 | 0.18.0 | Refrain | _(next)_ |
@@ -92,6 +93,8 @@ Development, Recapitulation, Exposition, Interval.
 Sforzando, Accent, Swell, Sustain, Legato, Staccato, Marcato, Tenuto, Rubato,
 Espressivo, Dolce, Vivace, Grave, Tremolo, Vibrato, Glissando, Portamento,
 Fermata, Attack, Release, Decay, Resonance.
+
+*(Taken since: Timbre — 0.31.0.)*
 
 **Tempo** — Largo, Adagio, Andante, Moderato, Allegro, Allegretto, Presto,
 Prestissimo, Accelerando, Ritardando, Lento, Grazioso, Con Brio, Agitato.

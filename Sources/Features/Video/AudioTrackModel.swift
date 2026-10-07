@@ -44,6 +44,16 @@ final class AudioTrackModel {
 
     private var player: AVPlayer?
 
+    /// The asset's audio selection group, kept from the load.
+    ///
+    /// Held rather than fetched at selection time: the synchronous
+    /// `mediaSelectionGroup(forMediaCharacteristic:)` is deprecated, and its
+    /// replacement is async -- which `select` cannot be, because it answers
+    /// "did this switch happen in place" and the caller needs that now.
+    /// Loading it once, asynchronously, and keeping it is the honest way to
+    /// have both.
+    private var group: AVMediaSelectionGroup?
+
     /// Reads the tracks the **asset** carries, for a directly played file.
     ///
     /// Returns false when the asset has no audio selection group — a
@@ -57,6 +67,8 @@ final class AudioTrackModel {
         guard let group = try? await asset.loadMediaSelectionGroup(for: .audible),
               group.options.count > 1
         else { return false }
+
+        self.group = group
 
         tracks = group.options.enumerated().map { index, option in
             Track(id: index, label: Self.label(for: option), option: option)
@@ -99,7 +111,7 @@ final class AudioTrackModel {
 
         guard let option = track.option,
               let item = player?.currentItem,
-              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .audible)
+              let group
         else { return false }
 
         item.select(option, in: group)

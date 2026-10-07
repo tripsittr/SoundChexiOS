@@ -3,7 +3,11 @@
 All notable changes to the SoundChex iOS app. Versions use SemVer with a
 music-themed name per minor release â see `Plans/Versioning.md`.
 
-## Unreleased
+## 0.31.0 "Timbre" — 2026-10-06
+
+The release about what you hear: choosing an audio track, and the playback
+bugs that were stopping anything being heard at all.
+
 
 ### Added
 - **An iOS test target, and decode tests over a real payload.** Three bugs of

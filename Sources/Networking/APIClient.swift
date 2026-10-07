@@ -215,7 +215,10 @@ struct APIClient {
         ///
         /// Derived from the probe, so empty for anything not probed yet --
         /// which is the honest answer rather than inferring "HD" from a name.
-        let capabilities: [String]?
+        var capabilities: [String]?
+
+        /// Every audio track the file carries, for the player's menu.
+        var audioTracks: [AudioTrack]?
 
         /// The file itself, which is part of "what is this" on a server the
         /// owner runs: how big it is and when it arrived.
@@ -238,11 +241,48 @@ struct APIClient {
         // the mapping is visible and cannot drift again.
         enum CodingKeys: String, CodingKey {
             case type, year, director, studio, creator, network, tagline
-            case capabilities
+            case capabilities, audioTracks
             case language, country, awards, metascore, artist, album, author
             case runtimeMinutes, seasonCount, episodeCount, contentRating
             case imdbRating, rtScore, imdbVotes
             case fileSize, addedAt
+        }
+
+        /// Returns a copy carrying the two keys the server sends at the **top
+        /// level** rather than inside `detail`.
+        func with(capabilities: [String]?, audioTracks: [AudioTrack]?) -> ItemFacts {
+            var copy = self
+
+            if let capabilities { copy.capabilities = capabilities }
+            if let audioTracks { copy.audioTracks = audioTracks }
+
+            return copy
+        }
+    }
+
+    /// One audio track a file carries.
+    ///
+    /// A rip routinely has the original language, a dub or two and a
+    /// commentary. The probe has always recorded them; until now none of it
+    /// reached a client, so every player took whichever came first.
+    struct AudioTrack: Decodable, Identifiable, Sendable {
+        /// What `?audio=N` keys on, and what `-map 0:a:N` encodes.
+        let index: Int
+        /// "English 5.1", "Japanese Stereo", "Track 2".
+        let label: String
+        let language: String?
+        let channels: Int?
+        let codec: String?
+        /// Whether the file marks this as the one to play by default.
+        let isDefault: Bool
+
+        var id: Int { index }
+
+        enum CodingKeys: String, CodingKey {
+            case index, label, language, channels, codec
+            // `default` is a Swift keyword, and the decoder's snake-case
+            // conversion leaves a single word untouched.
+            case isDefault = "default"
         }
     }
 
@@ -266,12 +306,29 @@ struct APIClient {
             // renders what it has rather than failing to decode at all.
             let genres: [String]?
             let detail: ItemFacts?
+
+            // **Top-level on the wire**, not inside `detail`.
+            //
+            // They were declared on `ItemFacts`, which decodes the `detail`
+            // object -- so they matched nothing and came back nil on every
+            // response. Silently, because both are optional: the capability
+            // badges simply never appeared and it read as missing probe data.
+            let capabilities: [String]?
+            let audioTracks: [AudioTrack]?
         }
 
         let response: Response = try await send("/api/v1/items/\(itemID)/details", method: "GET")
 
+        // Folded into the facts the caller already reads, so the two keys
+        // living at the top level is this function's problem rather than
+        // every screen's.
+        let facts = response.detail?.with(
+            capabilities: response.capabilities,
+            audioTracks: response.audioTracks,
+        )
+
         return (response.overview, response.cast, response.crew, response.tags,
-                response.genres ?? [], response.detail)
+                response.genres ?? [], facts)
     }
 
     /// What you started and did not finish (S-414).

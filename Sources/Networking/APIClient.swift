@@ -260,6 +260,34 @@ struct APIClient {
         }
     }
 
+    /// The `/items/{id}/details` response.
+    ///
+    /// A named type rather than one local to the request, so a test can
+    /// decode a captured payload through exactly the shape the app uses --
+    /// three decode bugs have shipped from here, each invisible because the
+    /// fields are optional.
+    struct DetailsResponse: Decodable {
+        let overview: String?
+        let cast: [Credit]
+        let crew: [Credit]
+        let tags: [String]
+
+        // Both added after the first clients shipped, so both are
+        // optional: an older server answers without them and the screen
+        // renders what it has rather than failing to decode at all.
+        let genres: [String]?
+        let detail: ItemFacts?
+
+        // **Top-level on the wire**, not inside `detail`.
+        //
+        // They were declared on `ItemFacts`, which decodes the `detail`
+        // object -- so they matched nothing and came back nil on every
+        // response. Silently, because both are optional: the capability
+        // badges simply never appeared and it read as missing probe data.
+        let capabilities: [String]?
+        let audioTracks: [AudioTrack]?
+    }
+
     /// One audio track a file carries.
     ///
     /// A rip routinely has the original language, a dub or two and a
@@ -295,29 +323,8 @@ struct APIClient {
         -> (overview: String?, cast: [Credit], crew: [Credit], tags: [String],
             genres: [String], facts: ItemFacts?)
     {
-        struct Response: Decodable {
-            let overview: String?
-            let cast: [Credit]
-            let crew: [Credit]
-            let tags: [String]
 
-            // Both added after the first clients shipped, so both are
-            // optional: an older server answers without them and the screen
-            // renders what it has rather than failing to decode at all.
-            let genres: [String]?
-            let detail: ItemFacts?
-
-            // **Top-level on the wire**, not inside `detail`.
-            //
-            // They were declared on `ItemFacts`, which decodes the `detail`
-            // object -- so they matched nothing and came back nil on every
-            // response. Silently, because both are optional: the capability
-            // badges simply never appeared and it read as missing probe data.
-            let capabilities: [String]?
-            let audioTracks: [AudioTrack]?
-        }
-
-        let response: Response = try await send("/api/v1/items/\(itemID)/details", method: "GET")
+        let response: DetailsResponse = try await send("/api/v1/items/\(itemID)/details", method: "GET")
 
         // Folded into the facts the caller already reads, so the two keys
         // living at the top level is this function's problem rather than

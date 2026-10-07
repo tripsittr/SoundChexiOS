@@ -6,6 +6,17 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 ## Unreleased
 
 ### Added
+- **An iOS test target, and decode tests over a real payload.** Three bugs of
+  one kind have shipped from the details response, each invisible for weeks
+  because every decoded field is optional: a `CodingKeys` spelling that
+  matches nothing returns nil and reads as missing data rather than a fault.
+
+  The suite decodes the server's actual response shape through the same type
+  the app uses. Reintroducing #91's snake_case key fails it in **0.1 seconds**
+  — that bug took a device session and a symbolicated report to find.
+
+
+### Added
 - **"Mark for review" on films, shows and episodes.** The reason picker has
   existed since S-414 — five reasons and an optional note — but it was only
   reachable from **music**: an album or artist track row, and a list view that

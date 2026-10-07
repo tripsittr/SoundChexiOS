@@ -15,6 +15,13 @@ struct ShowDetailView: View {
     /// The episode whose retention is being chosen (S-404). Held here because
     /// the context menu that starts the flow cannot present a sheet itself.
     @State private var downloadTarget: MediaItem?
+
+    /// The item being reported, which presents the reason picker.
+    ///
+    /// Held here rather than in the row, because a context menu is dismissed
+    /// before a sheet attached to it could appear -- the same reason the
+    /// download picker lives at this level.
+    @State private var reviewTarget: MediaItem?
     let item: MediaItem
 
     /// The item to play in the video player, when one is tapped.
@@ -99,6 +106,22 @@ struct ShowDetailView: View {
                 // opening a series wants the next episode first.
                 // The synopsis is drawn above, under the play button, so the
                 // section does not repeat it.
+                // Reporting the item itself -- a film has no episode rows to
+                // hang a menu off, and a series row is reportable in its own
+                // right (a wrong poster or a mis-identified show belongs to
+                // the series, not to one episode).
+                Button {
+                    reviewTarget = item
+                } label: {
+                    Label("Mark for review", systemImage: "flag")
+                        .font(.subheadline)
+                        .foregroundStyle(SoundChexTheme.ink400)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
                 MediaFactsSection(
                     item: item,
                     onFacts: { badges, synopsis in
@@ -137,6 +160,9 @@ struct ShowDetailView: View {
             }
             .presentationDetents([.medium])
             .soundchexTheme(theme)
+        }
+        .sheet(item: $reviewTarget) { target in
+            SendForReviewSheet(item: target).soundchexTheme(theme)
         }
         .downloadVariantPicker(for: $variantTarget) { target, variant in
             downloads.download(target, keeping: chosenRetention, variant: variant)
@@ -366,6 +392,7 @@ struct ShowDetailView: View {
             progress: episodeProgress,
             onPlay: { playing = $0 },
             onDownload: { downloadTarget = $0 },
+            onReview: { reviewTarget = $0 },
         )
     }
 

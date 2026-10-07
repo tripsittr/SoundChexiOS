@@ -21,6 +21,8 @@ struct EpisodeList: View {
     var progress: [Int: Double] = [:]
     let onPlay: (MediaItem) -> Void
     let onDownload: (MediaItem) -> Void
+    /// Asks the detail page to present the review sheet for an episode.
+    let onReview: (MediaItem) -> Void
 
     @Environment(DownloadStore.self) private var downloads
 
@@ -64,6 +66,7 @@ struct EpisodeList: View {
                         progress: progress[episode.id],
                         onPlay: { onPlay(episode) },
                         onDownload: { onDownload(episode) },
+                        onReview: { onReview(episode) },
                     )
 
                     Divider().overlay(SoundChexTheme.base700)
@@ -114,6 +117,7 @@ private struct EpisodeRow: View {
     let progress: Double?
     let onPlay: () -> Void
     let onDownload: () -> Void
+    let onReview: () -> Void
 
     @Environment(DownloadStore.self) private var downloads
 
@@ -171,8 +175,13 @@ private struct EpisodeRow: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "Play", onPlay)
         .accessibilityAction(named: "Download", onDownload)
+        .accessibilityAction(named: "Mark for review", onReview)
         .contextMenu {
-            EpisodeActions(episode: episode) { _ in onDownload() }
+            EpisodeActions(
+                episode: episode,
+                onDownload: { _ in onDownload() },
+                onReview: { _ in onReview() },
+            )
         }
     }
 
@@ -326,6 +335,11 @@ struct EpisodeActions: View {
     /// to the view the menu hangs off.
     let onDownload: (MediaItem) -> Void
 
+    /// Asks the parent to present the review sheet, for the same reason as
+    /// the download picker above: a context menu is gone before a sheet of
+    /// its own could appear.
+    let onReview: (MediaItem) -> Void
+
     var body: some View {
         if downloads.isStored(episode.id) {
             Button(role: .destructive) {
@@ -339,6 +353,16 @@ struct EpisodeActions: View {
             } label: {
                 Label("Download episode", systemImage: "arrow.down.circle")
             }
+        }
+
+        // Reporting a bad episode -- wrong metadata, wrong cover, a file that
+        // will not play. The server flags it `needs_review` with the reason
+        // and clears `reviewed_at`, so it re-enters the review queue rather
+        // than being silently noted.
+        Button {
+            onReview(episode)
+        } label: {
+            Label("Mark for review", systemImage: "flag")
         }
     }
 }

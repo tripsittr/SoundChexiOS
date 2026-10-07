@@ -17,10 +17,48 @@ struct VideoPlayerView: View {
     @Environment(\.dismiss) private var dismiss
     let item: MediaItem
 
+    /// Shows this player again after Picture in Picture is restored.
+    ///
+    /// The presenting view owns the `fullScreenCover`, so only it can bring
+    /// the screen back -- the player cannot re-present itself.
+    var onRestore: () -> Void = {}
+
     @State private var subtitles = SubtitleModel()
 
+    /// Dismisses this screen the moment Picture in Picture takes the video.
+    ///
+    /// AVKit otherwise leaves a bare "this video is playing in Picture in
+    /// Picture" placeholder behind -- no transport, no close button, and the
+    /// app unreachable underneath it. That placeholder should never be on
+    /// screen: either the window floats over the app, with the app usable,
+    /// or it floats outside the app. There is no third state worth showing.
+    private func pictureInPictureChanged(_ active: Bool) {
+        guard active else { return }
+
+        // Not while the system is handing the video *back*.
+        //
+        // Restoring re-presents this screen, and AVKit reports PiP as active
+        // again briefly during that handover -- so dismissing unconditionally
+        // closed the screen the instant it reappeared. The video paused, the
+        // audio did not return, and asking for full screen took the window
+        // away entirely.
+        // Asked of the session rather than a flag passed into this screen:
+        // the screen that requested the restore is gone by the time this
+        // matters, so a passed flag is one nobody is holding -- and the value
+        // SwiftUI captured when it built this cover may predate the request.
+        guard !PictureInPictureSession.shared.isRestoring else { return }
+
+        dismiss()
+    }
+
     var body: some View {
-        VideoPlayerContainer(item: item, api: session.api, subtitles: subtitles)
+        VideoPlayerContainer(
+            item: item,
+            api: session.api,
+            subtitles: subtitles,
+            onRestore: onRestore,
+            onPictureInPictureChange: pictureInPictureChanged,
+        )
             .ignoresSafeArea()
             .background(.black)
             // Video is the one screen where landscape is the point, and a
@@ -59,6 +97,10 @@ struct VideoPlayerView: View {
                 // Video takes over audio: stop the music player so the two don't
                 // both hold the audio session.
                 if playback.isPlaying { playback.togglePlayPause() }
+
+                // The handover is over once this screen is on, so an
+                // ordinary entry into PiP from here dismisses as it should.
+                PictureInPictureSession.shared.restored()
             }
     }
 
@@ -98,6 +140,14 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     let api: APIClient?
     let subtitles: SubtitleModel
 
+    /// Called when PiP's restore button is tapped, so the presenting view can
+    /// show the player again. Without it PiP is a one-way trip.
+    let onRestore: () -> Void
+
+    /// Reports whether a floating window currently holds the video, so the
+    /// screen can offer its own way out while AVKit's chrome is gone.
+    let onPictureInPictureChange: (Bool) -> Void
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.allowsPictureInPicturePlayback = true
@@ -107,6 +157,13 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         guard let api else { return controller }
 
         // Video should keep playing (or PiP) in the background, like audio.
+        //
+        // Set on **every** build of the player, not once per app launch, and
+        // deliberately so: a player restored out of Picture in Picture is a
+        // fresh controller, and the session may have been deactivated while
+        // the window was up. Without re-activating here the picture came
+        // back and the sound did not -- which is exactly what was reported
+        // after a PiP round trip.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
 
@@ -126,6 +183,12 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         // The coordinator is attached now, while `context` is still live. It
         // observes the player rather than the item, so it does not care that
         // nothing is loaded yet.
+        // The coordinator answers the PiP callbacks, so dismantling can tell
+        // a dismissed player from one that is still floating.
+        controller.delegate = context.coordinator
+        context.coordinator.onRestore = onRestore
+        context.coordinator.onPictureInPictureChange = onPictureInPictureChange
+
         context.coordinator.attach(player: player, item: item, api: api, subtitles: subtitles)
 
         // A downloaded copy needs no decision: it is on the device precisely
@@ -181,12 +244,134 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
+        // Leave a Picture in Picture window alone.
+        //
+        // This paused unconditionally, so dismissing the player killed PiP
+        // the instant the view went away -- which is the opposite of what PiP
+        // is for. YouTube's behaviour, and the one people expect, is that
+        // leaving the page is exactly when the floating window takes over.
+        //
+        // This is now also what makes the auto-dismiss safe: the screen
+        // closes itself the moment PiP starts, so this runs on *every* entry
+        // into Picture in Picture, and pausing here would stop the window
+        // before it had shown a frame.
+        //
+        // The flag is tracked from the start/stop delegate callbacks.
+        // `AVPlayerViewController` exposes no `isPictureInPictureActive` --
+        // I assumed one and the compiler corrected me.
+        if coordinator.isInPictureInPicture {
+            return
+        }
+
         coordinator.stop()
         controller.player?.pause()
     }
 
     /// Resumes from and reports progress to the server, off the UI.
-    final class Coordinator {
+    ///
+    /// Main-actor isolated as a whole, not method by method: AVKit calls the
+    /// delegate on the main thread, and the restore callback has to touch
+    /// `PictureInPictureSession` **synchronously** -- the screen decides
+    /// whether to dismiss itself in the very next callback, so a flag set
+    /// after an `await` arrives too late and the placeholder comes back.
+    ///
+    /// Partial isolation is not an option: the compiler rejects a conformance
+    /// that crosses into actor-isolated code in only some of its methods, and
+    /// `AVPlayerViewControllerDelegate` is not itself isolated -- hence
+    /// `@preconcurrency`, which is the sanctioned way to say "this framework
+    /// calls me on the main thread" for a protocol predating concurrency.
+    @MainActor
+    final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
+        /// Whether the video is still on screen as a floating window.
+        ///
+        /// Asked by `dismantleUIViewController`, which otherwise pauses
+        /// unconditionally and so killed Picture in Picture the moment the
+        /// player screen was dismissed -- the opposite of what PiP is for.
+        private(set) var isInPictureInPicture = false
+
+        /// Asks the presenting view to show the player again.
+        ///
+        /// Set by the container, because only the view that presented the
+        /// cover can present it a second time.
+        var onRestore: (() -> Void)?
+
+        /// Tells the screen when PiP takes the video and gives it back.
+        var onPictureInPictureChange: ((Bool) -> Void)?
+
+        /// Whether the PiP window is closing because the user asked for the
+        /// player back, rather than because they dismissed it.
+        private var isRestoring = false
+
+        func playerViewControllerDidStartPictureInPicture(_ controller: AVPlayerViewController) {
+            isInPictureInPicture = true
+            onPictureInPictureChange?(true)
+
+            // Registered so the rest of the app can find this window --
+            // starting another video has to take it down rather than leave
+            // two things playing at once.
+            PictureInPictureSession.shared.began(controller: controller)
+        }
+
+        /// Puts the player screen back when PiP's restore button is tapped.
+        ///
+        /// **This was missing, and its absence is why PiP was a dead end
+        /// inside the app.** Without it the system has nowhere to return to:
+        /// the player view shows "this video is playing in Picture in
+        /// Picture" and the restore button does nothing, so there is no way
+        /// back and no way to close.
+        ///
+        /// The completion handler must be called either way. Reporting
+        /// `false` leaves the system believing the restore failed, which is
+        /// what leaves the placeholder on screen for ever.
+        func playerViewController(
+            _ controller: AVPlayerViewController,
+            restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completion: @escaping (Bool) -> Void,
+        ) {
+            guard let onRestore else {
+                // Nothing to restore to -- say so rather than claiming
+                // success, so the system dismisses PiP cleanly.
+                completion(false)
+
+                return
+            }
+
+            // Remembered because `DidStopPictureInPicture` fires after a
+            // restore as well as after a close, and it pauses. Without this
+            // flag the restored video would come back already paused.
+            isRestoring = true
+            PictureInPictureSession.shared.restoring()
+
+            onRestore()
+
+            // The cover is driven by SwiftUI state, so the presentation
+            // happens on the next runloop pass rather than synchronously.
+            // Reporting success immediately is correct: the restore *will*
+            // happen, and the alternative is the system tearing PiP down
+            // before the screen is back.
+            completion(true)
+        }
+
+        func playerViewControllerDidStopPictureInPicture(_ controller: AVPlayerViewController) {
+            isInPictureInPicture = false
+            onPictureInPictureChange?(false)
+
+            PictureInPictureSession.shared.ended()
+
+            // This fires for both endings: the restore button, and closing
+            // the window. Only the second is the end of the viewing.
+            if isRestoring {
+                isRestoring = false
+
+                return
+            }
+
+            // Closing the floating window is the end of the viewing, and the
+            // view it belonged to is already gone -- so the observers have to
+            // be released here or they outlive the player.
+            stop()
+            controller.player?.pause()
+        }
+
         private var player: AVPlayer?
         private var timeObserver: Any?
         private var subtitleObserver: Any?
@@ -206,6 +391,29 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
         /// login page that AVPlayer dutifully decoded as video.
         private var statusObserver: NSKeyValueObservation?
         private var failureObserver: NSObjectProtocol?
+
+        /// Watches for the audio session being interrupted and handed back.
+        ///
+        /// The audio player has had this for a long time; video never did, so
+        /// a pause in Picture in Picture could leave the session inactive and
+        /// the resume was silent -- the picture moved, the sound did not.
+        private var interruptionObserver: NSObjectProtocol?
+
+        /// Whether video was actually playing when an interruption began.
+        ///
+        /// Without it, something paused before the interruption starts on its
+        /// own when the interruption ends, which is worse than staying quiet.
+        ///
+        /// A main-actor box rather than a property on this class: the
+        /// `Coordinator` is not isolated, so sending `self` into the hop is a
+        /// data race the compiler rightly rejects. Only the box crosses, and
+        /// it lives on the actor that reads it.
+        @MainActor
+        private final class ResumeFlag {
+            var wasPlaying = false
+        }
+
+        @MainActor private static let resumeFlag = ResumeFlag()
 
         func attach(player: AVPlayer, item: MediaItem, api: APIClient, subtitles: SubtitleModel) {
             self.player = player
@@ -244,6 +452,7 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             }
 
             watchForFailure(player: player, item: item)
+            watchForInterruption(player: player)
 
             timeObserver = player.addPeriodicTimeObserver(
                 forInterval: CMTime(seconds: 5, preferredTimescale: 1), queue: .main
@@ -308,6 +517,75 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             let api = api
 
             Task { try? await api?.saveProgress(itemID: id, position: s, duration: duration) }
+        }
+
+        /// Re-activates the audio session when an interruption ends.
+        ///
+        /// Pausing in Picture in Picture, a phone call, or another app taking
+        /// the session can all leave it inactive. `AVPlayer` happily resumes
+        /// the *picture* without it, so the symptom is a video playing with
+        /// no sound rather than an error -- and it is intermittent, because
+        /// it depends on whether the system took the session away during the
+        /// pause.
+        ///
+        /// This is the same handling `PlaybackController` has had all along
+        /// for audio. Video simply never got it.
+        private func watchForInterruption(player: AVPlayer) {
+            let session = AVAudioSession.sharedInstance()
+
+            interruptionObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: session,
+                queue: .main,
+            ) { [weak player] note in
+                // Only these cross the hop. A `Notification` is not Sendable
+                // and neither is the (non-isolated) coordinator, so sending
+                // `self` here is a data race the compiler rightly rejects --
+                // the two UInts and a weak player reference are enough.
+                let typeRaw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let optionsRaw = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+
+                Task { @MainActor in
+                    Coordinator.handleInterruption(
+                        typeRaw: typeRaw,
+                        optionsRaw: optionsRaw,
+                        player: player,
+                    )
+                }
+            }
+        }
+
+        @MainActor
+        private static func handleInterruption(typeRaw: UInt?, optionsRaw: UInt?, player: AVPlayer?) {
+            guard let typeRaw,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeRaw),
+                  let player
+            else { return }
+
+            switch type {
+            case .began:
+                resumeFlag.wasPlaying = player.timeControlStatus == .playing
+
+            case .ended:
+                // Only resume what was actually playing, and only when the
+                // system says we should -- somebody who switched away
+                // deliberately does not want this starting up behind them.
+                guard resumeFlag.wasPlaying else { return }
+
+                resumeFlag.wasPlaying = false
+
+                guard let optionsRaw,
+                      AVAudioSession.InterruptionOptions(rawValue: optionsRaw).contains(.shouldResume)
+                else { return }
+
+                // The session first: resuming the player without it gives a
+                // moving picture and silence, which is the reported bug.
+                try? AVAudioSession.sharedInstance().setActive(true)
+                player.play()
+
+            @unknown default:
+                break
+            }
         }
 
         /// Reports a playback that fails, instead of showing a black screen.
@@ -423,6 +701,12 @@ private struct VideoPlayerContainer: UIViewControllerRepresentable {
             }
 
             failureObserver = nil
+
+            if let interruptionObserver {
+                NotificationCenter.default.removeObserver(interruptionObserver)
+            }
+
+            interruptionObserver = nil
         }
     }
 }

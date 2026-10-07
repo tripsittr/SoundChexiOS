@@ -26,6 +26,16 @@ struct ShowDetailView: View {
 
     /// The item to play in the video player, when one is tapped.
     @State private var playing: MediaItem?
+
+    /// An item Picture in Picture has asked to put back on screen.
+    ///
+    /// Separate from `playing` because the request arrives *after* the player
+    /// screen has dismissed itself, so it cannot be made from inside that
+    /// screen's own closure.
+    @State private var restoringItem: MediaItem?
+
+    /// Whether the player about to be shown is coming back from PiP.
+    @State private var wasRestored = false
     /// The book to open in the reader.
     @State private var reading: MediaItem?
 
@@ -141,7 +151,25 @@ struct ShowDetailView: View {
         .nowPlayingInset()
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $playing) { toPlay in
-            VideoPlayerView(item: toPlay).soundchexTheme(theme)
+            // The restore request is handled *outside* this closure, through
+            // `restoringItem` below.
+            //
+            // It cannot be handled here: the screen now dismisses itself when
+            // PiP starts, so by the time the restore button is tapped this
+            // content is gone and `playing` is already nil. Setting it nil
+            // again and re-presenting from inside the view being torn down
+            // raced the teardown -- the video paused, the audio did not come
+            // back, and asking for full screen made the window disappear.
+            VideoPlayerView(item: toPlay) { restoringItem = toPlay }
+            .soundchexTheme(theme)
+        }
+        // Re-presents the player after PiP hands it back. A separate piece of
+        // state so the request outlives the screen that made it.
+        .onChange(of: restoringItem) { _, item in
+            guard let item else { return }
+
+            restoringItem = nil
+            playing = item
         }
         .sheet(item: $downloadTarget) { episode in
             RetentionPicker(title: episode.meta?.episodeTitle ?? episode.title) { retention in
@@ -390,7 +418,11 @@ struct ShowDetailView: View {
         EpisodeList(
             episodes: episodes,
             progress: episodeProgress,
-            onPlay: { playing = $0 },
+            onPlay: { episode in
+                // A floating window and a new video must not play at once.
+                PictureInPictureSession.shared.stopForNewPlayback()
+                playing = episode
+            },
             onDownload: { downloadTarget = $0 },
             onReview: { reviewTarget = $0 },
         )
@@ -424,6 +456,7 @@ struct ShowDetailView: View {
     /// does not. It is the one thing somebody came to the page to press.
     private func playButton(for item: MediaItem, label: String) -> some View {
         Button {
+            PictureInPictureSession.shared.stopForNewPlayback()
             playing = item
         } label: {
             Label(label, systemImage: "play.fill")

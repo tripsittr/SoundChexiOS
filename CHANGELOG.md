@@ -23,6 +23,58 @@ music-themed name per minor release â see `Plans/Versioning.md`.
 
 
 ### Fixed
+- **Pausing in Picture in Picture sometimes resumed silently.** The audio
+  session was activated once when the player was built and never again, and
+  nothing watched for interruptions — so a pause that let the system take the
+  session back resumed the *picture* with no sound. Intermittent, because it
+  depended on whether the session was actually taken.
+
+  `PlaybackController` has handled this for audio all along; video never got
+  it. Same shape: remember whether something was genuinely playing, and on
+  `.ended` with `.shouldResume`, reactivate the session **before** resuming
+  the player.
+
+### Added
+- **The "playing in Picture in Picture" placeholder is gone.** It should never
+  have been a state at all: either the window floats over the app with the app
+  usable, or it floats outside the app. There is no third thing worth showing.
+
+  The player screen now dismisses itself the moment PiP takes the video, so
+  what is behind it — the episode list, the rest of the app — is immediately
+  there and usable. Before, the placeholder sat on top with no transport, no
+  close button and nothing reachable underneath; the only exits were PiP's own
+  restore and close buttons.
+
+  Starting another video while a window floats now takes the window down
+  first, rather than leaving two things playing and fighting for the audio
+  session.
+
+- **Picture in Picture can be returned from.** Tapping the restore button did
+  nothing: the player screen showed *"this video is playing in Picture in
+  Picture"* with no way back to it and no way to close, because
+  `restoreUserInterfaceForPictureInPictureStopWithCompletionHandler` was never
+  implemented. The system had nowhere to return to.
+
+  The presenting view now re-presents its cover when the callback fires. It
+  also has to distinguish the two ways PiP ends — `DidStopPictureInPicture`
+  runs after a *restore* as well as a *close*, and it pauses, so without that
+  distinction the restored video came back already paused.
+
+- **Picture in Picture survives leaving the player.** `dismantleUIViewController`
+  paused unconditionally, so dismissing the player screen killed the floating
+  window the instant the view went away — the opposite of what PiP is for.
+
+  The coordinator is now the `AVPlayerViewControllerDelegate` and tracks
+  whether PiP is running, so dismantling can tell a dismissed player from one
+  still on screen. Closing the floating window itself still tears everything
+  down.
+
+  System-wide PiP over other apps already worked: `UIBackgroundModes: [audio]`
+  and `allowsPictureInPicturePlayback` were both set. What was missing was
+  surviving the dismissal that makes it useful.
+
+
+### Fixed
 - **The app crashed on opening any episode that transcodes.** `Int(NaN)` traps
   in Swift, and `player.currentItem.duration.seconds` is **NaN** for an HLS
   stream until enough of the playlist has loaded to know a duration —
